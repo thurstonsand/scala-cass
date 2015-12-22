@@ -1,0 +1,102 @@
+package com.weather.fastcass
+
+import com.datastax.driver.core.Session
+import com.datastax.driver.core.exceptions.InvalidTypeException
+import org.joda.time.DateTime
+import org.scalatest.{FlatSpec, OptionValues, Matchers}
+import scala.collection.JavaConverters._
+import scala.reflect.runtime.universe._
+
+import CassandraHelper.RichRow
+import util.EmbedCassandra
+
+
+class CassandraHelperUnitTests extends FlatSpec with Matchers with EmbedCassandra with OptionValues {
+  var session: Session = null
+  private val db = "TestDB"
+  private val defaultTable = "testTable"
+
+  override def beforeAll(): Unit = {
+    super.beforeAll()
+    session = client.session
+  }
+
+  before {
+    session.execute(s"CREATE KEYSPACE $db WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1};")
+    session.execute(s"""CREATE TABLE $db.$defaultTable (str varchar, str2 ascii, b blob, d decimal, f float, net inet,
+         |tid timeuuid, vi varint, i int, bi bigint, bool boolean, dub double, l list<varchar>, m map<varchar, bigint>,
+         |s set<double>, ts timestamp, id uuid, sblob set<blob>, PRIMARY KEY ((str)))""".stripMargin)
+  }
+
+  private def insert(pairs: Seq[(String, AnyRef)]) = {
+    val (strs, objs) = pairs.foldLeft(Seq.empty[String], Seq.empty[AnyRef]) { case ((accStr, acc), (nStr, n)) =>
+      (nStr +: accStr, n +: acc)
+    }
+    session.execute(s"INSERT INTO $db.$defaultTable ${strs.mkString("(", ",", ")")} VALUES ${objs.map(_ => "?").mkString("(", ",", ")")}", objs: _*)
+  }
+  private def getOne = session.execute(s"SELECT * FROM $db.$defaultTable").one()
+
+  def testType[GoodType: TypeTag, BadType: TypeTag](k: String, v: GoodType, convert: (GoodType) => AnyRef) = {
+    val args = {
+      val converted = convert(v)
+      if(k == "str") Seq((k, converted)) else Seq((k, converted), ("str", "asdf"))
+    }
+    insert(args)
+    val res = getOne
+    typeOf[GoodType] match {
+      case t if t <:< typeOf[Iterable[Array[Byte]]] =>
+        val known = v.asInstanceOf[Iterable[Array[Byte]]].head
+        res.as[GoodType](k).asInstanceOf[Iterable[Array[Byte]]].head should contain theSameElementsInOrderAs known
+        res.getAs[GoodType](k).map(_.asInstanceOf[Iterable[Array[Byte]]].head).value should contain theSameElementsInOrderAs known
+      case _ => res.as[GoodType](k) shouldBe v
+    }
+    an [IllegalArgumentException] should be thrownBy res.as[GoodType](s"not$k")
+    an [InvalidTypeException] should be thrownBy res.as[BadType](k)
+    an [IllegalArgumentException] should be thrownBy res.as[BadType](s"not$k")
+
+    res.getAs[GoodType](s"not$k") shouldBe None
+    res.getAs[BadType](k) shouldBe None
+    res.getAs[BadType](s"not$k") shouldBe None
+  }
+
+  "strings" should "be extracted correctly" in testType[String, Int]("str", "asdf", t => t)
+  "ints" should "be extracted correctly" in testType[Int, String]("i", 1234, t => Int.box(t))
+  "bigints" should "be extracted correctly" in testType[Long, String]("bi", 1234, t => Long.box(t))
+  "boolean" should "be extracted correctly" in testType[Boolean, Int]("bool", true, t => Boolean.box(t))
+  "double" should "be extracted correctly" in testType[Double, String]("dub", 123.4, t => Double.box(t))
+  "list" should "be extracted correctly (wrong basic)" in testType[List[String], String]("l", List("as", "df"), t => t.asJava)
+  "list" should "be extracted correctly (wrong type param)" in testType[List[String], List[Int]]("l", List("as", "df"), t => t.asJava)
+  "map" should "be extracted correctly (wrong basic)" in testType[Map[String, Long], String]("m", Map("asdf" -> 10L), t => t.mapValues(Long.box).asJava)
+  "map" should "be extracted correctly (wrong 1st type param)" in testType[Map[String, Long], Map[Long, Long]]("m", Map("asdf" -> 10L), t => t.mapValues(Long.box).asJava)
+  "map" should "be extracted correctly (wrong 2nd type param)" in testType[Map[String, Long], Map[String, Int]]("m", Map("asdf" -> 10L), t => t.mapValues(Long.box).asJava)
+  "set" should "be extracted correctly (wrong basic)" in testType[Set[Double], String]("s", Set(123.4), t => t.map(Double.box).asJava)
+  "set" should "be extracted correctly (wrong type param)" in testType[Set[Double], Set[String]]("s", Set(123.4), t => t.map(Double.box).asJava)
+  "timestamp" should "be extracted correctly" in testType[DateTime, String]("ts", DateTime.now, t => t.toDate)
+  "uuid" should "be extracted correctly" in testType[java.util.UUID, String]("id", java.util.UUID.randomUUID, t => t)
+  "ascii" should "be extracted correctly" in testType[String, Int]("str2", "asdf", t => t)
+  "blob" should "be extracted correctly (wrong basic)" in testType[Array[Byte], String]("b", "asdf".getBytes, t => java.nio.ByteBuffer.wrap(t))
+  "blob" should "be extracted correctly (wrong type param)" in testType[Array[Byte], Array[Char]]("b", "asdf".getBytes, t => java.nio.ByteBuffer.wrap(t))
+  "inet" should "be extracted correctly" in testType[java.net.InetAddress, String]("net", java.net.InetAddress.getByName("localhost"), t => t)
+  "decimal" should "be extracted correctly" in testType[BigDecimal, Double]("d", BigDecimal(3.0), t => t.underlying)
+  "varint" should "be extracted correctly" in testType[BigDecimal, Double]("d", BigDecimal(3.0), t => t.underlying)
+  "float" should "be extracted correctly" in testType[Float, Double]("f", 123.4f, t => Float.box(t))
+  "set<blob>" should "be extracted correctly" in testType[Set[Array[Byte]], Set[Double]]("sblob", Set("asdf".getBytes), t => t.map(java.nio.ByteBuffer.wrap).asJava)
+  "counter" should "be extracted correctly" in {
+    val pKey = "str"
+    val k = "count"
+    val counterTable = "counterTable"
+    session.execute(s"CREATE TABLE $db.$counterTable ($pKey varchar, $k counter, PRIMARY KEY (($pKey)))")
+    session.execute(s"UPDATE $db.$counterTable SET $k = $k + ? WHERE $pKey='asdf'", Long.box(1L))
+
+    val res = session.execute(s"SELECT * FROM $db.$counterTable").one()
+    res.as[Long](k) shouldBe 1
+    an [IllegalArgumentException] should be thrownBy res.as[Long](s"not$k")
+    an [InvalidTypeException] should be thrownBy res.as[String](k)
+    an [IllegalArgumentException] should be thrownBy res.as[String](s"not$k")
+
+    res.getAs[Long](k).value shouldBe 1
+    res.getAs[Long](s"not$k") shouldBe None
+    res.getAs[String](k) shouldBe None
+    res.getAs[String](s"not$k") shouldBe None
+  }
+}
