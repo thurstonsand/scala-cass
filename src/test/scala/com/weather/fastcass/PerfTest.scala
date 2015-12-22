@@ -36,7 +36,7 @@ class PerfTest extends FlatSpec with EmbedCassandra {
     session.execute(s"INSERT INTO $db.strperf (str) VALUES (?)", java.util.UUID.randomUUID.toString.take(4))
     val row = session.execute(s"SELECT * FROM $db.strperf").one()
     val rr = RichRow(row)
-    List.fill(1000)(row.as[String]("str")) // warm something up
+    List.fill(10000)(row.as[String]("str")) // warm something up
     runTest("RichRow", row.as[String]("str"))
     runTest("RichRow no implicit", rr.as[String]("str"))
     runTest("native", row.getString("str"))
