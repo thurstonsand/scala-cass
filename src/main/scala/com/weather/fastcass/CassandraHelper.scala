@@ -15,23 +15,23 @@ object CassandraHelper {
     private def getForType[T: TypeTag](name: String): T = (typeOf[T] match {
       case t if t <:< typeOf[Map[_, _]] =>
         val List(arg1, arg2) = t.typeArgs
-        r.getMap(name, getRTClass(arg1), getRTClass(arg2)).asScala.map { case (k, v) =>
+        r.getMap(name, getCassClass(arg1), getCassClass(arg2)).asScala.map { case (k, v) =>
           convertToScala(k) -> convertToScala(v)
         }.toMap
       case t if t <:< typeOf[List[_]] =>
         val List(arg) = t.typeArgs
-        r.getList(name, getRTClass(arg)).asScala.map(convertToScala).toList
+        r.getList(name, getCassClass(arg)).asScala.map(convertToScala).toList
       case t if t <:< typeOf[Set[_]] =>
         val List(arg) = t.typeArgs
-        r.getSet(name, getRTClass(arg)).asScala.map(convertToScala).toSet
+        r.getSet(name, getCassClass(arg)).asScala.map(convertToScala).toSet
       case t =>
-        val funcArg = getRTClass(t)
+        val funcArg = getCassClass(t)
         val cassArg = r.getColumnDefinitions.getType(name).asJavaClass()
         if (funcArg != cassArg)
           throw new InvalidTypeException(s"Column $name is a $cassArg, cannot be retrieved as a $funcArg")
         else convertToScala(r.getObject(name))
     }).asInstanceOf[T]
-    private def getRTClass(t: Type): Class[_] = t match {
+    private def getCassClass(t: Type): Class[_] = t match {
       case _ if t =:= typeOf[Long]        => classOf[java.lang.Long]
       case _ if t =:= typeOf[Int]         => classOf[java.lang.Integer]
       case _ if t =:= typeOf[Float]       => classOf[java.lang.Float]
@@ -56,5 +56,6 @@ object CassandraHelper {
     def getAs[T: TypeTag](name: String): Option[T] =
       if(!r.getColumnDefinitions.contains(name)) None
       else getForTypeOpt[T](name)
+    def getOrElse[T: TypeTag](name: String, default: T): T = getAs[T](name).getOrElse(default)
   }
 }
