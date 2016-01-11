@@ -7,8 +7,8 @@ import org.scalatest.{FlatSpec, OptionValues, Matchers}
 import scala.collection.JavaConverters._
 import scala.reflect.runtime.universe._
 
-import CassandraHelper.RichRow
 import util.EmbedCassandra
+import CassandraHelper._
 
 
 class CassandraHelperUnitTests extends FlatSpec with Matchers with EmbedCassandra with OptionValues {
@@ -36,7 +36,7 @@ class CassandraHelperUnitTests extends FlatSpec with Matchers with EmbedCassandr
   }
   private def getOne = session.execute(s"SELECT * FROM $db.$defaultTable").one()
 
-  def testType[GoodType: TypeTag, BadType: TypeTag](k: String, v: GoodType, default: GoodType, convert: (GoodType) => AnyRef) = {
+  def testType[GoodType: TypeTag : RowDecoder, BadType: TypeTag : RowDecoder](k: String, v: GoodType, default: GoodType, convert: (GoodType) => AnyRef) = {
     val args = {
       val converted = convert(v)
       if(k == "str") Seq((k, converted)) else Seq((k, converted), ("str", "asdf"))
@@ -82,7 +82,7 @@ class CassandraHelperUnitTests extends FlatSpec with Matchers with EmbedCassandr
   "uuid" should "be extracted correctly" in testType[java.util.UUID, String]("id", java.util.UUID.randomUUID, java.util.UUID.randomUUID, t => t)
   "ascii" should "be extracted correctly" in testType[String, Int]("str2", "asdf", "fdsa", t => t)
   "blob" should "be extracted correctly (wrong basic)" in testType[Array[Byte], String]("b", "asdf".getBytes, "fdsa".getBytes, t => java.nio.ByteBuffer.wrap(t))
-  "blob" should "be extracted correctly (wrong type param)" in testType[Array[Byte], Array[Char]]("b", "asdf".getBytes, "fdsa".getBytes, t => java.nio.ByteBuffer.wrap(t))
+//  "blob" should "be extracted correctly (wrong type param)" in testType[Array[Byte], Array[Char]]("b", "asdf".getBytes, "fdsa".getBytes, t => java.nio.ByteBuffer.wrap(t)) // implicitly disallowed
   "inet" should "be extracted correctly" in testType[java.net.InetAddress, String]("net", java.net.InetAddress.getByName("localhost"), java.net.InetAddress.getByName("google.com"), t => t)
   "decimal" should "be extracted correctly" in testType[BigDecimal, Double]("d", BigDecimal(3.0), BigDecimal(2.0), t => t.underlying)
   "varint" should "be extracted correctly" in testType[BigDecimal, Double]("d", BigDecimal(3.0), BigDecimal(2.0), t => t.underlying)

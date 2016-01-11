@@ -1,9 +1,8 @@
 package com.weather.fastcass
 
-import com.datastax.driver.core.{Row, Session}
+import com.datastax.driver.core.Session
 import util.EmbedCassandra
 import org.scalatest.FlatSpec
-//import scala.collection.JavaConverters._
 import CassandraHelper.RichRow
 import scalaz._, Scalaz._
 
@@ -24,16 +23,14 @@ class PerfTest extends FlatSpec with EmbedCassandra {
   }
 
   def runTest[T](testName: String, fn: => T) = {
-    val (_, duration) = time {
-      List.fill(10000)(fn)
-    }
+    val (_, duration) = time(List.fill(10000)(fn))
     println(s"$testName implementation took $duration ms")
   }
 
   "string repeats" should "be slooooooow" in {
     session.execute(s"CREATE KEYSPACE $db WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1};")
     session.execute(s"CREATE TABLE $db.strperf (str varchar, PRIMARY KEY ((str)))")
-    session.execute(s"INSERT INTO $db.strperf (str) VALUES (?)", java.util.UUID.randomUUID.toString.take(4))
+    session.execute(s"INSERT INTO $db.strperf (str) VALUES (?)", java.util.UUID.randomUUID.toString)
     val row = session.execute(s"SELECT * FROM $db.strperf").one()
     val rr = RichRow(row)
     List.fill(10000)(row.as[String]("str")) // warm something up
