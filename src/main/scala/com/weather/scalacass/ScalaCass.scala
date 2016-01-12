@@ -97,7 +97,7 @@ object ScalaCass {
       val fromRowParams = fields.map { field =>
         val encodedName = field.asTerm.name
         val fieldName = encodedName.decodedName.toString
-        val fieldType = tpe.decl(encodedName).typeSignature
+        val fieldType = field.infoIn(tpe)
 
         if (fieldType <:< typeOf[Option[_]]) q"r.getAs[${fieldType.typeArgs.head}]($fieldName)" else q"r.as[$fieldType]($fieldName)"
       }
