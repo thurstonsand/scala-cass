@@ -16,8 +16,8 @@ performance is decent. Measurements taken from getting a String 10,000 times.
 
 |                     |  as  | getAs | getAs not in row | getAs wrong type |
 |:-------------------:|:----:|:-----:|:----------------:|:----------------:|
-|       RichRow       | 23us | 19ms  |       7ms        |       171ms      |
-| RichRow no implicit | 9us  | 11ms  |       6ms        |       54ms       |
-|        Native       | 2us  | 10ms  |       3ms        |       n/a        |
+|       RichRow       | 23ms | 19ms  |       7ms        |       171ms      |
+| RichRow no implicit | 9ms  | 11ms  |       6ms        |       54ms       |
+|        Native       | 2ms  | 10ms  |       3ms        |       n/a        |
 `RichRow no implicit` means that I created a RichRow instance and used it directly.  
 Caching could potentially speed up results. Will have to test further

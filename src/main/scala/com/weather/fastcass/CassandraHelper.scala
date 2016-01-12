@@ -19,7 +19,9 @@ object CassandraHelper {
       else Try(parseRow[T](name)).toOption.flatMap(Option.apply)
     def getOrElse[T: TypeTag : RowDecoder](name: String, default: T): T = getAs[T](name).getOrElse(default)
 
-    def parseRow[A](name: String)(implicit da: RowDecoder[A]) = da.decode(r, name)
+    private def parseRow[A: RowDecoder](name: String) = implicitly[RowDecoder[A]].decode(r, name)
+
+    def realize[T: CaseClassRealizer] = implicitly[CaseClassRealizer[T]].fromRow(r)
   }
 
   private def getCassClass(t: Type): Class[_] = t match {
@@ -31,7 +33,7 @@ object CassandraHelper {
     case _ if t =:= typeOf[DateTime]    => classOf[java.util.Date]
     case _ if t =:= typeOf[BigDecimal]  => classOf[java.math.BigDecimal]
     case _ if t =:= typeOf[Array[Byte]] => classOf[java.nio.ByteBuffer]
-//          case _ if t =:= typeOf[String]      => classOf[String] // optional if runtimeClass is super slow
+    case _ if t =:= typeOf[String]      => classOf[String]
     case _                              => currentMirror.runtimeClass(t)
   }
   private def convertToScala[T](o: T): Any = o match {
@@ -44,53 +46,67 @@ object CassandraHelper {
   trait RowDecoder[T] {
     def decode(r: Row, name: String): T
   }
-  implicit val stringDecoder = new RowDecoder[String] {
-    def decode(r: Row, name: String) = r.getString(name)
+
+  def rowDecoder[T](_decode: (Row, String) => T) = new RowDecoder[T] {
+    def decode(r: Row, name: String) = _decode(r, name)
   }
-  implicit val intDecoder = new RowDecoder[Int] {
-    def decode(r: Row, name: String) = r.getInt(name)
+  implicit val stringDecoder = rowDecoder[String]((r, name) => r.getString(name))
+  implicit val intDecoder = rowDecoder[Int]((r, name) => r.getInt(name))
+  implicit val LongDecoder = rowDecoder[Long]((r, name) => r.getLong(name))
+  implicit val booleanDecoder = rowDecoder[Boolean]((r, name) => r.getBool(name))
+  implicit val doubleDecoder = rowDecoder[Double]((r, name) => r.getDouble(name))
+  implicit val dateTimeDecoder = rowDecoder[DateTime]((r, name) => convertToScala(r.getDate(name)).asInstanceOf[DateTime])
+  implicit val uuidDecoder = rowDecoder[java.util.UUID]((r, name) => r.getUUID(name))
+  implicit val INetDecoder = rowDecoder[java.net.InetAddress]((r, name) => r.getInet(name))
+  implicit val bigDecimalDecoder = rowDecoder[BigDecimal]((r, name) => convertToScala(r.getDecimal(name)).asInstanceOf[BigDecimal])
+  implicit val floatDecoder = rowDecoder[Float]((r, name) => r.getFloat(name))
+  implicit val blobDecoder = rowDecoder[Array[Byte]]((r, name) => {
+    val cassType = r.getColumnDefinitions.getType(name).asJavaClass
+    if (cassType != classOf[java.nio.ByteBuffer])
+      throw new InvalidTypeException(s"Column $name is a $cassType, cannot be retrieved as a Byte[Array]")
+    else convertToScala(r.getBytes(name)).asInstanceOf[Array[Byte]]
+  })
+
+  implicit def listDecoder[A: TypeTag] = rowDecoder[List[A]]((r, name) =>
+    r.getList(name, getCassClass(typeOf[A])).asScala.map(convertToScala).toList.asInstanceOf[List[A]])
+  implicit def mapDecoder[A: TypeTag, B: TypeTag] = rowDecoder[Map[A, B]]((r, name) => {
+    r.getMap(name, getCassClass(typeOf[A]), getCassClass(typeOf[B])).asScala.map { case (k, v) => convertToScala(k) -> convertToScala(v) }.toMap.asInstanceOf[Map[A, B]]
+  })
+  implicit def setDecoder[A: TypeTag] = rowDecoder[Set[A]]((r, name) => r.getSet(name, getCassClass(typeOf[A])).asScala.map(convertToScala).toSet.asInstanceOf[Set[A]])
+
+
+
+  trait CaseClassRealizer[T] {
+    def fromRow(r: Row): T
   }
-  implicit val LongDecoder = new RowDecoder[Long] {
-    def decode(r: Row, name: String) = r.getLong(name)
-  }
-  implicit val booleanDecoder = new RowDecoder[Boolean] {
-    def decode(r: Row, name: String) = r.getBool(name)
-  }
-  implicit val doubleDecoder = new RowDecoder[Double] {
-    def decode(r: Row, name: String) = r.getDouble(name)
-  }
-  implicit val dateTimeDecoder = new RowDecoder[DateTime] {
-    def decode(r: Row, name: String) = convertToScala(r.getDate(name)).asInstanceOf[DateTime]
-  }
-  implicit val uuidDecoder = new RowDecoder[java.util.UUID] {
-    def decode(r: Row, name: String) = r.getUUID(name)
-  }
-  implicit val blobDecoder = new RowDecoder[Array[Byte]] {
-    def decode(r: Row, name: String) = {
-      val cassType = r.getColumnDefinitions.getType(name).asJavaClass
-      if (cassType != classOf[java.nio.ByteBuffer])
-        throw new InvalidTypeException(s"Column $name is a $cassType, cannot be retrieved as a Byte[Array]")
-      else convertToScala(r.getBytes(name)).asInstanceOf[Array[Byte]]
+  object CaseClassRealizer {
+    import scala.language.experimental.macros
+    import scala.reflect.macros.whitebox
+
+    implicit def realizeCaseClass[T]: CaseClassRealizer[T] = macro realizeCaseClassImpl[T]
+
+    def realizeCaseClassImpl[T: c.WeakTypeTag](c: whitebox.Context): c.Expr[CaseClassRealizer[T]] = {
+      import c.universe._
+      val tpe = weakTypeOf[T]
+      val companion = tpe.typeSymbol.companion
+
+      val fields = tpe.decls.collectFirst {
+        case m: MethodSymbol if m.isPrimaryConstructor => m
+      }.get.paramLists.head
+
+      val fromRowParams = fields.map { field =>
+        val encodedName = field.asTerm.name
+        val fieldName = encodedName.decodedName.toString
+        val fieldType = tpe.decl(encodedName).typeSignature
+
+        if (fieldType <:< typeOf[Option[_]]) q"r.getAs[${fieldType.typeArgs.head}]($fieldName)" else q"r.as[$fieldType]($fieldName)"
+      }
+
+      c.Expr[CaseClassRealizer[T]] { q"""
+        new CaseClassRealizer[$tpe] {
+          def fromRow(r: com.datastax.driver.core.Row): $tpe = $companion(..$fromRowParams)
+        }
+      """ }
     }
-  }
-  implicit val INetDecoder = new RowDecoder[java.net.InetAddress] {
-    def decode(r: Row, name: String) = r.getInet(name)
-  }
-  implicit val bigDecimalDecoder = new RowDecoder[BigDecimal] {
-    def decode(r: Row, name: String) = BigDecimal.javaBigDecimal2bigDecimal(r.getDecimal(name))
-  }
-  implicit val floatDecoder = new RowDecoder[Float] {
-    def decode(r: Row, name: String) = r.getFloat(name)
-  }
-  implicit def listDecoder[A: TypeTag] = new RowDecoder[List[A]] {
-    def decode(r: Row, name: String) = r.getList(name, getCassClass(typeOf[A])).asScala.map(convertToScala).toList.asInstanceOf[List[A]]
-  }
-  implicit def mapDecoder[A: TypeTag, B: TypeTag] = new RowDecoder[Map[A, B]] {
-    def decode(r: Row, name: String) = r.getMap(name, getCassClass(typeOf[A]), getCassClass(typeOf[B])).asScala.map { case (k, v) =>
-      convertToScala(k) -> convertToScala(v)
-    }.toMap.asInstanceOf[Map[A, B]]
-  }
-  implicit def setDecoder[A: TypeTag] = new RowDecoder[Set[A]] {
-    def decode(r: Row, name: String) = r.getSet(name, getCassClass(typeOf[A])).asScala.map(convertToScala).toSet.asInstanceOf[Set[A]]
   }
 }
