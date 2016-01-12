@@ -1,4 +1,4 @@
-package com.weather.fastcass
+package com.weather.scalacass
 
 import com.datastax.driver.core.Session
 import com.datastax.driver.core.exceptions.InvalidTypeException
@@ -8,10 +8,10 @@ import scala.collection.JavaConverters._
 import scala.reflect.runtime.universe._
 
 import util.EmbedCassandra
-import CassandraHelper._
+import ScalaCass._
 
 
-class CassandraHelperUnitTests extends FlatSpec with Matchers with EmbedCassandra with OptionValues {
+class ScalaCassUnitTests extends FlatSpec with Matchers with EmbedCassandra with OptionValues {
   var session: Session = null
   private val db = "TestDB"
   private val defaultTable = "testTable"

@@ -1,9 +1,9 @@
-package com.weather.fastcass
+package com.weather.scalacass
 
 import com.datastax.driver.core.Session
 import util.EmbedCassandra
 import org.scalatest.FlatSpec
-import CassandraHelper.RichRow
+import ScalaCass.RichRow
 import scalaz._, Scalaz._
 
 class PerfTest extends FlatSpec with EmbedCassandra {

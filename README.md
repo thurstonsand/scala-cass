@@ -1,4 +1,4 @@
-# fast-cass
+# scala-cass
 ### light Cassandra wrapper that makes retrieval from Rows a little easier
 
 usage is simple: `import CassandraHelper.RichRow` and you're on your way  

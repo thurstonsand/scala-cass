@@ -1,4 +1,4 @@
-package com.weather.fastcass.util
+package com.weather.scalacass.util
 
 import com.datastax.driver.core.Cluster
 import com.datastax.driver.core.Session

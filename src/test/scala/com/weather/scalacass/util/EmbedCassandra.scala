@@ -1,4 +1,4 @@
-package com.weather.fastcass.util
+package com.weather.scalacass.util
 
 import org.cassandraunit.utils.EmbeddedCassandraServerHelper
 import org.scalatest.{BeforeAndAfterAll, BeforeAndAfter, FlatSpec}

@@ -1,4 +1,4 @@
-package com.weather.fastcass
+package com.weather.scalacass
 
 import com.datastax.driver.core.Row
 import com.datastax.driver.core.exceptions.InvalidTypeException
@@ -9,7 +9,7 @@ import scala.reflect.runtime.currentMirror
 import scala.reflect.runtime.universe._
 import scala.util.Try
 
-object CassandraHelper {
+object ScalaCass {
   implicit class RichRow(r: Row) {
     def as[T: TypeTag : RowDecoder](name: String): T =
       if (r.isNull(name)) throw new IllegalArgumentException(s"""Cassandra: "$name" was not defined in ${r.getColumnDefinitions.getTable(name)}""")

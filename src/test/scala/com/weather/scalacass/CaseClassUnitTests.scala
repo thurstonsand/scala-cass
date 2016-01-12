@@ -1,4 +1,4 @@
-package com.weather.fastcass
+package com.weather.scalacass
 
 import com.datastax.driver.core.Session
 import com.datastax.driver.core.exceptions.InvalidTypeException
@@ -6,10 +6,10 @@ import org.joda.time.DateTime
 import org.scalatest.{FlatSpec, OptionValues, Matchers}
 import scala.collection.JavaConverters._
 import scala.reflect.runtime.universe._
-import com.weather.fastcass.CassandraHelper.CaseClassRealizer._
+import com.weather.scalacass.ScalaCass.CaseClassRealizer._
 
 import util.EmbedCassandra
-import CassandraHelper._
+import ScalaCass._
 
 class CaseClassUnitTests extends FlatSpec with Matchers with EmbedCassandra with OptionValues {
   var session: Session = null
@@ -43,7 +43,7 @@ class CaseClassUnitTests extends FlatSpec with Matchers with EmbedCassandra with
 
   "case class with Options" should "materialize even with empty" in {
     insert(Seq(("name", "asdf"), ("age", Int.box(22))))
-    import com.weather.fastcass.CassandraHelper.CaseClassRealizer._
+    import com.weather.scalacass.ScalaCass.CaseClassRealizer._
     getOne.realize[PersonWithOption](realizeCaseClass[PersonWithOption]) shouldBe PersonWithOption(Some("asdf"), Some(22), None)
   }
 

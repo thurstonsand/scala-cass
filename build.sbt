@@ -2,8 +2,6 @@ scalaVersion := "2.11.7"
 
 scalacOptions ++= Seq("-unchecked", "-deprecation")
 
-assemblyJarName in assembly := "FastCass.jar"
-
 resolvers += Resolver.jcenterRepo
 
 libraryDependencies ++= Seq(
