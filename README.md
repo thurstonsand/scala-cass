@@ -1,9 +1,9 @@
 # scala-cass
 ### light Cassandra wrapper that makes retrieval from Rows a little easier
 
-usage is simple: `import CassandraHelper.RichRow` and you're on your way  
+usage is simple: `import ScalaCass._` and you're on your way  
 ```scala
-import com.weather.fastcass.CassandraHelper.RichRow
+import com.weather.scalacass.ScalaCass._
 r: Row = getARow()
 val myStr: String = r.as[String]("mystr")
 val myMap: Map[String, Long] = r.as[Map[String, Long]]("mymap")
@@ -11,8 +11,14 @@ val myBoolOpt: Option[Boolean] = r.getAs[Boolean]("mybool")
 val myBlobOpt: Option[Array[Byte]] = r.getAs[Array[Byte]]("myblob")
 ```
 etc
+
+and now with case classes:
+```scala
+case class Person(name: String, age: Int, job: Option[String])
+val person = r.realize[Person]
+```
 ### Performance
-performance is decent. Measurements taken from getting a String 10,000 times.
+performance is decent. Measurements taken from getting a String 10,000 times on my late 2015 Macbook Pro 15" fully decked out.
 
 |                     |  as  | getAs | getAs not in row | getAs wrong type |
 |:-------------------:|:----:|:-----:|:----------------:|:----------------:|

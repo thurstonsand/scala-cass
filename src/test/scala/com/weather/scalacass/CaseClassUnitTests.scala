@@ -1,50 +1,24 @@
 package com.weather.scalacass
 
-import com.datastax.driver.core.Session
-import com.datastax.driver.core.exceptions.InvalidTypeException
-import org.joda.time.DateTime
-import org.scalatest.{FlatSpec, OptionValues, Matchers}
-import scala.collection.JavaConverters._
-import scala.reflect.runtime.universe._
-import com.weather.scalacass.ScalaCass.CaseClassRealizer._
-
-import util.EmbedCassandra
+import com.weather.scalacass.util.CassandraTester
 import ScalaCass._
 
-class CaseClassUnitTests extends FlatSpec with Matchers with EmbedCassandra with OptionValues {
-  var session: Session = null
-  private val db = "TestDB"
+class CaseClassUnitTests extends CassandraTester("TestDB", "personTable", List("name varchar", "age int", "job varchar"), "((name))") {
   case class Person(name: String, age: Int)
-  case class PersonWithOption(name: Option[String], age: Option[Int], job: Option[String])
-  private val personTable = "personTable"
-
-  override def beforeAll(): Unit = {
-    super.beforeAll()
-    session = client.session
-  }
-
-  before {
-    session.execute(s"CREATE KEYSPACE $db WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1};")
-    session.execute(s"""CREATE TABLE $db.$personTable (name varchar, age int, PRIMARY KEY ((name)))""")
-  }
-
-  private def insert(pairs: Seq[(String, AnyRef)]) = {
-    val (strs, objs) = pairs.foldLeft(Seq.empty[String], Seq.empty[AnyRef]) { case ((accStr, acc), (nStr, n)) =>
-      (nStr +: accStr, n +: acc)
-    }
-    session.execute(s"INSERT INTO $db.$personTable ${strs.mkString("(", ",", ")")} VALUES ${objs.map(_ => "?").mkString("(", ",", ")")}", objs: _*)
-  }
-  private def getOne = session.execute(s"SELECT * FROM $db.$personTable").one()
+  case class PersonWithOption(name: String, age: Int, job: Option[String])
 
   "case class with no Options" should "materialize" in {
     insert(Seq(("name", "asdf"), ("age", Int.box(22))))
-    getOne.realize[Person](realizeCaseClass[Person]) shouldBe Person("asdf", 22)
+    getOne.realize[Person] shouldBe Person("asdf", 22)
   }
 
-  "case class with Options" should "materialize even with empty" in {
+  "case class with Options and not filled" should "realize" in {
     insert(Seq(("name", "asdf"), ("age", Int.box(22))))
-    import com.weather.scalacass.ScalaCass.CaseClassRealizer._
-    getOne.realize[PersonWithOption](realizeCaseClass[PersonWithOption]) shouldBe PersonWithOption(Some("asdf"), Some(22), None)
+    getOne.realize[PersonWithOption] shouldBe PersonWithOption("asdf", 22, None)
   }
 
+  "case class With Options and filled" should "realize" in {
+    insert(Seq(("name", "asdf"), ("age", Int.box(22)), ("job", "programmer")))
+    getOne.realize[PersonWithOption] shouldBe PersonWithOption("asdf", 22, Some("programmer"))
+  }
 }

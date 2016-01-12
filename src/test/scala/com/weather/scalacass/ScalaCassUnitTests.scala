@@ -7,35 +7,13 @@ import org.scalatest.{FlatSpec, OptionValues, Matchers}
 import scala.collection.JavaConverters._
 import scala.reflect.runtime.universe._
 
-import util.EmbedCassandra
+import com.weather.scalacass.util.{CassandraTester, EmbedCassandra}
 import ScalaCass._
 
 
-class ScalaCassUnitTests extends FlatSpec with Matchers with EmbedCassandra with OptionValues {
-  var session: Session = null
-  private val db = "TestDB"
-  private val defaultTable = "testTable"
-
-  override def beforeAll(): Unit = {
-    super.beforeAll()
-    session = client.session
-  }
-
-  before {
-    session.execute(s"CREATE KEYSPACE $db WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1};")
-    session.execute(s"""CREATE TABLE $db.$defaultTable (str varchar, str2 ascii, b blob, d decimal, f float, net inet,
-         |tid timeuuid, vi varint, i int, bi bigint, bool boolean, dub double, l list<varchar>, m map<varchar, bigint>,
-         |s set<double>, ts timestamp, id uuid, sblob set<blob>, PRIMARY KEY ((str)))""".stripMargin)
-  }
-
-  private def insert(pairs: Seq[(String, AnyRef)]) = {
-    val (strs, objs) = pairs.foldLeft(Seq.empty[String], Seq.empty[AnyRef]) { case ((accStr, acc), (nStr, n)) =>
-      (nStr +: accStr, n +: acc)
-    }
-    session.execute(s"INSERT INTO $db.$defaultTable ${strs.mkString("(", ",", ")")} VALUES ${objs.map(_ => "?").mkString("(", ",", ")")}", objs: _*)
-  }
-  private def getOne = session.execute(s"SELECT * FROM $db.$defaultTable").one()
-
+class ScalaCassUnitTests extends CassandraTester("testDB", "testTable", List("str varchar", "str2 ascii", "b blob",
+  "d decimal", "f float", "net inet", "tid timeuuid", "vi varint", "i int", "bi bigint", "bool boolean", "dub double",
+  "l list<varchar>", "m map<varchar, bigint>", "s set<double>", "ts timestamp", "id uuid", "sblob set<blob>"), "((str))") with OptionValues {
   def testType[GoodType: TypeTag : RowDecoder, BadType: TypeTag : RowDecoder](k: String, v: GoodType, default: GoodType, convert: (GoodType) => AnyRef) = {
     val args = {
       val converted = convert(v)
@@ -92,10 +70,10 @@ class ScalaCassUnitTests extends FlatSpec with Matchers with EmbedCassandra with
     val pKey = "str"
     val k = "count"
     val counterTable = "counterTable"
-    session.execute(s"CREATE TABLE $db.$counterTable ($pKey varchar, $k counter, PRIMARY KEY (($pKey)))")
-    session.execute(s"UPDATE $db.$counterTable SET $k = $k + ? WHERE $pKey='asdf'", Long.box(1L))
+    session.execute(s"CREATE TABLE $dbName.$counterTable ($pKey varchar, $k counter, PRIMARY KEY (($pKey)))")
+    session.execute(s"UPDATE $dbName.$counterTable SET $k = $k + ? WHERE $pKey='asdf'", Long.box(1L))
 
-    val res = session.execute(s"SELECT * FROM $db.$counterTable").one()
+    val res = session.execute(s"SELECT * FROM $dbName.$counterTable").one()
     res.as[Long](k) shouldBe 1
     an [IllegalArgumentException] should be thrownBy res.as[Long](s"not$k")
     an [InvalidTypeException] should be thrownBy res.as[String](k)
