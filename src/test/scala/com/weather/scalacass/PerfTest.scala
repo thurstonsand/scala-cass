@@ -5,6 +5,7 @@ import util.EmbedCassandra
 import org.scalatest.FlatSpec
 import ScalaCass.RichRow
 import scalaz._, Scalaz._
+import ScalaCass._
 
 class PerfTest extends FlatSpec with EmbedCassandra {
   var session: Session = null
@@ -27,7 +28,7 @@ class PerfTest extends FlatSpec with EmbedCassandra {
     println(s"$testName implementation took $duration ms")
   }
 
-  "string repeats" should "be slooooooow" in {
+  "string repeats" should "be decent" in {
     session.execute(s"CREATE KEYSPACE $db WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1};")
     session.execute(s"CREATE TABLE $db.strperf (str varchar, PRIMARY KEY ((str)))")
     session.execute(s"INSERT INTO $db.strperf (str) VALUES (?)", java.util.UUID.randomUUID.toString)

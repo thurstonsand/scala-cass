@@ -3,7 +3,7 @@ package com.weather.scalacass.util
 import com.datastax.driver.core.Session
 import org.scalatest.{Matchers, FlatSpec}
 
-abstract class CassandraTester(val dbName: String, tableName: String, tableColumns: List[String], primaryKeys: String) extends FlatSpec with Matchers with EmbedCassandra {
+abstract class CassandraTester(val dbName: String, tableName: String, tableColumns: List[String], primaryKeys: List[String]) extends FlatSpec with Matchers with EmbedCassandra {
   protected var session: Session = null
 
   override def beforeAll(): Unit = {
@@ -13,7 +13,7 @@ abstract class CassandraTester(val dbName: String, tableName: String, tableColum
 
   before {
     session.execute(s"CREATE KEYSPACE $dbName WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1};")
-    session.execute(s"CREATE TABLE $dbName.$tableName ${tableColumns.mkString("(", ", ", ", ")} PRIMARY KEY $primaryKeys)")
+    session.execute(s"CREATE TABLE $dbName.$tableName ${tableColumns.mkString("(", ", ", ",")} PRIMARY KEY ${primaryKeys.mkString("((", ", ", "))")})")
   }
 
   protected def insert(pairs: Seq[(String, AnyRef)]) = {

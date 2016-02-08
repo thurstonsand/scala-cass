@@ -1,19 +1,19 @@
 package com.weather.scalacass
 
-import com.datastax.driver.core.Session
 import com.datastax.driver.core.exceptions.InvalidTypeException
 import org.joda.time.DateTime
-import org.scalatest.{FlatSpec, OptionValues, Matchers}
+import org.scalatest.OptionValues
 import scala.collection.JavaConverters._
 import scala.reflect.runtime.universe._
 
-import com.weather.scalacass.util.{CassandraTester, EmbedCassandra}
+import com.weather.scalacass.util.CassandraTester
 import ScalaCass._
+//import TypeClasses._
 
 
 class ScalaCassUnitTests extends CassandraTester("testDB", "testTable", List("str varchar", "str2 ascii", "b blob",
   "d decimal", "f float", "net inet", "tid timeuuid", "vi varint", "i int", "bi bigint", "bool boolean", "dub double",
-  "l list<varchar>", "m map<varchar, bigint>", "s set<double>", "ts timestamp", "id uuid", "sblob set<blob>"), "((str))") with OptionValues {
+  "l list<varchar>", "m map<varchar, bigint>", "s set<double>", "ts timestamp", "id uuid", "sblob set<blob>"), List("str")) with OptionValues {
   def testType[GoodType: TypeTag : RowDecoder, BadType: TypeTag : RowDecoder](k: String, v: GoodType, default: GoodType, convert: (GoodType) => AnyRef) = {
     val args = {
       val converted = convert(v)
