@@ -30,61 +30,61 @@ object CassandraFormats {
     def convert(f: T) = f
   }
 
-  val stringFormat = new NoConvertCassFormat[String] {
+  implicit val stringFormat = new NoConvertCassFormat[String] {
     val clazz = classOf[From]
     def decodeFrom(r: Row, name: String) = r.getString(name)
   }
-  val intFormat = new CassFormat[Int] {
+  implicit val intFormat = new CassFormat[Int] {
     type From = java.lang.Integer
     val clazz = classOf[From]
     def convert(f: From) = Int.unbox(f)
     def decodeNoNullCheck(r: Row, name: String) = r.getInt(name)
   }
-  val longFormat = new CassFormat[Long] {
+  implicit val longFormat = new CassFormat[Long] {
     type From = java.lang.Long
     val clazz = classOf[From]
     def convert(f: From) = Long.unbox(f)
     def decodeNoNullCheck(r: Row, name: String) = r.getLong(name)
   }
-  val booleanFormat = new CassFormat[Boolean] {
+  implicit val booleanFormat = new CassFormat[Boolean] {
     type From = java.lang.Boolean
     val clazz = classOf[From]
     def convert(f: From) = Boolean.unbox(f)
     def decodeNoNullCheck(r: Row, name: String) = r.getBool(name)
   }
-  val doubleFormat = new CassFormat[Double] {
+  implicit val doubleFormat = new CassFormat[Double] {
     type From = java.lang.Double
     val clazz = classOf[From]
     def convert(f: From) = Double.unbox(f)
     def decodeNoNullCheck(r: Row, name: String) = r.getDouble(name)
   }
-  val dateTimeFormat = new CassFormat[DateTime] {
+  implicit val dateTimeFormat = new CassFormat[DateTime] {
     type From = java.util.Date
     val clazz = classOf[From]
     def convert(f: From) = new DateTime(f)
     def decodeNoNullCheck(r: Row, name: String) = convert(r.getDate(name))
   }
-  val uuidFormat = new NoConvertCassFormat[java.util.UUID] {
+  implicit val uuidFormat = new NoConvertCassFormat[java.util.UUID] {
     val clazz = classOf[From]
     def decodeFrom(r: Row, name: String) = r.getUUID(name)
   }
-  val iNetFormat = new NoConvertCassFormat[java.net.InetAddress] {
+  implicit val iNetFormat = new NoConvertCassFormat[java.net.InetAddress] {
     val clazz = classOf[From]
     def decodeFrom(r: Row, name: String) = r.getInet(name)
   }
-  val bigDecimalFormat = new BasicCassFormat[BigDecimal] {
+  implicit val bigDecimalFormat = new BasicCassFormat[BigDecimal] {
     type From = java.math.BigDecimal
     val clazz = classOf[From]
     def convert(f: From) = BigDecimal.javaBigDecimal2bigDecimal(f)
     def decodeFrom(r: Row, name: String) = r.getDecimal(name)
   }
-  val floatFormat = new CassFormat[Float] {
+  implicit val floatFormat = new CassFormat[Float] {
     type From = java.lang.Float
     val clazz = classOf[From]
     def convert(f: From) = Float.unbox(f)
     def decodeNoNullCheck(r: Row, name: String) = r.getFloat(name)
   }
-  val blobFormat = new BasicCassFormat[Array[Byte]] {
+  implicit val blobFormat = new BasicCassFormat[Array[Byte]] {
     type From = java.nio.ByteBuffer
     val clazz = classOf[From]
     def convert(f: From) = com.datastax.driver.core.utils.Bytes.getArray(f).toIndexedSeq.toArray
@@ -96,26 +96,26 @@ object CassandraFormats {
     }
   }
 
-  def listFormat[T](implicit underlying: CassFormat[T]) = new BasicCassFormat[List[T]] {
+  implicit def listFormat[T](implicit underlying: CassFormat[T]) = new BasicCassFormat[List[T]] {
     type From = java.util.List[underlying.From]
     val clazz = classOf[From]
     def convert(f: From): List[T] = f.asScala.map(underlying.convert).toList
     def decodeFrom(r: Row, name: String) = r.getList(name, underlying.clazz)
   }
 
-  def mapFormat[A, B](implicit underlyingA: CassFormat[A], underlyingB: CassFormat[B]) = new BasicCassFormat[Map[A, B]] {
+  implicit def mapFormat[A, B](implicit underlyingA: CassFormat[A], underlyingB: CassFormat[B]) = new BasicCassFormat[Map[A, B]] {
     type From = java.util.Map[underlyingA.From, underlyingB.From]
     val clazz = classOf[From]
     def convert(f: From) = f.asScala.map{ case (k ,v) => underlyingA.convert(k) -> underlyingB.convert(v)}.toMap
     def decodeFrom(r: Row, name: String) = r.getMap(name, underlyingA.clazz, underlyingB.clazz)
   }
-  def setFormat[A](implicit underlying: CassFormat[A]) = new BasicCassFormat[Set[A]] {
+  implicit def setFormat[A](implicit underlying: CassFormat[A]) = new BasicCassFormat[Set[A]] {
     type From = java.util.Set[underlying.From]
     val clazz = classOf[From]
     def convert(f: From) = f.asScala.map(underlying.convert).toSet
     def decodeFrom(r: Row, name: String) = r.getSet(name, underlying.clazz)
   }
-  def optionFormat[A](implicit underlying: CassFormat[A]) = new CassFormat[Option[A]] {
+  implicit def optionFormat[A](implicit underlying: CassFormat[A]) = new CassFormat[Option[A]] {
     type From = Option[underlying.From]
     val clazz = classOf[From]
     def convert(f: From) = f.map(underlying.convert)

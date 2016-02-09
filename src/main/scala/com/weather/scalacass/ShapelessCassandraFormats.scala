@@ -12,14 +12,14 @@ object ShapelessCassandraFormats {
     def decode(r: Row) = _decode(r)
   }
 
-  val hNilDecoder = ccCassFormat[HNil](_ => Right(HNil))
+  implicit val hNilDecoder = ccCassFormat[HNil](_ => Right(HNil))
 
-  def hConsDecoder[K <: Symbol, H, T <: HList](implicit w: Witness.Aux[K], tdH: Lazy[CassFormat[H]], tdT: Lazy[CCCassFormat[T]]) =
+  implicit def hConsDecoder[K <: Symbol, H, T <: HList](implicit w: Witness.Aux[K], tdH: Lazy[CassFormat[H]], tdT: Lazy[CCCassFormat[T]]) =
     ccCassFormat[FieldType[K, H] :: T](r => for {
       h <- tdH.value.decode(r, w.value.name.toString).right
       t <- tdT.value.decode(r).right
     } yield field[K](h) :: t)
 
-  def hListConverter[T, Repr](implicit gen: LabelledGeneric.Aux[T, Repr], sg: Lazy[CCCassFormat[Repr]]) =
+  implicit def hListConverter[T, Repr](implicit gen: LabelledGeneric.Aux[T, Repr], sg: Lazy[CCCassFormat[Repr]]) =
     ccCassFormat[T](r => sg.value.decode(r).right.map(gen.from))
 }
