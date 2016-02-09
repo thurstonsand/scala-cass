@@ -2,24 +2,28 @@ package com.weather.scalacass
 
 import com.datastax.driver.core.Row
 import scala.reflect.runtime.universe.TypeTag
-import scala.util.Try
-//import TypeClasses.RowDecoder
-//import ShapelessTypeClasses.CCRowDecoder
 
 object ScalaCass {
   type RowDecoder[T] = TypeClasses.RowDecoder[T]
   type CCRowDecoder[T] = ShapelessTypeClasses.CCRowDecoder[T]
+
+  private implicit class RichEither[+A <: Throwable, +B](val e: Either[A, B]) extends AnyVal {
+    def getOrThrow = e match {
+      case Right(v) => v
+      case Left(exc) => throw exc
+    }
+  }
   implicit class RichRow(val r: Row) extends AnyVal {
     def as[T: TypeTag : RowDecoder](name: String): T =
       if (r.isNull(name)) throw new IllegalArgumentException(s"""Cassandra: "$name" was not defined in ${r.getColumnDefinitions.getTable(name)}""")
-      else parseRow[T](name)
-    def getAs[T: TypeTag](name: String)(implicit od: RowDecoder[Option[T]]): Option[T] = parseRow[Option[T]](name)
-    def getOrElse[T: TypeTag](name: String, default: => T)(implicit od: RowDecoder[Option[T]]): T = getAs[T](name).getOrElse(default)
+      else parseRow[T](name).getOrThrow
+    def getAs[T: TypeTag](name: String)(implicit od: RowDecoder[T]): Option[T] = parseRow[T](name).right.toOption
+    def getOrElse[T: TypeTag](name: String, default: => T)(implicit od: RowDecoder[T]): T = getAs[T](name).getOrElse(default)
 
     private def parseRow[A: RowDecoder](name: String) = implicitly[RowDecoder[A]].decode(r, name)
 
-    def as[T](implicit f: CCRowDecoder[T]): T = f.decode(r)
-    def getAs[T](implicit f: CCRowDecoder[T]): Option[T] = Try(f.decode(r)).toOption
+    def as[T](implicit f: CCRowDecoder[T]): T = f.decode(r).getOrThrow
+    def getAs[T](implicit f: CCRowDecoder[T]): Option[T] = f.decode(r).right.toOption
     def getOrElse[T](default: => T)(implicit f: CCRowDecoder[T]): T = getAs[T].getOrElse(default)
   }
 
@@ -43,12 +47,12 @@ object ScalaCass {
 
   // Case class derivation via Shapeless
   import shapeless.{Lazy, Witness, HList, LabelledGeneric}
-  implicit val hNilDecoder = ShapelessTypeClasses.HNilDecoder
-  implicit def HConsDecoder[K <: Symbol, H, T <: HList](implicit
+  implicit val hNilDecoder = ShapelessTypeClasses.hNilDecoder
+  implicit def hConsDecoder[K <: Symbol, H, T <: HList](implicit
     w: Witness.Aux[K], tdH: Lazy[RowDecoder[H]], tdT: Lazy[CCRowDecoder[T]]) =
-    ShapelessTypeClasses.HConsDecoder[K, H, T](w, tdH, tdT)
-  implicit def HListConverter[T, Repr](implicit gen: LabelledGeneric.Aux[T, Repr], sg: Lazy[CCRowDecoder[Repr]]) =
-    ShapelessTypeClasses.HListConverter[T, Repr]
+    ShapelessTypeClasses.hConsDecoder[K, H, T](w, tdH, tdT)
+  implicit def hListConverter[T, Repr](implicit gen: LabelledGeneric.Aux[T, Repr], sg: Lazy[CCRowDecoder[Repr]]) =
+    ShapelessTypeClasses.hListConverter[T, Repr]
 }
 
 

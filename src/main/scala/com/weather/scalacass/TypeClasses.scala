@@ -7,15 +7,18 @@ import org.joda.time.DateTime
 import scala.collection.JavaConverters._
 import scala.reflect.runtime.currentMirror
 import scala.reflect.runtime.universe._
-import scala.util.Try
+import scala.util.{Try, Success => TSuccess, Failure => TFailure}
 
 object TypeClasses {
   trait RowDecoder[T] {
-    def decode(r: Row, name: String): T
+    def decode(r: Row, name: String): Either[Throwable, T]
   }
 
   def rowDecoder[T](_decode: (Row, String) => T) = new RowDecoder[T] {
-    def decode(r: Row, name: String) = _decode(r, name)
+    def decode(r: Row, name: String) = Try(_decode(r, name)) match {
+      case TSuccess(v) => Right(v)
+      case TFailure(e) => Left(e)
+    }
   }
 
   def getCassClass(t: Type): Class[_] = t match {
@@ -30,15 +33,11 @@ object TypeClasses {
     case _ if t =:= typeOf[String]      => classOf[String]
     case _                              => currentMirror.runtimeClass(t)
   }
-  def convertToScala[T](o: T): Any = o match {
+  def convertToScala(o: Any): Any = o match {
     case o: java.nio.ByteBuffer  => com.datastax.driver.core.utils.Bytes.getArray(o).toIndexedSeq.toArray
     case o: java.math.BigDecimal => BigDecimal.javaBigDecimal2bigDecimal(o)
     case o: java.util.Date       => new DateTime(o)
     case _                       => o
-  }
-
-  trait LowPriorityRowDecoder {
-
   }
 
   implicit val stringDecoder = rowDecoder[String]((r, name) => r.getString(name))
@@ -67,6 +66,6 @@ object TypeClasses {
   implicit def optionDecoder[A: TypeTag: RowDecoder] = rowDecoder[Option[A]]((r, name) =>
     if (!r.getColumnDefinitions.contains(name)) None
     else if (r.isNull(name)) None
-    else Try(implicitly[RowDecoder[A]].decode(r, name)).toOption.flatMap(Option.apply)
+    else implicitly[RowDecoder[A]].decode(r, name).right.toOption
   )
 }
