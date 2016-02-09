@@ -1,6 +1,7 @@
 package com.weather.scalacass
 
 import com.datastax.driver.core.exceptions.InvalidTypeException
+import com.weather.scalacass.CassandraFormats.CassFormat
 import org.joda.time.DateTime
 import org.scalatest.OptionValues
 import scala.collection.JavaConverters._
@@ -14,15 +15,15 @@ import ScalaCass._
 class ScalaCassUnitTests extends CassandraTester("testDB", "testTable", List("str varchar", "str2 ascii", "b blob",
   "d decimal", "f float", "net inet", "tid timeuuid", "vi varint", "i int", "bi bigint", "bool boolean", "dub double",
   "l list<varchar>", "m map<varchar, bigint>", "s set<double>", "ts timestamp", "id uuid", "sblob set<blob>"), List("str")) with OptionValues {
-  def testType[GoodType: TypeTag : RowDecoder, BadType: TypeTag : RowDecoder](k: String, v: GoodType, default: GoodType, convert: (GoodType) => AnyRef) = {
+  def testType[GoodType: CassFormat, BadType: CassFormat](k: String, v: GoodType, default: GoodType, convert: (GoodType) => AnyRef) = {
     val args = {
       val converted = convert(v)
       if(k == "str") Seq((k, converted)) else Seq((k, converted), ("str", "asdf"))
     }
     insert(args)
     val res = getOne
-    typeOf[GoodType] match {
-      case t if t <:< typeOf[Iterable[Array[Byte]]] =>
+    k match {
+      case "sblob" =>
         val known = v.asInstanceOf[Iterable[Array[Byte]]].head
         res.as[GoodType](k).asInstanceOf[Iterable[Array[Byte]]].head should contain theSameElementsInOrderAs known
         res.getAs[GoodType](k).map(_.asInstanceOf[Iterable[Array[Byte]]].head).value should contain theSameElementsInOrderAs known
@@ -35,6 +36,7 @@ class ScalaCassUnitTests extends CassandraTester("testDB", "testTable", List("st
         res.getOrElse(k, default) shouldBe v
         res.getOrElse(s"not$k", default) shouldBe default
     }
+
     an [IllegalArgumentException] should be thrownBy res.as[GoodType](s"not$k")
     an [InvalidTypeException] should be thrownBy res.as[BadType](k)
     an [IllegalArgumentException] should be thrownBy res.as[BadType](s"not$k")
@@ -61,7 +63,7 @@ class ScalaCassUnitTests extends CassandraTester("testDB", "testTable", List("st
   "ascii" should "be extracted correctly" in testType[String, Int]("str2", "asdf", "fdsa", t => t)
   "blob" should "be extracted correctly (wrong basic)" in testType[Array[Byte], String]("b", "asdf".getBytes, "fdsa".getBytes, t => java.nio.ByteBuffer.wrap(t))
 //  "blob" should "be extracted correctly (wrong type param)" in testType[Array[Byte], Array[Char]]("b", "asdf".getBytes, "fdsa".getBytes, t => java.nio.ByteBuffer.wrap(t)) // implicitly disallowed
-  "inet" should "be extracted correctly" in testType[java.net.InetAddress, String]("net", java.net.InetAddress.getByName("localhost"), java.net.InetAddress.getByName("google.com"), t => t)
+  "inet" should "be extracted correctly" in testType[java.net.InetAddress, String]("net", java.net.InetAddress.getByName("localhost"), java.net.InetAddress.getByName("192.168.1.2"), t => t)
   "decimal" should "be extracted correctly" in testType[BigDecimal, Double]("d", BigDecimal(3.0), BigDecimal(2.0), t => t.underlying)
   "varint" should "be extracted correctly" in testType[BigDecimal, Double]("d", BigDecimal(3.0), BigDecimal(2.0), t => t.underlying)
   "float" should "be extracted correctly" in testType[Float, Double]("f", 123.4f, 987.6f, t => Float.box(t))

@@ -1,6 +1,6 @@
 package com.weather.scalacass
 
-import com.datastax.driver.core.{Row, Session}
+import com.datastax.driver.core.Session
 import util.EmbedCassandra
 import org.scalatest.FlatSpec
 import ScalaCass._
@@ -18,22 +18,15 @@ class PerfTest extends FlatSpec with EmbedCassandra {
 
   "string repeats" should "be decent" in {
     session.execute(s"CREATE KEYSPACE $db WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1};")
-    session.execute(s"CREATE TABLE $db.strperf (str varchar, PRIMARY KEY ((str)))")
-    session.execute(s"INSERT INTO $db.strperf (str) VALUES (?)", java.util.UUID.randomUUID.toString)
+    session.execute(s"CREATE TABLE $db.ccperf (str varchar, str2 varchar, str3 varchar, str4 varchar, PRIMARY KEY ((str)))")
+    def n = java.util.UUID.randomUUID.toString
+    session.execute(s"INSERT INTO $db.ccperf (str, str2, str3, str4) VALUES (?,?,?,?)", n, n, n, n)
     val row = session.execute(s"SELECT * FROM $db.strperf").one()
 
     th.pbenchOffWarm(title = "compare implicit and native get")(th.Warm(List.fill(100000)(row.as[String]("str"))), 2048, "withImplicit")(th.Warm(List.fill(100000)(if (row.isNull("str")) throw new IllegalArgumentException(s"""Cassandra: "str" was not defined in ${row.getColumnDefinitions.getTable("str")}""") else row.getString("str"))), 2048, "native")
 
     th.pbenchOffWarm(title = "compare implicit and native getAs")(th.Warm(List.fill(100000)(row.getAs[String]("str"))), 2048, "with implicit")(th.Warm(List.fill(100000)(if (row.getColumnDefinitions.contains("str") && !row.isNull("str")) Some(row.getString("str")) else None)), 2048, "native")
-  }
 
-  "case class repeats" should "work" in {
-    session.execute(s"CREATE KEYSPACE $db WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1};")
-    session.execute(s"CREATE TABLE $db.ccperf (str varchar, str2 varchar, str3 varchar, str4 varchar, PRIMARY KEY ((str)))")
-    def n = java.util.UUID.randomUUID.toString
-    session.execute(s"INSERT INTO $db.ccperf (str, str2, str3, str4) VALUES (?,?,?,?)", n, n, n, n)
-
-    val row = session.execute(s"SELECT * FROM $db.ccperf").one()
     case class Strings(str: String, str2: String, str3: String, str4: Option[String])
     def g(name: String) = if (row.isNull("str")) throw new IllegalArgumentException(s"""Cassandra: "str" was not defined in ${row.getColumnDefinitions.getTable("str")}""") else row.getString("str")
     th.pbenchOffWarm(title = "compare implicit and native case class get")(th.Warm(List.fill(100000)(row.as[Strings])), 2048, "with implicit")(th.Warm(List.fill(100000)(Strings(g("str"), g("str2"), g("str3"), if (row.getColumnDefinitions.contains("str") && !row.isNull("str")) Some(row.getString("str")) else None))), 2048, "native")
