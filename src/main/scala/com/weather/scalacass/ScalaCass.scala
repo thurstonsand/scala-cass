@@ -1,11 +1,8 @@
 package com.weather.scalacass
 
-import com.datastax.driver.core.Row
+import com.datastax.driver.core.{Row, Session}
 
-object ScalaCass {
-  type CassFormat[T] = CassandraFormats.CassFormat[T]
-  type CCCassFormat[T] = ShapelessCassandraFormats.CCCassFormat[T]
-
+object ScalaCass extends CassandraFormats with ShapelessCassandraFormats {
   private implicit class RichEither[+A <: Throwable, +B](val e: Either[A, B]) extends AnyVal {
     def getOrThrow = e match {
       case Right(v) => v
@@ -24,36 +21,8 @@ object ScalaCass {
     def getOrElse[T](default: => T)(implicit f: CCCassFormat[T]): T = getAs[T].getOrElse(default)
   }
 
-  // Native Cassandra Types
-  trait LowPriorityRichRow {
-    implicit val stringFormat     = CassandraFormats.stringFormat
-    implicit val intFormat        = CassandraFormats.intFormat
-    implicit val longFormat       = CassandraFormats.longFormat
-    implicit val booleanFormat    = CassandraFormats.booleanFormat
-    implicit val doubleFormat     = CassandraFormats.doubleFormat
-    implicit val dateTimeFormat   = CassandraFormats.dateTimeFormat
-    implicit val uuidFormat       = CassandraFormats.uuidFormat
-    implicit val iNetFormat       = CassandraFormats.iNetFormat
-    implicit val bigDecimalFormat = CassandraFormats.bigDecimalFormat
-    implicit val floatFormat      = CassandraFormats.floatFormat
-    implicit val blobFormat       = CassandraFormats.blobFormat
-
-    implicit def listFormat[T: CassFormat]             = CassandraFormats.listFormat[T]
-    implicit def mapFormat[A: CassFormat, B: CassFormat] = CassandraFormats.mapFormat[A, B]
-    implicit def setFormat[A: CassFormat]              = CassandraFormats.setFormat[A]
-    implicit def optionFormat[A: CassFormat]           = CassandraFormats.optionFormat[A]
+  object ScalaSession {
+    def apply(keyspace: String)(implicit session: Session): ScalaSession = new ScalaSession(keyspace)
   }
-  object RichRow extends LowPriorityRichRow {
-    // Case class derivation via Shapeless
-    import shapeless.{Lazy, Witness, HList, LabelledGeneric}
-    implicit val hNilFormat = ShapelessCassandraFormats.hNilDecoder
-    implicit def hConsFormat[K <: Symbol, H, T <: HList](implicit
-      w: Witness.Aux[K], tdH: Lazy[CassFormat[H]], tdT: Lazy[CCCassFormat[T]]
-    ) = ShapelessCassandraFormats.hConsDecoder[K, H, T](w, tdH, tdT)
-    implicit def hListConverter[T, Repr](implicit gen: LabelledGeneric.Aux[T, Repr], sg: Lazy[CCCassFormat[Repr]]) =
-      ShapelessCassandraFormats.hListConverter[T, Repr]
-  }
-
 }
-
 
