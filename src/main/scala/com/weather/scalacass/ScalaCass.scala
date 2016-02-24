@@ -1,8 +1,8 @@
 package com.weather.scalacass
 
-import com.datastax.driver.core.{Row, Session}
+import com.datastax.driver.core.Row
 
-object ScalaCass extends CassandraFormats with ShapelessCassandraFormats {
+object ScalaCass extends CassandraFormats with ShapelessCassandraFormats with ScalaSessionT {
   private implicit class RichEither[+A <: Throwable, +B](val e: Either[A, B]) extends AnyVal {
     def getOrThrow = e match {
       case Right(v) => v
@@ -20,9 +20,4 @@ object ScalaCass extends CassandraFormats with ShapelessCassandraFormats {
     def getAs[T](implicit f: CCCassFormat[T]): Option[T] = f.decode(r).getRightOpt
     def getOrElse[T](default: => T)(implicit f: CCCassFormat[T]): T = getAs[T].getOrElse(default)
   }
-
-  object ScalaSession {
-    def apply(keyspace: String)(implicit session: Session): ScalaSession = new ScalaSession(keyspace)
-  }
 }
-

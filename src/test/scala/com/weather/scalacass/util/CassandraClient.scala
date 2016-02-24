@@ -4,7 +4,7 @@ import com.datastax.driver.core.Cluster
 import com.datastax.driver.core.Session
 
 case class CassandraClient(hosts: List[String], port: Option[Int]) {
-  private val cluster = {
+  val cluster = {
     val c = Cluster.builder().addContactPoints(hosts: _*)
     port.foreach(c.withPort)
     c.build()

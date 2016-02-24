@@ -42,7 +42,7 @@ class ScalaCassUnitTests extends CassandraTester("testDB", "testTable", List("st
 
 
     case class TestCC(pkField: String, refField: GoodType)
-    implicit val s = session
+    implicit val s = client.session
     val ss = new ScalaSession(dbName)
     val tname = s"test${goodCF.cassType.takeWhile(_ != '<')}"
     ss.createTable[TestCC](tname, 1, 0)
@@ -86,10 +86,10 @@ class ScalaCassUnitTests extends CassandraTester("testDB", "testTable", List("st
     val pKey = "str"
     val k = "count"
     val counterTable = "counterTable"
-    session.execute(s"CREATE TABLE $dbName.$counterTable ($pKey varchar, $k counter, PRIMARY KEY (($pKey)))")
-    session.execute(s"UPDATE $dbName.$counterTable SET $k = $k + ? WHERE $pKey='asdf'", Long.box(1L))
+    client.session.execute(s"CREATE TABLE $dbName.$counterTable ($pKey varchar, $k counter, PRIMARY KEY (($pKey)))")
+    client.session.execute(s"UPDATE $dbName.$counterTable SET $k = $k + ? WHERE $pKey='asdf'", Long.box(1L))
 
-    val res = session.execute(s"SELECT * FROM $dbName.$counterTable").one()
+    val res = client.session.execute(s"SELECT * FROM $dbName.$counterTable").one()
     res.as[Long](k) shouldBe 1
     an [IllegalArgumentException] should be thrownBy res.as[Long](s"not$k")
     an [InvalidTypeException] should be thrownBy res.as[String](k)
@@ -102,7 +102,7 @@ class ScalaCassUnitTests extends CassandraTester("testDB", "testTable", List("st
 
     case class CounterCC(str: String, count: Long)
     val tname = "derivedtable"
-    implicit val s = session
+    implicit val s = client.session
     val ss = ScalaSession(dbName)
     ss.createTable[CounterCC](tname, 1, 0)
     val t1 = CounterCC("t1", 1)
