@@ -32,18 +32,18 @@ trait ScalaSessionT {
   class ScalaSession(val keyspace: String)(implicit val session: Session) {
     import ScalaSession.resultSetFutureToScalaFuture
 
-    private val queryCache = new LRUCache[Set[String], PreparedStatement](100)
+    private[this] val queryCache = new LRUCache[Set[String], PreparedStatement](100)
 
-    private def numParams(table: String, numColumns: Int) = {
+    private[this] def numParams(table: String, numColumns: Int) = {
       val numPrimaryKeys = session.getCluster.getMetadata.getKeyspace(keyspace).getTable(table).getPrimaryKey.size
       if (numColumns <= 0) numPrimaryKeys
       else numColumns min numPrimaryKeys
     }
 
-    private def clean[T: CCCassFormat](toClean: T): (List[String], List[AnyRef]) = clean(implicitly[CCCassFormat[T]].encode(toClean))
-    private def clean[T: CCCassFormat](toClean: T, table: String, numColumns: Int): (List[String], List[AnyRef]) =
+    private[this] def clean[T: CCCassFormat](toClean: T): (List[String], List[AnyRef]) = clean(implicitly[CCCassFormat[T]].encode(toClean))
+    private[this] def clean[T: CCCassFormat](toClean: T, table: String, numColumns: Int): (List[String], List[AnyRef]) =
       clean(implicitly[CCCassFormat[T]].encode(toClean).take(numParams(table, numColumns)))
-    private def clean[T](toClean: List[(String, AnyRef)]): (List[String], List[AnyRef]) = toClean.filter(_._2 match {
+    private[this] def clean[T](toClean: List[(String, AnyRef)]): (List[String], List[AnyRef]) = toClean.filter(_._2 match {
       case None => false
       case _    => true
     }).map {
@@ -66,7 +66,7 @@ trait ScalaSessionT {
 
     def dropTable(table: String): Unit = session.execute(s"DROP TABLE $keyspace.$table")
 
-    private def prepareInsert[T: CCCassFormat](table: String, insertable: T): BoundStatement = {
+    private[this] def prepareInsert[T: CCCassFormat](table: String, insertable: T): BoundStatement = {
       val (strArgs, anyrefArgs) = clean(insertable)
       val prepared = queryCache.get(strArgs.toSet + table + "INSERT",
         session.prepare(s"INSERT INTO $keyspace.$table ${strArgs.mkString("(", ",", ")")} VALUES ${List.fill(anyrefArgs.length)("?").mkString("(", ",", ")")}"))
@@ -77,7 +77,7 @@ trait ScalaSessionT {
     def insert[T: CCCassFormat](table: String, insertable: T): ResultSet = session.execute(prepareInsert(table, insertable))
     def insertAsync[T: CCCassFormat](table: String, insertable: T): Future[ResultSet] = session.executeAsync(prepareInsert(table, insertable))
 
-    private def prepareDelete[T: CCCassFormat](table: String, deletable: T, numColumns: Int): BoundStatement = {
+    private[this] def prepareDelete[T: CCCassFormat](table: String, deletable: T, numColumns: Int): BoundStatement = {
       val (strArgs, anyrefArgs) = clean(deletable, table, numColumns)
       val prepared = queryCache.get(strArgs.toSet + table + "DELETE",
         session.prepare(s"DELETE FROM $keyspace.$table WHERE ${strArgs.map(s => s"$s = ?").mkString(" AND ")}"))
@@ -89,7 +89,7 @@ trait ScalaSessionT {
     def deleteAsync[T: CCCassFormat](table: String, deletable: T, numColumns: Int = 0): Future[ResultSet] =
       session.executeAsync(prepareDelete(table, deletable, numColumns))
 
-    def prepareSelect[T: CCCassFormat](table: String, selectable: T, numColumns: Int, allowFiltering: Boolean, limit: Long) = {
+    private[this] def prepareSelect[T: CCCassFormat](table: String, selectable: T, numColumns: Int, allowFiltering: Boolean, limit: Long) = {
       val (strArgs, anyrefArgs) = clean(selectable, table, numColumns)
       val prepared = queryCache.get(strArgs.toSet + table + "SELECT", {
         val limitStr = if (limit > 0) s" LIMIT $limit" else ""
@@ -107,5 +107,20 @@ trait ScalaSessionT {
       Option(session.execute(prepareSelect(table, selectable, includeColumns, allowFiltering, limit)).one()).flatMap(s => s.getAs[T])
     def selectOneAsync[T: CCCassFormat](table: String, selectable: T, includeColumns: Int = 0, allowFiltering: Boolean = false, limit: Long = 0): Future[Option[T]] =
       session.executeAsync(prepareSelect(table, selectable, includeColumns, allowFiltering, limit)).map(rs => Option(rs.one()).flatMap(_.getAs[T]))
+
+    private[this] def prepareRawSelect(query: String, anyrefArgs: Seq[AnyRef]) = {
+      val prepared = queryCache.get(Set(query), {
+        session.prepare(query)
+      })
+      prepared.bind(anyrefArgs: _*)
+    }
+    def selectRaw[T: CCCassFormat](query: String, anyrefArgs: Seq[AnyRef]): Iterator[T] =
+      session.execute(prepareRawSelect(query, anyrefArgs)).iterator.asScala.map(_.getAs[T]).collect{ case Some(r) => r}
+    def selectRawAsync[T: CCCassFormat](query: String, anyrefArgs: Seq[AnyRef]): Future[Iterator[T]] =
+      session.executeAsync(prepareRawSelect(query, anyrefArgs)).map(_.iterator.asScala.map(_.getAs[T]).collect{ case Some(r) => r})
+    def selectOneRaw[T: CCCassFormat](query: String, anyrefArgs: Seq[AnyRef]): Option[T] =
+      Option(session.execute(prepareRawSelect(query, anyrefArgs)).one()).flatMap(s => s.getAs[T])
+    def selectOneAsync[T: CCCassFormat](query: String, anyrefArgs: Seq[AnyRef]): Future[Option[T]] =
+      session.executeAsync(prepareRawSelect(query, anyrefArgs)).map(rs => Option(rs.one()).flatMap(_.getAs[T]))
   }
 }

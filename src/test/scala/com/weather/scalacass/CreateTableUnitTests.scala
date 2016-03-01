@@ -25,7 +25,8 @@ class CreateTableUnitTests extends EmbedCassandra with OptionValues {//Cassandra
   case class A(str: String, str2: String, i: Int)
 
   "createTable" should "reject a table without primary key" in {
-    an [InvalidQueryException] should be thrownBy ssFixture.ss.createTable[A]("createTableTest", 0, 0)
+    case class AA(str: String, str2: String, i: Int)
+    an [InvalidQueryException] should be thrownBy ssFixture.ss.createTable[AA]("createTableTest", 0, 0)(implicitly[CCCassFormat[AA]])
   }
 
   def getTable(tname: String) = client.cluster.getMetadata.getKeyspace(dbName).getTable(tname)
