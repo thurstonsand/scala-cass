@@ -29,7 +29,6 @@ class CreateTableUnitTests extends EmbedCassandra with OptionValues {//Cassandra
     an [InvalidQueryException] should be thrownBy ssFixture.ss.createTable[AA]("createTableTest", 0, 0)(implicitly[CCCassFormat[AA]])
   }
 
-  def getTable(tname: String) = client.cluster.getMetadata.getKeyspace(dbName).getTable(tname)
   def getpk[T: CCCassFormat](tname: String, pkCount: Int, clustCount: Int) = {
     ssFixture.ss.createTable[T](tname, pkCount, clustCount)
     val table = client.cluster.getMetadata.getKeyspace(dbName).getTable(tname)

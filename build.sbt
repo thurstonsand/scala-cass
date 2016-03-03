@@ -4,7 +4,7 @@ version := "0.1"
 
 scalaVersion := "2.11.7"
 
-scalacOptions ++= Seq("-unchecked", "-deprecation")
+scalacOptions ++= Seq("-unchecked", "-deprecation", "-feature")
 
 resolvers ++= Seq(
   Resolver.jcenterRepo,
@@ -25,7 +25,7 @@ publishMavenStyle := true
 publishTo := {
   val nexus = "https://oss.sonatype.org"
   if (isSnapshot.value) Some("snapshots" at s"$nexus/content/repositories/snapshots")
-  else Some("releases" at s"$nexus/serice/local/staging/deploy/maven2")
+  else Some("releases" at s"$nexus/service/local/staging/deploy/maven2")
 }
 pomIncludeRepository := { _ => false }
 
