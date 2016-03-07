@@ -32,9 +32,9 @@ trait ShapelessCassandraFormats {
       def namesAndTypes = (w.value.name.toString, tdH.value.cassType) :: tdT.value.namesAndTypes
     }
 
-  implicit def hListConverter[T, Repr](implicit gen: LabelledGeneric.Aux[T, Repr], sg: Lazy[CCCassFormat[Repr]]) =
+  implicit def hListConverter[T, Repr](implicit gen: LabelledGeneric.Aux[T, Repr], sg: Lazy[CCCassFormat[Repr]]): CCCassFormat[T] =
     new CCCassFormat[T] {
-      def decode(r: Row) = sg.value.decode(r).right.map(gen.from)
+      def decode(r: Row): Either[Throwable, T] = sg.value.decode(r).right.map(gen.from)
       def encode(o: T) = sg.value.encode(gen.to(o))
       def namesAndTypes = sg.value.namesAndTypes
     }

@@ -33,8 +33,8 @@ class PerfTest extends FlatSpec with EmbedCassandra {
     th.pbenchOffWarm(title = "compare implicit and native case class as")(th.Warm(List.fill(100000)(row.as[Strings])), 2048, "with implicit")(th.Warm(List.fill(100000)(Strings(g("str"), g("str2"), g("str3"), if (row.getColumnDefinitions.contains("str") && !row.isNull("str")) Some(row.getString("str")) else None))), 2048, "native")
 
     def fAs() = {
-      val c: CCCassFormat[Strings] = shapeless.cachedImplicit
-      th.pbenchOffWarm(title = "compare implicit and native case class as with cachedImplicit")(th.Warm(List.fill(100000)(row.as[Strings](c)) ), 2048, "with implicit")(th.Warm(List.fill(100000)(Strings(g("str"), g("str2"), g("str3"), if (row.getColumnDefinitions.contains("str") && !row.isNull("str")) Some(row.getString("str")) else None))), 2048, "native")
+      implicit val c: CCCassFormat[Strings] = shapeless.cachedImplicit
+      th.pbenchOffWarm(title = "compare implicit and native case class as with cachedImplicit")(th.Warm(List.fill(100000)(row.as[Strings])), 2048, "with implicit")(th.Warm(List.fill(100000)(Strings(g("str"), g("str2"), g("str3"), if (row.getColumnDefinitions.contains("str") && !row.isNull("str")) Some(row.getString("str")) else None))), 2048, "native")
     }
 
     fAs()
@@ -44,13 +44,13 @@ class PerfTest extends FlatSpec with EmbedCassandra {
       s1 <- ga("str")
       s2 <- ga("str2")
       s3 <- ga("str3")
-      s4  = ga("str4")
+      s4 = ga("str4")
     } yield Strings(s1, s2, s3, s4)
     th.pbenchOffWarm(title = "compare implicit and native case class getAs")(th.Warm(List.fill(100000)(row.getAs[Strings])), 2048, "with implicit")(th.Warm(List.fill(100000)(getAs)), 2048, "native")
 
     def fgetAs() = {
-      val c: CCCassFormat[Strings] = shapeless.cachedImplicit
-      th.pbenchOffWarm(title = "compare implicit and native case class getAs with cachedImplicit")(th.Warm(List.fill(100000)(row.getAs[Strings](c))), 2048, "with cachedImplicit")(th.Warm(List.fill(100000)(getAs)), 2038, "native")
+      implicit val c: CCCassFormat[Strings] = shapeless.cachedImplicit
+      th.pbenchOffWarm(title = "compare implicit and native case class getAs with cachedImplicit")(th.Warm(List.fill(100000)(row.getAs[Strings])), 2048, "with cachedImplicit")(th.Warm(List.fill(100000)(getAs)), 2038, "native")
     }
 
     fgetAs()

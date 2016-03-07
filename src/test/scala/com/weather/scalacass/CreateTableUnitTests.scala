@@ -6,9 +6,7 @@ import org.scalatest.OptionValues
 import ScalaCass._
 import scala.collection.JavaConverters._
 
-class CreateTableUnitTests extends EmbedCassandra with OptionValues {//CassandraTester("testDB", "testTable", List("str varchar", "str2 ascii", "b blob",
-//  "d decimal", "f float", "net inet", "tid timeuuid", "vi varint", "i int", "bi bigint", "bool boolean", "dub double",
-//  "l list<varchar>", "m map<varchar, bigint>", "s set<double>", "ts timestamp", "id uuid", "sblob set<blob>"), List("str")) with OptionValues {
+class CreateTableUnitTests extends EmbedCassandra with OptionValues {
   val dbName = "testDB"
   val tableName = "testTable"
   val tableColumns = List("str varchar, str2 varchar, i int")
@@ -26,7 +24,7 @@ class CreateTableUnitTests extends EmbedCassandra with OptionValues {//Cassandra
 
   "createTable" should "reject a table without primary key" in {
     case class AA(str: String, str2: String, i: Int)
-    an [InvalidQueryException] should be thrownBy ssFixture.ss.createTable[AA]("createTableTest", 0, 0)(implicitly[CCCassFormat[AA]])
+    an[InvalidQueryException] should be thrownBy ssFixture.ss.createTable[AA]("createTableTest", 0, 0)(implicitly[CCCassFormat[AA]])
   }
 
   def getpk[T: CCCassFormat](tname: String, pkCount: Int, clustCount: Int) = {
@@ -40,68 +38,67 @@ class CreateTableUnitTests extends EmbedCassandra with OptionValues {//Cassandra
   "createTable10" should "create a table" in {
     val f = ssFixture
     val (parts, clust) = getpk[A](f.tname, 1, 0)
-    parts should contain ("str")
+    parts should contain("str")
     parts should not contain "str2"
     parts should not contain "i"
-    
+
     clust shouldBe empty
-    
+
     f.ss.dropTable(f.tname)
   }
   "createTable11" should "create a table" in {
     val f = ssFixture
     val (parts, clust) = getpk[A](f.tname, 1, 1)
-    
+
     parts should contain("str")
     parts should not contain "str2"
     parts should not contain "i"
-    
+
     clust should not contain "str"
     clust should contain("str2")
     clust should not contain "i"
-    
+
     f.ss.dropTable(f.tname)
   }
   "createTable20" should "create a table" in {
     val f = ssFixture
     val (parts, clust) = getpk[A](f.tname, 2, 0)
-    
-    parts should contain ("str")
-    parts should contain ("str2")
+
+    parts should contain("str")
+    parts should contain("str2")
     parts should not contain "i"
-    
+
     clust shouldBe empty
-    
+
     f.ss.dropTable(f.tname)
   }
   "createTable21" should "create a table" in {
     val f = ssFixture
     val (parts, clust) = getpk[A](f.tname, 2, 1)
-    
-    parts should contain ("str")
-    parts should contain ("str2")
+
+    parts should contain("str")
+    parts should contain("str2")
     parts should not contain "i"
-    
+
     clust should not contain "str"
     clust should not contain "str2"
-    clust should contain ("i")
-    
+    clust should contain("i")
+
     f.ss.dropTable(f.tname)
   }
   "createTable12" should "create a table" in {
     val f = ssFixture
     val (parts, clust) = getpk[A](f.tname, 1, 2)
 
-    parts should contain ("str")
+    parts should contain("str")
     parts should not contain "str2"
     parts should not contain "i"
 
     clust should not contain "str"
-    clust should contain ("str2")
-    clust should contain ("i")
-    
+    clust should contain("str2")
+    clust should contain("i")
+
     f.ss.dropTable(f.tname)
   }
-
 
 }

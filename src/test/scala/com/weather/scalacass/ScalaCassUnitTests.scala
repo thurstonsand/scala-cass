@@ -6,14 +6,13 @@ import org.scalatest.OptionValues
 import com.weather.scalacass.util.CassandraTester
 import ScalaCass._
 
-
 class ScalaCassUnitTests extends CassandraTester("testDB", "testTable", List("str varchar", "str2 ascii", "b blob",
   "d decimal", "f float", "net inet", "tid timeuuid", "vi varint", "i int", "bi bigint", "bool boolean", "dub double",
   "l list<varchar>", "m map<varchar, bigint>", "s set<double>", "ts timestamp", "id uuid", "sblob set<blob>"), List("str")) with OptionValues {
   def testType[GoodType, BadType: CassFormat](k: String, v: GoodType, default: GoodType)(implicit goodCF: CassFormat[GoodType]) = {
     val args = {
       val converted = goodCF.t2f(v).asInstanceOf[AnyRef]
-      if(k == "str") Seq((k, converted)) else Seq((k, converted), ("str", "asdf"))
+      if (k == "str") Seq((k, converted)) else Seq((k, converted), ("str", "asdf"))
     }
     insert(args)
     val res = getOne
@@ -32,14 +31,13 @@ class ScalaCassUnitTests extends CassandraTester("testDB", "testTable", List("st
         res.getOrElse(s"not$k", default) shouldBe default
     }
 
-    an [IllegalArgumentException] should be thrownBy res.as[GoodType](s"not$k")
-    an [InvalidTypeException] should be thrownBy res.as[BadType](k)
-    an [IllegalArgumentException] should be thrownBy res.as[BadType](s"not$k")
+    an[IllegalArgumentException] should be thrownBy res.as[GoodType](s"not$k")
+    an[InvalidTypeException] should be thrownBy res.as[BadType](k)
+    an[IllegalArgumentException] should be thrownBy res.as[BadType](s"not$k")
 
     res.getAs[GoodType](s"not$k") shouldBe None
     res.getAs[BadType](k) shouldBe None
     res.getAs[BadType](s"not$k") shouldBe None
-
 
     case class TestCC(pkField: String, refField: GoodType)
     implicit val s = client.session
@@ -76,7 +74,7 @@ class ScalaCassUnitTests extends CassandraTester("testDB", "testTable", List("st
   "uuid" should "be extracted correctly" in testType[java.util.UUID, String]("id", java.util.UUID.randomUUID, java.util.UUID.randomUUID)
   "ascii" should "be extracted correctly" in testType[String, Int]("str2", "asdf", "fdsa")
   "blob" should "be extracted correctly (wrong basic)" in testType[Array[Byte], String]("b", "asdf".getBytes, "fdsa".getBytes)
-//  "blob" should "be extracted correctly (wrong type param)" in testType[Array[Byte], Array[Char]]("b", "asdf".getBytes, "fdsa".getBytes) // implicitly disallowed
+  //  "blob" should "be extracted correctly (wrong type param)" in testType[Array[Byte], Array[Char]]("b", "asdf".getBytes, "fdsa".getBytes) // implicitly disallowed
   "inet" should "be extracted correctly" in testType[java.net.InetAddress, String]("net", java.net.InetAddress.getByName("localhost"), java.net.InetAddress.getByName("192.168.1.2"))
   "decimal" should "be extracted correctly" in testType[BigDecimal, Double]("d", BigDecimal(3.0), BigDecimal(2.0))
   "varint" should "be extracted correctly" in testType[BigInt, Long]("vi", 3, 2)
@@ -91,9 +89,9 @@ class ScalaCassUnitTests extends CassandraTester("testDB", "testTable", List("st
 
     val res = client.session.execute(s"SELECT * FROM $dbName.$counterTable").one()
     res.as[Long](k) shouldBe 1
-    an [IllegalArgumentException] should be thrownBy res.as[Long](s"not$k")
-    an [InvalidTypeException] should be thrownBy res.as[String](k)
-    an [IllegalArgumentException] should be thrownBy res.as[String](s"not$k")
+    an[IllegalArgumentException] should be thrownBy res.as[Long](s"not$k")
+    an[InvalidTypeException] should be thrownBy res.as[String](k)
+    an[IllegalArgumentException] should be thrownBy res.as[String](s"not$k")
 
     res.getAs[Long](k).value shouldBe 1
     res.getAs[Long](s"not$k") shouldBe None

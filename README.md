@@ -1,9 +1,9 @@
 # scala-cass
 ### Light Cassandra wrapper that makes retrieval from Rows a little easier
 
-usage is simple: `import com.weather.scalacass.ScalaCass._` and you're on your way  
+usage is simple: `import com.weather.scalacass._, ScalaCass._` and you're on your way  
 ```scala
-import com.weather.scalacass.ScalaCass._
+import com.weather.scalacass._, ScalaCass._
 r: Row = getARow()
 val myStr: String = r.as[String]("mystr")
 val myMap: Map[String, Long] = r.as[Map[String, Long]]("mymap")
@@ -168,11 +168,11 @@ ss.delete("mytable", MyTable("asdf", None, None), 2)
 ss.select("mytable", MyTable("asdf", None, None)) // returns Iterator.empty[MyTable]
 ```
 
-`deleteRaw` or `deleteRawAsync`  
+`insertRaw`, `insertRawAsync`, `deleteRaw`, or `deleteRawAsync`  
 as with `selectRaw`, uses direct query string with benefits of caching
 ```scala
-ss.insert("mytable", MyTable("asdf", Some("zxcv"), None)
-ss.insert("mytable", MyTable("asdf", Some("zxcv2"), None)
+ss.insertRaw("INSERT INTO mykeyspace.mytable (str str2) VALUES (?,?)", "asdf", "zxcv")
+ss.insertRaw("INSERT INTO mykeyspace.mytable (str str2) VALUES (?,?)", "asdf", "zxcv2")
 ss.deleteRaw("DELETE * FROM mykeyspace.mytable WHERE str=? AND str2=?", "asdf", "zxcv")
 ss.select("mytable", MyTable("asdf", None, None)) // returns Iterator(MyTable("asdf", Some("zxcv2"), Some(1234)))
 ```

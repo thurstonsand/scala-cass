@@ -17,13 +17,13 @@ trait CassandraFormats {
     def decode(r: Row, name: String): Either[Throwable, T]
   }
 
-  private def tryDecode[T](r: Row, name: String, decode: (Row, String) => T) = Try(
+  private def tryDecode[T](r: Row, name: String, decode: (Row, String) => T) = Try[Either[Throwable, T]](
     if (r.isNull(name)) Left(new IllegalArgumentException(s"""Cassandra: "$name" was not defined in ${r.getColumnDefinitions.getTable(name)}"""))
     else Right(decode(r, name))
   ) match {
-    case TSuccess(v) => v
-    case TFailure(e) => Left(e)
-  }
+      case TSuccess(v) => v
+      case TFailure(e) => Left(e)
+    }
 
   def sameTypeCassFormat[T <: AnyRef](_cassType: String, _clazz: Class[T], _decode: (Row, String) => T) = new CassFormat[T] {
     type From = T
@@ -126,8 +126,8 @@ trait CassandraFormats {
   implicit def mapFormat[A, B](implicit underlyingA: CassFormat[A], underlyingB: CassFormat[B]) = collectionCassFormat[Map[A, B], java.util.Map[underlyingA.From, underlyingB.From]](
     s"map<${underlyingA.cassType}, ${underlyingB.cassType}>",
     classOf[java.util.Map[underlyingA.From, underlyingB.From]],
-    _.map{ case (k, v) => underlyingA.t2f(k) -> underlyingB.t2f(v) }.asJava,
-    _.asScala.map{ case (k ,v) => underlyingA.f2t(k) -> underlyingB.f2t(v)}.toMap,
+    _.map { case (k, v) => underlyingA.t2f(k) -> underlyingB.t2f(v) }.asJava,
+    _.asScala.map { case (k, v) => underlyingA.f2t(k) -> underlyingB.f2t(v) }.toMap,
     (r, name) => r.getMap(name, underlyingA.clazz, underlyingB.clazz)
   )
   implicit def setFormat[A](implicit underlying: CassFormat[A]) = collectionCassFormat[Set[A], java.util.Set[underlying.From]](
@@ -153,7 +153,7 @@ trait CassandraFormats {
     val cassType = "blob"
     def f2t(f: From) = com.datastax.driver.core.utils.Bytes.getArray(f).toIndexedSeq.toArray
     def t2f(t: Array[Byte]) = java.nio.ByteBuffer.wrap(t)
-    def decode(r: Row, name: String) = Try {
+    def decode(r: Row, name: String) = Try[Either[Throwable, Array[Byte]]] {
       val cassClass = r.getColumnDefinitions.getType(name).asJavaClass
       if (r.isNull(name)) Left(new IllegalArgumentException(s"""Cassandra: "$name" was not defined in ${r.getColumnDefinitions.getTable(name)}"""))
       else if (cassClass != clazz)
@@ -175,8 +175,8 @@ trait CassandraFormats {
       if (r.isNull(name)) None
       else underlying.decode(r, name).right.toOption
     ) match {
-      case TSuccess(v) => Right(v)
-      case TFailure(_) => Right(None)
-    }
+        case TSuccess(v) => Right(v)
+        case TFailure(_) => Right(None)
+      }
   }
 }

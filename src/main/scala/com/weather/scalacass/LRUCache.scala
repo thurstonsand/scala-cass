@@ -4,7 +4,7 @@ class LRUCache[K, V](cacheSize: Int) extends java.util.LinkedHashMap[K, V](cache
   override protected def removeEldestEntry(eldest: java.util.Map.Entry[K, V]): Boolean = size >= cacheSize
 
   def get(key: K, fn: => V): V =
-    if(containsKey(key)) get(key)
+    if (containsKey(key)) get(key)
     else {
       val res = fn
       put(key, res)
