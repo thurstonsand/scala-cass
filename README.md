@@ -1,4 +1,4 @@
-# scala-cass
+# ScalaCass
 ### Light Cassandra wrapper that makes retrieval from Rows a little easier
 
 usage is simple: `import com.weather.scalacass._, ScalaCass._` and you're on your way  
