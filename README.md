@@ -15,7 +15,8 @@ etc
 and with case classes:
 ```scala
 case class Person(name: String, age: Int, job: Option[String])
-val person = r.as[Person]
+val person: Person = r.as[Person]
+val person_?: Option[Person] = r.getAs[Person]
 ```
 
 ### Getting ScalaCass
