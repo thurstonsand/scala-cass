@@ -17,6 +17,24 @@ and with case classes:
 case class Person(name: String, age: Int, job: Option[String])
 val person = r.as[Person]
 ```
+
+### Getting ScalaCass
+you can find it on bintray. Currently only supports **scala 2.11**  
+**sbt**
+```scala
+resolvers += Resolver.jcenterRepo
+libraryDependencies += "com.github.thurstonsand" %% "scalacass" % "0.1"
+```
+**maven**  
+```xml
+<dependency>
+  <groupId>com.github.thurstonsand</groupId>
+  <artifactId>scalacass_2.11</artifactId>
+  <version>0.1</version>
+  <type>pom</type>
+</dependency>
+```
+
 ### Performance
 performance is pretty decent.
 
@@ -35,7 +53,7 @@ if (row.getColumnDefinitions.contains("str") && !row.isNull("str")) Some(row.get
 |:---------:|:------:|:------:|
 | ScalaCass | 6.92us | 6.71us |
 |   Native  | 6.88us | 7.80us |
-ScalaCass is 99.392%% the speed of native for `as`, 106.209% the speed of native for `getAs`  
+ScalaCass is 99.392% the speed of native for `as`, 106.209% the speed of native for `getAs`  
   
 compare the implementation of `as` for a case class:
 ```scala
@@ -68,7 +86,7 @@ ScalaCass w/ cachedImplicit is 77.664% the speed of native for `as`, 93.372% the
 There are also utility functions that work with Cassandra Sessions:
 ```scala
 implicit val s: Session = someCassSession
-val ss = new ScalaSession("mykeyspace") // the session is picked up implicitly, passed explicitly
+val ss = new ScalaSession("mykeyspace") // the session can be picked up implicitly
 case class MyTable(str: String, i: Option[Int])
 
 // name of table, number of partition keys (left-to-right), number of clustering keys (left-to-right)
@@ -81,7 +99,7 @@ ss.selectOne("mytable", MyTable("a string", None)) // returns None
 ```
 * all case classes should be modeled left-to-right with partition keys -> clustering keys -> remaining columns
 * all functions have an async variant that returns a scala `Future[ResultSet]`
-* there is no need to convert types to AnyRef variants. That is all handled by ScalaCass (with the exception of Raw functions)
+* there is no need to convert types to AnyRef variants. That is all handled by ScalaCass (with the exception of `Raw` functions)
 * all queries are prepared and cached in ScalaSession
 * undefined behavior will throw whatever error the Java driver does unless otherwise explicitly mentioned
 
