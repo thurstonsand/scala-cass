@@ -80,7 +80,8 @@ def ga(name: String) = if (row.getColumnDefinitions.contains(name) && !row.isNul
 | ScalaCass w/ cachedImplicit | 39.3us | 39.1us |
 |            Native           | 30.5us | 36.5us |     
 ScalaCass alone is 44.844% the speed of native for `as`, 55.557% the speed of native for `getAs`  
-ScalaCass w/ cachedImplicit is 77.664% the speed of native for `as`, 93.372% the speed of native for `getAs`
+ScalaCass w/ `cachedImplicit` is 77.664% the speed of native for `as`, 93.372% the speed of native for `getAs`
+* `cachedImplicit` is a feature of shapeless that caches the underlying representation of a case class so that it does not need to be constantly recreated for every call.
 
 ### Session utilities
 
