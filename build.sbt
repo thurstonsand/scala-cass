@@ -1,4 +1,4 @@
-eorganization := "com.github.thurstonsand"
+organization := "com.github.thurstonsand"
 name := "ScalaCass"
 
 version := "0.1"
