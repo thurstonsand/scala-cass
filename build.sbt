@@ -1,4 +1,4 @@
-organization := "com.github.thurstonsand"
+eorganization := "com.github.thurstonsand"
 name := "ScalaCass"
 
 version := "0.1"
@@ -54,7 +54,9 @@ pomExtra :=
     <connection>scm:git:git@github.com/thurstonsand/scala-cass.git</connection>
   </scm>
   <developers>
-    <id>thurstonsand</id>
-    <name>Thurston Sandberg</name>
-    <url>https://github.com/thurstonsand</url>
+    <developer>
+      <id>thurstonsand</id>
+      <name>Thurston Sandberg</name>
+      <url>https://github.com/thurstonsand</url>
+    </developer>
   </developers>
