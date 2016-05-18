@@ -5,6 +5,7 @@ import com.weather.scalacass.util.{EmbedCassandra, CassandraTester}
 import org.scalatest.OptionValues
 import ScalaCass._
 import scala.collection.JavaConverters._
+import scala.language.reflectiveCalls
 
 class CreateTableUnitTests extends EmbedCassandra with OptionValues {
   val dbName = "testDB"

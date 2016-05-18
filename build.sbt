@@ -1,9 +1,9 @@
 organization := "com.github.thurstonsand"
 name := "ScalaCass"
 
-version := "0.1"
+version := "0.2"
 
-scalaVersion := "2.11.7"
+scalaVersion := "2.11.8"
 
 scalacOptions ++= Seq("-unchecked", "-deprecation", "-feature")
 
@@ -13,10 +13,10 @@ resolvers ++= Seq(
 )
 
 libraryDependencies ++= Seq(
-	"com.datastax.cassandra" % "cassandra-driver-core" % "2.1.9" classifier "shaded" excludeAll ExclusionRule(organization = "io.netty", name = "netty-handler"),
+  "com.datastax.cassandra" % "cassandra-driver-core" % "2.1.9" classifier "shaded" excludeAll ExclusionRule(organization = "io.netty", name = "netty-handler"),
   "joda-time" % "joda-time" % "2.9.1",
-  "com.chuusai" %% "shapeless" % "2.3.0",
-  "org.scalatest" % "scalatest_2.11" % "3.0.0-M10" % "test",
+  "com.chuusai" %% "shapeless" % "2.3.1",
+  "org.scalatest" %% "scalatest" % "3.0.0-M15" % "test",
   "org.cassandraunit" % "cassandra-unit" % "2.2.2.1" % "test"
 )
 

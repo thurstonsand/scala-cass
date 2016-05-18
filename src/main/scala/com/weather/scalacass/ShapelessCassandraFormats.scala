@@ -2,15 +2,14 @@ package com.weather.scalacass
 
 import com.datastax.driver.core.Row
 import shapeless._, labelled._
-import ScalaCass._
 
-trait ShapelessCassandraFormats {
-  trait CCCassFormat[T] {
-    def decode(r: Row): Either[Throwable, T]
-    def encode(o: T): List[(String, AnyRef)]
-    def namesAndTypes: List[(String, String)]
-  }
+trait CCCassFormat[T] {
+  def decode(r: Row): Either[Throwable, T]
+  def encode(o: T): List[(String, AnyRef)]
+  def namesAndTypes: List[(String, String)]
+}
 
+trait LowPriorityCCCassFormat {
   implicit val hNilDecoder = new CCCassFormat[HNil] {
     def decode(r: Row) = Right(HNil)
     def encode(o: HNil) = Nil
@@ -39,3 +38,5 @@ trait ShapelessCassandraFormats {
       def namesAndTypes = sg.value.namesAndTypes
     }
 }
+
+object CCCassFormat extends LowPriorityCCCassFormat

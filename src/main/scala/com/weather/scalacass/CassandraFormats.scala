@@ -7,16 +7,16 @@ import org.joda.time.DateTime
 import scala.collection.JavaConverters._
 import scala.util.{Try, Success => TSuccess, Failure => TFailure}
 
-trait CassandraFormats {
-  trait CassFormat[T] {
-    type From <: AnyRef
-    val clazz: Class[From]
-    val cassType: String
-    def f2t(f: From): T
-    def t2f(t: T): From
-    def decode(r: Row, name: String): Either[Throwable, T]
-  }
+trait CassFormat[T] {
+  type From <: AnyRef
+  val clazz: Class[From]
+  val cassType: String
+  def f2t(f: From): T
+  def t2f(t: T): From
+  def decode(r: Row, name: String): Either[Throwable, T]
+}
 
+trait LowPriorityCassFormat {
   private def tryDecode[T](r: Row, name: String, decode: (Row, String) => T) = Try[Either[Throwable, T]](
     if (r.isNull(name)) Left(new IllegalArgumentException(s"""Cassandra: "$name" was not defined in ${r.getColumnDefinitions.getTable(name)}"""))
     else Right(decode(r, name))
@@ -180,3 +180,5 @@ trait CassandraFormats {
       }
   }
 }
+
+object CassFormat extends LowPriorityCassFormat
