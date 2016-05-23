@@ -1,10 +1,6 @@
 package com.weather.scalacass.util
 
-abstract class CassandraTester(val dbName: String, protected val tableName: String, tableColumns: List[String], primaryKeys: List[String]) extends EmbedCassandra {
-  override def beforeAll(): Unit = {
-    super.beforeAll()
-  }
-
+abstract class CassandraTester(val dbName: String, protected val tableName: String, tableColumns: List[String], primaryKeys: List[String]) extends DockerCassandra {
   before {
     client.session.execute(s"CREATE KEYSPACE $dbName WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1};")
     client.session.execute(s"CREATE TABLE $dbName.$tableName ${tableColumns.mkString("(", ", ", ",")} PRIMARY KEY ${primaryKeys.mkString("((", ", ", "))")})")

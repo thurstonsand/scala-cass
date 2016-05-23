@@ -1,11 +1,11 @@
 package com.weather.scalacass
 
 import com.datastax.driver.core.Session
-import util.EmbedCassandra
 import org.scalatest.FlatSpec
 import ScalaCass._
+import com.weather.scalacass.util.DockerCassandra
 
-class PerfTest extends FlatSpec with EmbedCassandra {
+class PerfTest extends FlatSpec with DockerCassandra {
   var session: Session = null
   val db = "perfdb"
   val table = "perftable"
@@ -33,7 +33,7 @@ class PerfTest extends FlatSpec with EmbedCassandra {
     th.pbenchOffWarm(title = "compare implicit and native case class as")(th.Warm(List.fill(100000)(row.as[Strings])), 2048, "with implicit")(th.Warm(List.fill(100000)(Strings(g("str"), g("str2"), g("str3"), if (row.getColumnDefinitions.contains("str") && !row.isNull("str")) Some(row.getString("str")) else None))), 2048, "native")
 
     def fAs() = {
-      implicit val c: CCCassFormat[Strings] = shapeless.cachedImplicit
+      implicit val c: CCCassFormatDecoder[Strings] = shapeless.cachedImplicit
       th.pbenchOffWarm(title = "compare implicit and native case class as with cachedImplicit")(th.Warm(List.fill(100000)(row.as[Strings])), 2048, "with implicit")(th.Warm(List.fill(100000)(Strings(g("str"), g("str2"), g("str3"), if (row.getColumnDefinitions.contains("str") && !row.isNull("str")) Some(row.getString("str")) else None))), 2048, "native")
     }
 
@@ -49,7 +49,7 @@ class PerfTest extends FlatSpec with EmbedCassandra {
     th.pbenchOffWarm(title = "compare implicit and native case class getAs")(th.Warm(List.fill(100000)(row.getAs[Strings])), 2048, "with implicit")(th.Warm(List.fill(100000)(getAs)), 2048, "native")
 
     def fgetAs() = {
-      implicit val c: CCCassFormat[Strings] = shapeless.cachedImplicit
+      implicit val c: CCCassFormatDecoder[Strings] = shapeless.cachedImplicit
       th.pbenchOffWarm(title = "compare implicit and native case class getAs with cachedImplicit")(th.Warm(List.fill(100000)(row.getAs[Strings])), 2048, "with cachedImplicit")(th.Warm(List.fill(100000)(getAs)), 2038, "native")
     }
 

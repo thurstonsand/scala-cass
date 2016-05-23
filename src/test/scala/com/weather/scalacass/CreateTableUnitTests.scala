@@ -1,13 +1,14 @@
 package com.weather.scalacass
 
 import com.datastax.driver.core.exceptions.InvalidQueryException
-import com.weather.scalacass.util.{EmbedCassandra, CassandraTester}
+import com.weather.scalacass.util.DockerCassandra
 import org.scalatest.OptionValues
 import ScalaCass._
+
 import scala.collection.JavaConverters._
 import scala.language.reflectiveCalls
 
-class CreateTableUnitTests extends EmbedCassandra with OptionValues {
+class CreateTableUnitTests extends DockerCassandra with OptionValues {
   val dbName = "testDB"
   val tableName = "testTable"
   val tableColumns = List("str varchar, str2 varchar, i int")
@@ -25,10 +26,10 @@ class CreateTableUnitTests extends EmbedCassandra with OptionValues {
 
   "createTable" should "reject a table without primary key" in {
     case class AA(str: String, str2: String, i: Int)
-    an[InvalidQueryException] should be thrownBy ssFixture.ss.createTable[AA]("createTableTest", 0, 0)(implicitly[CCCassFormat[AA]])
+    an[InvalidQueryException] should be thrownBy ssFixture.ss.createTable[AA]("createTableTest", 0, 0)(implicitly[CCCassFormatEncoder[AA]])
   }
 
-  def getpk[T: CCCassFormat](tname: String, pkCount: Int, clustCount: Int) = {
+  def getpk[T: CCCassFormatDecoder: CCCassFormatEncoder](tname: String, pkCount: Int, clustCount: Int) = {
     ssFixture.ss.createTable[T](tname, pkCount, clustCount)
     val table = client.cluster.getMetadata.getKeyspace(dbName).getTable(tname)
     val parts = table.getPartitionKey.asScala.map(_.getName)

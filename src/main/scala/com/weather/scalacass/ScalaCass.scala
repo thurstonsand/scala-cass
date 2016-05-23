@@ -12,12 +12,12 @@ object ScalaCass {
   }
 
   implicit class RichRow(val r: Row) extends AnyVal {
-    def as[T: CassFormat](name: String): T = implicitly[CassFormat[T]].decode(r, name).getOrThrow
-    def getAs[T: CassFormat](name: String): Option[T] = implicitly[CassFormat[T]].decode(r, name).getRightOpt
-    def getOrElse[T: CassFormat](name: String, default: => T): T = getAs[T](name).getOrElse(default)
+    def as[T: CassFormatDecoder](name: String): T = implicitly[CassFormatDecoder[T]].decode(r, name).getOrThrow
+    def getAs[T: CassFormatDecoder](name: String): Option[T] = implicitly[CassFormatDecoder[T]].decode(r, name).getRightOpt
+    def getOrElse[T: CassFormatDecoder](name: String, default: => T): T = getAs[T](name).getOrElse(default)
 
-    def as[T](implicit f: CCCassFormat[T]): T = f.decode(r).getOrThrow
-    def getAs[T](implicit f: CCCassFormat[T]): Option[T] = f.decode(r).getRightOpt
-    def getOrElse[T](default: => T)(implicit f: CCCassFormat[T]): T = getAs[T].getOrElse(default)
+    def as[T: CCCassFormatDecoder]: T = implicitly[CCCassFormatDecoder[T]].decode(r).getOrThrow
+    def getAs[T: CCCassFormatDecoder]: Option[T] = implicitly[CCCassFormatDecoder[T]].decode(r).getRightOpt
+    def getOrElse[T: CCCassFormatDecoder](default: => T): T = getAs[T].getOrElse(default)
   }
 }
