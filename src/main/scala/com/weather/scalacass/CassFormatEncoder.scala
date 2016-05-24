@@ -1,33 +1,42 @@
 package com.weather.scalacass
 
 import org.joda.time.DateTime
+
 import scala.collection.JavaConverters._
+import scala.collection.mutable.ListBuffer
+import scala.language.higherKinds
 
 trait CassFormatEncoder[F] { self =>
   type To <: AnyRef
   val cassType: String
-  def encode(f: F): To
-  def map[G](fn: G => F) = new CassFormatEncoder[G] {
+  def encode(f: F): Either[Throwable, To]
+  def map[G](fn: G => F): CassFormatEncoder[G] = new CassFormatEncoder[G] {
     type To = self.To
     val cassType = self.cassType
-    def encode(f: G): To = self.encode(fn(f))
+    def encode(f: G): Either[Throwable, To] = self.encode(fn(f))
+  }
+
+  def flatMap[G](fn: G => Either[Throwable, F]): CassFormatEncoder[G] = new CassFormatEncoder[G] {
+    type To = self.To
+    val cassType = self.cassType
+    def encode(f: G): Either[Throwable, To] = fn(f).right.flatMap(self.encode)
   }
 }
 
 trait LowPriorityCassFormatEncoder {
-  def sameTypeCassFormatEncoder[F <: AnyRef](_cassType: String) = new CassFormatEncoder[F] {
+  def sameTypeCassFormatEncoder[F <: AnyRef](_cassType: String): CassFormatEncoder[F] = new CassFormatEncoder[F] {
     type To = F
     val cassType = _cassType
-    def encode(f: F) = f
+    def encode(f: F) = Right(f)
   }
   implicit val stringFormat = sameTypeCassFormatEncoder[String]("varchar")
   implicit val uuidFormat = sameTypeCassFormatEncoder[java.util.UUID]("uuid")
   implicit val iNetFormat = sameTypeCassFormatEncoder[java.net.InetAddress]("inet")
 
-  def transCassFormatEncoder[F, T <: AnyRef](_cassType: String, _f2t: F => T) = new CassFormatEncoder[F] {
+  def transCassFormatEncoder[F, T <: AnyRef](_cassType: String, _encode: F => T): CassFormatEncoder[F] = new CassFormatEncoder[F] {
     type To = T
     val cassType = _cassType
-    def encode(f: F) = _f2t(f)
+    def encode(f: F) = Right(_encode(f))
   }
   implicit val intFormat = transCassFormatEncoder("int", Int.box)
   implicit val longFormat = transCassFormatEncoder("bigint", Long.box)
@@ -39,11 +48,67 @@ trait LowPriorityCassFormatEncoder {
   implicit val dateTimeFormat = transCassFormatEncoder("timestamp", (_: DateTime).toDate)
   implicit val blobFormat = transCassFormatEncoder("blob", java.nio.ByteBuffer.wrap)
 
-  implicit def listFormat[A](implicit underlying: CassFormatEncoder[A]) = transCassFormatEncoder(s"list<${underlying.cassType}>", (_: List[A]).map(underlying.encode(_)).asJava)
+  def containerCassFormatEncoder[Coll[_], F, JColl[_] <: java.util.Collection[_], T <: AnyRef](_cassType: String, _encode: F => Either[Throwable, T], lb2JColl: ListBuffer[T] => JColl[T])(implicit ev: Coll[F] <:< Iterable[F]) =
+    new CassFormatEncoder[Coll[F]] {
+      type To = JColl[T]
+      val cassType = _cassType
+      def encode(f: Coll[F]) = {
+        val acc = ListBuffer.empty[T]
+        @scala.annotation.tailrec
+        def process(l: Iterable[F]): Either[Throwable, JColl[T]] = l.headOption.map(_encode) match {
+          case Some(Left(ff)) => Left(ff)
+          case Some(Right(n)) =>
+            acc += n
+            process(l.tail)
+          case None => Right(lb2JColl(acc))
+        }
+        process(f)
+      }
+    }
+
+  implicit def listFormat[A](implicit underlying: CassFormatEncoder[A]) = containerCassFormatEncoder[List, A, java.util.List, underlying.To](s"list<${underlying.cassType}>", underlying.encode(_), _.asJava)
+  implicit def setFormat[A](implicit underlying: CassFormatEncoder[A]) = containerCassFormatEncoder[Set, A, java.util.Set, underlying.To](s"set<${underlying.cassType}>", underlying.encode(_), _.toSet.asJava)
   implicit def mapFormat[A, B](implicit underlyingA: CassFormatEncoder[A], underlyingB: CassFormatEncoder[B]) =
-    transCassFormatEncoder(s"map<${underlyingA.cassType}, ${underlyingB.cassType}>", (_: Map[A, B]).map { case (k, v) => underlyingA.encode(k) -> underlyingB.encode(v) }.asJava)
-  implicit def setFormat[A](implicit underlying: CassFormatEncoder[A]) = transCassFormatEncoder(s"set<${underlying.cassType}>", (_: Set[A]).map(underlying.encode(_)).asJava)
-  implicit def optionFormat[A](implicit underlying: CassFormatEncoder[A]) = transCassFormatEncoder(underlying.cassType, (_: Option[A]).map(underlying.encode(_)))
+    new CassFormatEncoder[Map[A, B]] {
+      type To = java.util.Map[underlyingA.To, underlyingB.To]
+      val cassType = s"map<${underlyingA.cassType}, ${underlyingB.cassType}>"
+      def encode(f: Map[A, B]): Either[Throwable, java.util.Map[underlyingA.To, underlyingB.To]] = {
+        val acc = ListBuffer.empty[(underlyingA.To, underlyingB.To)]
+        @scala.annotation.tailrec
+        def process(l: Iterable[(A, B)]): Either[Throwable, java.util.Map[underlyingA.To, underlyingB.To]] = l.headOption.map {
+          case (k, v) => for {
+            kk <- underlyingA.encode(k).right
+            vv <- underlyingB.encode(v).right
+          } yield (kk, vv)
+        } match {
+          case Some(Left(ff)) => Left(ff)
+          case Some(Right(n)) =>
+            acc += n
+            process(l.tail)
+          case None => Right(acc.toMap.asJava)
+        }
+        process(f)
+      }
+    }
+
+  implicit def optionFormat[A](implicit underlying: CassFormatEncoder[A]) = new CassFormatEncoder[Option[A]] {
+    type To = Option[underlying.To]
+    val cassType = underlying.cassType
+    def encode(f: Option[A]): Either[Throwable, Option[underlying.To]] = f.map(underlying.encode(_)) match {
+      case None           => Right(None)
+      case Some(Left(_))  => Right(None)
+      case Some(Right(n)) => Right(Some(n))
+    }
+  }
+  implicit def eitherFormat[A](implicit underlying: CassFormatEncoder[A]) = new CassFormatEncoder[Either[Throwable, A]] {
+    type To = Either[Throwable, underlying.To]
+    val cassType = underlying.cassType
+    @SuppressWarnings(Array("org.brianmckenna.wartremover.warts.Product", "org.brianmckenna.wartremover.warts.Serializable"))
+    def encode(f: Either[Throwable, A]): Either[Throwable, Either[Throwable, underlying.To]] = f.right.map(underlying.encode(_)) match {
+      case Left(ff) => Right(Left(ff))
+      case other    => other
+    }
+  }
 }
 
 object CassFormatEncoder extends LowPriorityCassFormatEncoder {

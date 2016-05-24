@@ -1,4 +1,6 @@
-resolvers += "Sonatype OSS Releases" at "https://oss.sonatype.org/service/local/staging/deploy/maven2"
+resolvers ++= Seq(
+  Resolver.sonatypeRepo("releases")
+)
 
 addSbtPlugin("me.lessis" % "bintray-sbt" % "0.3.0")
 

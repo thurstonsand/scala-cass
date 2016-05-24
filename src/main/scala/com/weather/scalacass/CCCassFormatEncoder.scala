@@ -4,19 +4,22 @@ import shapeless.labelled.FieldType
 import shapeless.{::, HList, HNil, LabelledGeneric, Lazy, Witness}
 
 trait CCCassFormatEncoder[F] {
-  def encode(f: F): List[(String, AnyRef)]
+  def encode(f: F): Either[Throwable, List[(String, AnyRef)]]
   def namesAndTypes: List[(String, String)]
 }
 
 object CCCassFormatEncoder {
   implicit val hNilEncoder = new CCCassFormatEncoder[HNil] {
-    def encode(f: HNil) = Nil
+    def encode(f: HNil) = Right(Nil)
     val namesAndTypes = Nil
   }
 
   implicit def hConsEncoder[K <: Symbol, H, T <: HList](implicit w: Witness.Aux[K], tdH: Lazy[CassFormatEncoder[H]], tdT: Lazy[CCCassFormatEncoder[T]]) =
     new CCCassFormatEncoder[FieldType[K, H] :: T] {
-      def encode(f: FieldType[K, H] :: T) = (w.value.name.toString, tdH.value.encode(f.head)) :: tdT.value.encode(f.tail)
+      def encode(f: FieldType[K, H] :: T) = for {
+        h <- tdH.value.encode(f.head).right
+        t <- tdT.value.encode(f.tail).right
+      } yield (w.value.name.toString, h) :: t
       def namesAndTypes = (w.value.name.toString, tdH.value.cassType) :: tdT.value.namesAndTypes
     }
 

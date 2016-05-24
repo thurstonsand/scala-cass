@@ -14,8 +14,8 @@ object ScalaSession {
     Futures.addCallback(
       f,
       new FutureCallback[ResultSet] {
-        def onSuccess(r: ResultSet) = p success r; ()
-        def onFailure(t: Throwable) = p failure t; ()
+        def onSuccess(r: ResultSet) = p success r; (): Unit
+        def onFailure(t: Throwable) = p failure t; (): Unit
       }
     )
     p.future
@@ -42,9 +42,10 @@ class ScalaSession(val keyspace: String)(implicit val session: Session) {
     else includeColumns min numPrimaryKeys
   }
 
-  private[this] def clean[T: CCCassFormatEncoder](toClean: T): (List[String], List[AnyRef]) = clean(implicitly[CCCassFormatEncoder[T]].encode(toClean))
+  private[this] def clean[T: CCCassFormatEncoder](toClean: T): (List[String], List[AnyRef]) =
+    clean(implicitly[CCCassFormatEncoder[T]].encode(toClean).getOrThrow)
   private[this] def clean[T: CCCassFormatEncoder](toClean: T, table: String, includeColumns: Int): (List[String], List[AnyRef]) =
-    clean(implicitly[CCCassFormatEncoder[T]].encode(toClean).take(numParams(table, includeColumns)))
+    clean(implicitly[CCCassFormatEncoder[T]].encode(toClean).getOrThrow.take(numParams(table, includeColumns)))
   @SuppressWarnings(Array("org.brianmckenna.wartremover.warts.Any", "org.brianmckenna.wartremover.warts.AsInstanceOf", "org.brianmckenna.wartremover.warts.IsInstanceOf"))
   private[this] def clean[T](toClean: List[(String, AnyRef)]): (List[String], List[AnyRef]) = toClean.filter(_._2 match {
     case None => false
@@ -125,25 +126,25 @@ class ScalaSession(val keyspace: String)(implicit val session: Session) {
     prepared.bind(anyrefArgs: _*)
   }
   // includeColumns: specify the number of columns, as represented from left to right in the case class, to include in the WHERE clause for the delete
-  def select[T: CCCassFormatEncoder: CCCassFormatDecoder](table: String, selectable: T, includeColumns: Int = 0, limit: Long = 0): Iterator[T] =
-    session.execute(prepareSelect(table, selectable, includeColumns, limit)).iterator.asScala.map(_.getAs[T]).collect { case Some(r) => r }
-  def selectAsync[T: CCCassFormatEncoder: CCCassFormatDecoder](table: String, selectable: T, includeColumns: Int = 0, limit: Long = 0): Future[Iterator[T]] =
-    session.executeAsync(prepareSelect(table, selectable, includeColumns, limit)).map(_.iterator.asScala.map(_.getAs[T]).collect { case Some(r) => r })
-  def selectOne[T: CCCassFormatEncoder: CCCassFormatDecoder](table: String, selectable: T, includeColumns: Int = 0, limit: Long = 0): Option[T] =
-    Option(session.execute(prepareSelect(table, selectable, includeColumns, limit)).one()).flatMap(s => s.getAs[T])
-  def selectOneAsync[T: CCCassFormatEncoder: CCCassFormatDecoder](table: String, selectable: T, includeColumns: Int = 0, limit: Long = 0): Future[Option[T]] =
-    session.executeAsync(prepareSelect(table, selectable, includeColumns, limit)).map(rs => Option(rs.one()).flatMap(_.getAs[T]))
+  def select[T: CCCassFormatEncoder](table: String, selectable: T, includeColumns: Int = 0, limit: Long = 0): Iterator[Row] =
+    session.execute(prepareSelect(table, selectable, includeColumns, limit)).iterator.asScala
+  def selectAsync[T: CCCassFormatEncoder](table: String, selectable: T, includeColumns: Int = 0, limit: Long = 0): Future[Iterator[Row]] =
+    session.executeAsync(prepareSelect(table, selectable, includeColumns, limit)).map(_.iterator.asScala)
+  def selectOne[T: CCCassFormatEncoder](table: String, selectable: T, includeColumns: Int = 0, limit: Long = 0): Option[Row] =
+    Option(session.execute(prepareSelect(table, selectable, includeColumns, limit)).one())
+  def selectOneAsync[T: CCCassFormatEncoder](table: String, selectable: T, includeColumns: Int = 0, limit: Long = 0): Future[Option[Row]] =
+    session.executeAsync(prepareSelect(table, selectable, includeColumns, limit)).map(rs => Option(rs.one()))
 
   private[this] def prepareRawSelect(query: String, anyrefArgs: Seq[AnyRef]) = {
     val prepared = queryCache.get(Set(query), session.prepare(query))
     prepared.bind(anyrefArgs: _*)
   }
-  def selectRaw[T: CCCassFormatEncoder: CCCassFormatDecoder](query: String, anyrefArgs: AnyRef*): Iterator[T] =
-    session.execute(prepareRawSelect(query, anyrefArgs)).iterator.asScala.map(_.getAs[T]).collect { case Some(r) => r }
-  def selectRawAsync[T: CCCassFormatEncoder: CCCassFormatDecoder](query: String, anyrefArgs: AnyRef*): Future[Iterator[T]] =
-    session.executeAsync(prepareRawSelect(query, anyrefArgs)).map(_.iterator.asScala.map(_.getAs[T]).collect { case Some(r) => r })
-  def selectOneRaw[T: CCCassFormatEncoder: CCCassFormatDecoder](query: String, anyrefArgs: AnyRef*): Option[T] =
-    Option(session.execute(prepareRawSelect(query, anyrefArgs)).one()).flatMap(s => s.getAs[T])
-  def selectOneAsync[T: CCCassFormatEncoder: CCCassFormatDecoder](query: String, anyrefArgs: AnyRef*): Future[Option[T]] =
-    session.executeAsync(prepareRawSelect(query, anyrefArgs)).map(rs => Option(rs.one()).flatMap(_.getAs[T]))
+  def selectRaw[T: CCCassFormatDecoder](query: String, anyrefArgs: AnyRef*): Iterator[Row] =
+    session.execute(prepareRawSelect(query, anyrefArgs)).iterator.asScala
+  def selectRawAsync[T: CCCassFormatDecoder](query: String, anyrefArgs: AnyRef*): Future[Iterator[Row]] =
+    session.executeAsync(prepareRawSelect(query, anyrefArgs)).map(_.iterator.asScala)
+  def selectOneRaw[T: CCCassFormatDecoder](query: String, anyrefArgs: AnyRef*): Option[Row] =
+    Option(session.execute(prepareRawSelect(query, anyrefArgs)).one())
+  def selectOneAsync[T: CCCassFormatDecoder](query: String, anyrefArgs: AnyRef*): Future[Option[Row]] =
+    session.executeAsync(prepareRawSelect(query, anyrefArgs)).map(rs => Option(rs.one()))
 }

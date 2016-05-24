@@ -28,7 +28,7 @@ trait DockerCassandra extends FlatSpec with Matchers with BeforeAndAfter with Do
 
   after {
     val keyspaces = client.cluster.getMetadata.getKeyspaces.asScala.map(_.getName).filterNot(ks => ks == "system_traces" || ks == "system")
-    keyspaces.foreach(k => client.session.execute(s"drop keyspace $k"))
+    keyspaces.foreach { k => println(s"dropping keyspace $k with tables ${client.cluster.getMetadata.getKeyspace(k).getTables.asScala.map(_.getName).mkString(", ")}"); client.session.execute(s"drop keyspace $k") }
   }
 
   override def afterAll(): Unit = {
