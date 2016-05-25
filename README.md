@@ -94,8 +94,8 @@ case class MyTable(str: String, i: Option[Int])
 // name of table, number of partition keys (left-to-right), number of clustering keys (left-to-right)
 ss.createTable[MyTable]("mytable", 1, 0)
 ss.insert("mytable", MyTable("a string", Some(1234)))
-ss.selectOne("mytable", MyTable("a string", None)) // returns Some(MyTable("a string", Some(1234)))
-ss.selectOneRaw[MyTable]("SELECT * FROM mykeyspace.mytable WHERE str=?", "a string") // returns Some(MyTable("a string", Some(1234)))
+ss.selectOne("mytable", MyTable("a string", None)).getAs[MyTable] // returns Some(MyTable("a string", Some(1234)))
+ss.selectOneRaw("SELECT * FROM mykeyspace.mytable WHERE str=?", "a string").getAs[MyTable] // returns Some(MyTable("a string", Some(1234)))
 ss.delete("mytable", MyTable("a string", None))
 ss.selectOne("mytable", MyTable("a string", None)) // returns None
 ```
@@ -124,6 +124,18 @@ ss.insertAsync("mytable", MyTable("asdf2", None)).unsafePerformSync
 ```
 * nulls are not written into Cassandra for None case
 * queries are prepared and cached so they only need to be generated once
+
+`update` or `updateAsync`  
+takes 2 types: the update case class and the query case class
+```scala
+case class MyTable(str: String, i: Int, f: Float)
+case class Query(str: String, i: Int)
+case class Update(f: Float)
+// table with 2 primary keys, 'str' and 'i', and 1 column 'f'
+ss.createTable[MyTable]("mytable", 2, 0)
+// generates """UPDATE mykeyspace.mytable SET asdf=4.0 WHERE str="asdf" AND i=2"""
+ss.update[Update, Query]("mytable", Update(4.f), Query("asdf", 2))
+```
 
 `select`, `selectAsync`, `selectOne`, or `selectOneAsync`  
 can take an additional parameter includeColumns that specifies left-to-right how many fields to include in select query, otherwise use full primary key  
@@ -158,7 +170,7 @@ case class MyTable(str: String, i: Option[Int], otherStr: Str)
 ss.createTable[MyTable]("mytable", 1, 0)
 
 ss.insert("mytable", MyTable("asdf", None, "otherasdf")
-ss.selectOneRaw[MyTable]("SELECT * FROM mykeyspace.mytable WHERE str=?", "asdf") // returns Some(MyTable("asdf", None, "otherasdf"))
+ss.selectOneRaw("SELECT * FROM mykeyspace.mytable WHERE str=?", "asdf").getAs[MyTable] // returns Some(MyTable("asdf", None, "otherasdf"))
 ```
 
 `delete` or `deleteAsync`  
@@ -195,6 +207,20 @@ ss.insertRaw("INSERT INTO mykeyspace.mytable (str str2) VALUES (?,?)", "asdf", "
 ss.insertRaw("INSERT INTO mykeyspace.mytable (str str2) VALUES (?,?)", "asdf", "zxcv2")
 ss.deleteRaw("DELETE * FROM mykeyspace.mytable WHERE str=? AND str2=?", "asdf", "zxcv")
 ss.select("mytable", MyTable("asdf", None, None)) // returns Iterator(MyTable("asdf", Some("zxcv2"), Some(1234)))
+```
+
+### Batch statements
+batch statements are now supported via a handful of case classes:
+```scala
+case class MyTable(str: String, i: Int, f: Float)
+case class Query(str: String, i: Int)
+case class Update(f: Float)
+
+val updateBatch = UpdateBatch("mytable", Update(4.f), Query("asdf", 2))
+val deleteBatch = DeleteBatch("mytable", Query("asdf", 2)
+val insertBatch = InsertBatch("mytable", MyTable("fdsa", 1234, 43.21f))
+// results in a single row with ("fdsa", 1234, 43.21)
+ss.batch(Seq(updateBatch, deleteBatch, insertBatch))
 ```
 
 the session utilities are experimental, and suggestions are welcome on a better syntax
