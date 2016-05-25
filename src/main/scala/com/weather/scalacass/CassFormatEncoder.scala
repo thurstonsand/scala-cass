@@ -113,4 +113,5 @@ trait LowPriorityCassFormatEncoder {
 
 object CassFormatEncoder extends LowPriorityCassFormatEncoder {
   type Aux[F, To0] = CassFormatEncoder[F] { type To = To0 }
+  def apply[T: CassFormatEncoder] = implicitly[CassFormatEncoder[T]]
 }

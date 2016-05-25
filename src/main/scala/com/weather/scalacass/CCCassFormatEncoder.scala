@@ -28,4 +28,6 @@ object CCCassFormatEncoder {
       def encode(f: T) = hListDecoder.value.encode(gen.to(f))
       def namesAndTypes = hListDecoder.value.namesAndTypes
     }
+
+  def apply[T: CCCassFormatEncoder] = implicitly[CCCassFormatEncoder[T]]
 }

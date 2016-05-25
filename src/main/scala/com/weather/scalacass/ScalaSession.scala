@@ -7,6 +7,11 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.{Promise, Future}
 import ScalaCass._
 
+sealed trait Batch
+final case class UpdateBatch[T, S](table: String, item: T, query: T)(implicit val tEncoder: CCCassFormatEncoder[T], val sEncoder: CCCassFormatEncoder[S]) extends Batch
+final case class DeleteBatch[T](table: String, item: T)(implicit val tEncoder: CCCassFormatEncoder[T]) extends Batch
+final case class InsertBatch[T](table: String, item: T)(implicit val tEncoder: CCCassFormatEncoder[T]) extends Batch
+
 object ScalaSession {
   import scala.language.implicitConversions
   private implicit def resultSetFutureToScalaFuture(f: ResultSetFuture): Future[ResultSet] = {
@@ -41,11 +46,12 @@ class ScalaSession(val keyspace: String)(implicit val session: Session) {
     if (includeColumns <= 0) numPrimaryKeys
     else includeColumns min numPrimaryKeys
   }
+  private[this] def tableSize(table: String) = session.getCluster.getMetadata.getKeyspace(keyspace).getTable(table).getPrimaryKey.size
 
   private[this] def clean[T: CCCassFormatEncoder](toClean: T): (List[String], List[AnyRef]) =
     clean(implicitly[CCCassFormatEncoder[T]].encode(toClean).getOrThrow)
-  private[this] def clean[T: CCCassFormatEncoder](toClean: T, table: String, includeColumns: Int): (List[String], List[AnyRef]) =
-    clean(implicitly[CCCassFormatEncoder[T]].encode(toClean).getOrThrow.take(numParams(table, includeColumns)))
+  private[this] def clean[T: CCCassFormatEncoder](toClean: T, table: String): (List[String], List[AnyRef]) =
+    clean(implicitly[CCCassFormatEncoder[T]].encode(toClean).getOrThrow.take(tableSize(table)))
   @SuppressWarnings(Array("org.brianmckenna.wartremover.warts.Any", "org.brianmckenna.wartremover.warts.AsInstanceOf", "org.brianmckenna.wartremover.warts.IsInstanceOf"))
   private[this] def clean[T](toClean: List[(String, AnyRef)]): (List[String], List[AnyRef]) = toClean.filter(_._2 match {
     case None => false
@@ -93,19 +99,32 @@ class ScalaSession(val keyspace: String)(implicit val session: Session) {
   def insertRawAsync(query: String, anyrefArgs: AnyRef*): Future[ResultSet] =
     session.executeAsync(prepareInsertRaw(query, anyrefArgs))
 
-  private[this] def prepareDelete[T: CCCassFormatEncoder](table: String, deletable: T, includeColumns: Int): BoundStatement = {
-    val (strArgs, anyrefArgs) = clean(deletable, table, includeColumns)
+  private[this] def prepareUpdate[T: CCCassFormatEncoder, S: CCCassFormatEncoder](table: String, updateable: T, query: S): BoundStatement = {
+    val (updateStrArgs, updateAnyrefArgs) = clean(updateable)
+    val (queryStrArgs, queryAnyrefArgs) = clean(query)
+    val prepared = queryCache.get(
+      updateStrArgs.toSet ++ queryStrArgs.toSet + table + "UPDATE",
+      session.prepare(s"UPDATE $keyspace.$table SET ${updateStrArgs.map(_ + "=?").mkString(",")} WHERE ${queryStrArgs.map(_ + "=?").mkString(" AND ")}")
+    )
+    prepared.bind(updateAnyrefArgs ++ queryAnyrefArgs: _*)
+  }
+
+  def update[T: CCCassFormatEncoder, S: CCCassFormatEncoder](table: String, updateable: T, query: S): ResultSet =
+    session.execute(prepareUpdate(table, updateable, query))
+
+  private[this] def prepareDelete[T: CCCassFormatEncoder](table: String, deletable: T): BoundStatement = {
+    val (strArgs, anyrefArgs) = clean(deletable, table)
     val prepared = queryCache.get(
       strArgs.toSet + table + "DELETE",
-      session.prepare(s"DELETE FROM $keyspace.$table WHERE ${strArgs.map(s => s"$s = ?").mkString(" AND ")}")
+      session.prepare(s"DELETE FROM $keyspace.$table WHERE ${strArgs.map(_ + "=?").mkString(" AND ")}")
     )
     prepared.bind(anyrefArgs: _*)
   }
   // includeColumns: specify the number of columns, as represented from left to right in the case class, to include in the WHERE clause for the delete
-  def delete[T: CCCassFormatEncoder](table: String, deletable: T, includeColumns: Int = 0): ResultSet =
-    session.execute(prepareDelete(table, deletable, includeColumns))
-  def deleteAsync[T: CCCassFormatEncoder](table: String, deletable: T, includeColumns: Int = 0): Future[ResultSet] =
-    session.executeAsync(prepareDelete(table, deletable, includeColumns))
+  def delete[T: CCCassFormatEncoder](table: String, deletable: T): ResultSet =
+    session.execute(prepareDelete(table, deletable))
+  def deleteAsync[T: CCCassFormatEncoder](table: String, deletable: T): Future[ResultSet] =
+    session.executeAsync(prepareDelete(table, deletable))
 
   private[this] def prepareRawDelete(query: String, anyrefArgs: Seq[AnyRef]) = {
     val prepared = queryCache.get(Set(query), session.prepare(query))
@@ -116,24 +135,36 @@ class ScalaSession(val keyspace: String)(implicit val session: Session) {
   def deleteRawAsync(query: String, anyrefArgs: AnyRef*): Future[ResultSet] =
     session.executeAsync(prepareRawDelete(query, anyrefArgs))
 
-  private[this] def prepareSelect[T: CCCassFormatEncoder](table: String, selectable: T, includeColumns: Int, limit: Long) = {
-    val (strArgs, anyrefArgs) = clean(selectable, table, includeColumns)
+  @SuppressWarnings(Array("org.brianmckenna.wartremover.warts.Any"))
+  def prepareBatch(batches: Seq[Batch]): BatchStatement = {
+    val batch = new BatchStatement
+    batches.foreach {
+      case d @ DeleteBatch(table, item)        => batch.add(prepareDelete(table, item)(d.tEncoder))
+      case u @ UpdateBatch(table, item, query) => batch.add(prepareUpdate(table, item, query)(u.tEncoder, u.sEncoder))
+      case i @ InsertBatch(table, item)        => batch.add(prepareInsert(table, item)(i.tEncoder))
+    }
+    batch
+  }
+  def batch(batches: Seq[Batch]): ResultSet = session.execute(prepareBatch(batches))
+  def batchAsync(batches: Seq[Batch]): Future[ResultSet] = session.executeAsync(prepareBatch(batches))
+
+  private[this] def prepareSelect[T: CCCassFormatEncoder](table: String, selectable: T, limit: Long) = {
+    val (strArgs, anyrefArgs) = clean(selectable, table)
     val prepared = queryCache.get(strArgs.toSet + table + "SELECT", {
       val limitStr = if (limit > 0) s" LIMIT $limit" else ""
       val filteringStr = if (keyspaceMeta.getTable(table).getPrimaryKey.size() < anyrefArgs.length) s" ALLOW FILTERING" else ""
-      session.prepare(s"SELECT * FROM $keyspace.$table WHERE ${strArgs.map(s => s"$s = ?").mkString(" AND ")}" + limitStr + filteringStr)
+      session.prepare(s"SELECT * FROM $keyspace.$table WHERE ${strArgs.map(_ + "=?").mkString(" AND ")}" + limitStr + filteringStr)
     })
     prepared.bind(anyrefArgs: _*)
   }
-  // includeColumns: specify the number of columns, as represented from left to right in the case class, to include in the WHERE clause for the delete
-  def select[T: CCCassFormatEncoder](table: String, selectable: T, includeColumns: Int = 0, limit: Long = 0): Iterator[Row] =
-    session.execute(prepareSelect(table, selectable, includeColumns, limit)).iterator.asScala
-  def selectAsync[T: CCCassFormatEncoder](table: String, selectable: T, includeColumns: Int = 0, limit: Long = 0): Future[Iterator[Row]] =
-    session.executeAsync(prepareSelect(table, selectable, includeColumns, limit)).map(_.iterator.asScala)
-  def selectOne[T: CCCassFormatEncoder](table: String, selectable: T, includeColumns: Int = 0, limit: Long = 0): Option[Row] =
-    Option(session.execute(prepareSelect(table, selectable, includeColumns, limit)).one())
-  def selectOneAsync[T: CCCassFormatEncoder](table: String, selectable: T, includeColumns: Int = 0, limit: Long = 0): Future[Option[Row]] =
-    session.executeAsync(prepareSelect(table, selectable, includeColumns, limit)).map(rs => Option(rs.one()))
+  def select[T: CCCassFormatEncoder](table: String, selectable: T, limit: Long = 0): Iterator[Row] =
+    session.execute(prepareSelect(table, selectable, limit)).iterator.asScala
+  def selectAsync[T: CCCassFormatEncoder](table: String, selectable: T, limit: Long = 0): Future[Iterator[Row]] =
+    session.executeAsync(prepareSelect(table, selectable, limit)).map(_.iterator.asScala)
+  def selectOne[T: CCCassFormatEncoder](table: String, selectable: T, limit: Long = 0): Option[Row] =
+    Option(session.execute(prepareSelect(table, selectable, limit)).one())
+  def selectOneAsync[T: CCCassFormatEncoder](table: String, selectable: T, limit: Long = 0): Future[Option[Row]] =
+    session.executeAsync(prepareSelect(table, selectable, limit)).map(rs => Option(rs.one()))
 
   private[this] def prepareRawSelect(query: String, anyrefArgs: Seq[AnyRef]) = {
     val prepared = queryCache.get(Set(query), session.prepare(query))
