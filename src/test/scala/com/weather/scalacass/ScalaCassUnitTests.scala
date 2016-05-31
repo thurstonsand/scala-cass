@@ -5,6 +5,7 @@ import org.joda.time.DateTime
 import org.scalatest.OptionValues
 import com.weather.scalacass.util.CassandraTester
 import ScalaCass._
+import com.weather.scalacass.CassFormatDecoder.ValueNotDefinedException
 
 class ScalaCassUnitTests extends CassandraTester("testDB", "testTable", List("str varchar", "str2 ascii", "b blob",
   "d decimal", "f float", "net inet", "tid timeuuid", "vi varint", "i int", "bi bigint", "bool boolean", "dub double",
@@ -40,22 +41,24 @@ class ScalaCassUnitTests extends CassandraTester("testDB", "testTable", List("st
     res.getAs[BadType](s"not$k") shouldBe None
 
     case class TestCC(pkField: String, refField: GoodType)
+    case class QueryCC(pkField: String)
     implicit val s = client.session
     val ss = new ScalaSession(dbName)
     val tname = s"test${TestCC.hashCode.toString.take(5)}"
-    ss.createTable[TestCC](tname, 1, 0)(implicitly[CCCassFormatEncoder[TestCC]])
+    ss.createTable[TestCC](tname, 1, 0)(CCCassFormatEncoder[TestCC])
     val t1 = TestCC("t1", v)
-    ss.insert(tname, t1)(implicitly[CCCassFormatEncoder[TestCC]])
+    val q1 = QueryCC(t1.pkField)
+    ss.insert(tname, t1)(CCCassFormatEncoder[TestCC])
     k match {
       case "b" =>
-        ss.selectOne(tname, t1).flatMap(_.getAs[TestCC]).map(_.refField.asInstanceOf[Array[Byte]]).value should contain theSameElementsInOrderAs t1.refField.asInstanceOf[Array[Byte]]
+        ss.selectOne(tname, q1).getAs[TestCC].map(_.refField.asInstanceOf[Array[Byte]]).value should contain theSameElementsInOrderAs t1.refField.asInstanceOf[Array[Byte]]
       case "sblob" =>
-        ss.selectOne(tname, t1).flatMap(_.getAs[TestCC]).flatMap(_.refField.asInstanceOf[Set[Array[Byte]]].headOption).value should contain theSameElementsInOrderAs t1.refField.asInstanceOf[Set[Array[Byte]]].head
+        ss.selectOne(tname, q1).getAs[TestCC].flatMap(_.refField.asInstanceOf[Set[Array[Byte]]].headOption).value should contain theSameElementsInOrderAs t1.refField.asInstanceOf[Set[Array[Byte]]].head
       case _ =>
-        ss.selectOne(tname, t1).flatMap(_.getAs[TestCC]).value shouldBe t1
+        ss.selectOne(tname, q1).getAs[TestCC].value shouldBe t1
     }
-    ss.delete(tname, t1)
-    ss.select(tname, t1).toList.map(_.as[TestCC]) shouldBe empty
+    ss.delete(tname, q1)
+    ss.select(tname, q1).toList.map(_.as[TestCC]) shouldBe empty
   }
 
   "strings" should "be extracted correctly" in testType[String, Int]("str", "asdf", "qwerty")
@@ -99,14 +102,16 @@ class ScalaCassUnitTests extends CassandraTester("testDB", "testTable", List("st
     res.getAs[String](s"not$k") shouldBe None
 
     case class CounterCC(str: String, count: Long)
+    case class QueryCC(str: String)
     val tname = "derivedtable"
     implicit val s = client.session
     val ss = ScalaSession(dbName)
     ss.createTable[CounterCC](tname, 1, 0)
     val t1 = CounterCC("t1", 1)
+    val q1 = QueryCC(t1.str)
     ss.insert(tname, t1)
-    ss.selectOne(tname, t1).value.as[CounterCC] shouldBe t1
-    ss.delete(tname, t1)
-    ss.select(tname, t1).toList shouldBe empty
+    ss.selectOne(tname, q1).value.as[CounterCC] shouldBe t1
+    ss.delete(tname, q1)
+    ss.select(tname, q1).toList shouldBe empty
   }
 }

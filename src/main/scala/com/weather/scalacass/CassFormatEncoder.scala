@@ -109,6 +109,12 @@ trait LowPriorityCassFormatEncoder {
       case other    => other
     }
   }
+
+  implicit val nothingFormat = new CassFormatEncoder[Nothing] {
+    type To = Nothing
+    val cassType = ""
+    def encode(f: Nothing): Either[Throwable, To] = throw new IllegalArgumentException("Nothing isn't a real type!")
+  }
 }
 
 object CassFormatEncoder extends LowPriorityCassFormatEncoder {

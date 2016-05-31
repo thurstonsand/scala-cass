@@ -1,7 +1,7 @@
 organization := "com.github.thurstonsand"
 name := "ScalaCass"
 
-version := "0.3.2"
+version := "0.3.3"
 
 scalaVersion := "2.11.8"
 
@@ -16,6 +16,7 @@ libraryDependencies ++= Seq(
   "com.datastax.cassandra" % "cassandra-driver-core" % "2.1.9" classifier "shaded" excludeAll ExclusionRule(organization = "io.netty", name = "netty-handler"),
   "joda-time" % "joda-time" % "2.9.1",
   "com.chuusai" %% "shapeless" % "2.3.1",
+  "com.google.guava" % "guava" % "19.0",
   "org.scalatest" %% "scalatest" % "3.0.0-M15" % "test",
   "com.whisk" %% "docker-testkit-scalatest" % "0.6.1" % "test"
 )

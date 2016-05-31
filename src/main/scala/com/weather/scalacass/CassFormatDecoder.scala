@@ -1,13 +1,13 @@
 package com.weather.scalacass
 
 import com.datastax.driver.core.Row
-import com.datastax.driver.core.exceptions.InvalidTypeException
+import com.datastax.driver.core.exceptions.{InvalidTypeException, QueryExecutionException}
 import org.joda.time.DateTime
 
 import scala.collection.JavaConverters._
 import scala.collection.mutable.ListBuffer
 import scala.language.higherKinds
-import scala.util.{Failure => TFailure, Success => TSuccess, Try}
+import scala.util.{Try, Failure => TFailure, Success => TSuccess}
 
 trait CassFormatDecoder[T] { self =>
   type From <: AnyRef
@@ -29,16 +29,16 @@ trait CassFormatDecoder[T] { self =>
 }
 
 trait LowPriorityCassFormatDecoder {
-  import CassFormatDecoder.TryEither
+  import CassFormatDecoder.{TryEither, ValueNotDefinedException}
   private def tryDecode[T](r: Row, name: String, decode: (Row, String) => T) = Try[Either[Throwable, T]](
-    if (r.isNull(name)) Left(new IllegalArgumentException(s"""Cassandra: "$name" was not defined in ${r.getColumnDefinitions.getTable(name)}"""))
+    if (r.isNull(name)) Left(new ValueNotDefinedException(s""""$name" was not defined in ${r.getColumnDefinitions.getTable(name)}"""))
     else Right(decode(r, name))
   ) match {
       case TSuccess(v) => v
       case TFailure(e) => Left(e)
     }
   private def tryDecodeE[T](r: Row, name: String, decode: (Row, String) => Either[Throwable, T]) = Try[Either[Throwable, T]](
-    if (r.isNull(name)) Left(new IllegalArgumentException(s"""Cassandra: "$name" was not defined in ${r.getColumnDefinitions.getTable(name)}"""))
+    if (r.isNull(name)) Left(new ValueNotDefinedException(s""""$name" was not defined in ${r.getColumnDefinitions.getTable(name)}"""))
     else decode(r, name)
   ) match {
       case TSuccess(v) => v
@@ -148,7 +148,7 @@ trait LowPriorityCassFormatDecoder {
     def f2t(f: From) = Try(com.datastax.driver.core.utils.Bytes.getArray(f).toIndexedSeq.toArray).toEither
     def decode(r: Row, name: String) = Try[Either[Throwable, Array[Byte]]] {
       val cassClass = r.getColumnDefinitions.getType(name).asJavaClass
-      if (r.isNull(name)) Left(new IllegalArgumentException(s"""Cassandra: "$name" was not defined in ${r.getColumnDefinitions.getTable(name)}"""))
+      if (r.isNull(name)) Left(new ValueNotDefinedException(s""""$name" was not defined in ${r.getColumnDefinitions.getTable(name)}"""))
       else if (cassClass != clazz)
         Left(new InvalidTypeException(s"Column $name is a $cassClass, cannot be retrieved as an Array[Byte]"))
       else f2t(r.getBytes(name))
@@ -176,7 +176,7 @@ trait LowPriorityCassFormatDecoder {
     val clazz = underlying.clazz
     def f2t(f: From) = Right(underlying.f2t(f))
     def decode(r: Row, name: String) = Try(
-      if (r.isNull(name)) Left(new IllegalArgumentException(s"""Cassandra: "$name" was not defined in ${r.getColumnDefinitions.getTable(name)}"""))
+      if (r.isNull(name)) Left(new ValueNotDefinedException(s""""$name" was not defined in ${r.getColumnDefinitions.getTable(name)}"""))
       else underlying.decode(r, name)
     ) match {
         case TSuccess(v) => Right(v)
@@ -195,4 +195,6 @@ object CassFormatDecoder extends LowPriorityCassFormatDecoder {
       case TFailure(f) => Left(f)
     }
   }
+
+  class ValueNotDefinedException(m: String) extends QueryExecutionException(m)
 }

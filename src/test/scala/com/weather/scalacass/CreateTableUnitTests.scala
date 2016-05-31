@@ -1,9 +1,9 @@
 package com.weather.scalacass
 
-import com.datastax.driver.core.exceptions.InvalidQueryException
 import com.weather.scalacass.util.DockerCassandra
 import org.scalatest.OptionValues
 import ScalaCass._
+import com.weather.scalacass.ScalaSession.WrongPrimaryKeySizeException
 
 import scala.collection.JavaConverters._
 import scala.language.reflectiveCalls
@@ -26,7 +26,7 @@ class CreateTableUnitTests extends DockerCassandra with OptionValues {
 
   "createTable" should "reject a table without primary key" in {
     case class AA(str: String, str2: String, i: Int)
-    an[InvalidQueryException] should be thrownBy ssFixture.ss.createTable[AA]("createTableTest", 0, 0)(implicitly[CCCassFormatEncoder[AA]])
+    an[WrongPrimaryKeySizeException] should be thrownBy ssFixture.ss.createTable[AA]("createTableTest", 0, 0)(implicitly[CCCassFormatEncoder[AA]])
   }
 
   def getpk[T: CCCassFormatDecoder: CCCassFormatEncoder](tname: String, pkCount: Int, clustCount: Int) = {
