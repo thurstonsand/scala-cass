@@ -54,13 +54,6 @@ class ScalaSession(val keyspace: String)(implicit val session: Session) {
   //  private[this] val queryCache = new LRUCache[Set[String], PreparedStatement](100)
   private[this] val queryCache = CacheBuilder.newBuilder().maximumSize(1000).build[Set[String], PreparedStatement]()
 
-  private[this] def numParams(table: String, includeColumns: Int) = {
-    val numPrimaryKeys = session.getCluster.getMetadata.getKeyspace(keyspace).getTable(table).getPrimaryKey.size
-    if (includeColumns <= 0) numPrimaryKeys
-    else includeColumns min numPrimaryKeys
-  }
-  private[this] def pkSize(table: String) = session.getCluster.getMetadata.getKeyspace(keyspace).getTable(table).getPrimaryKey.size
-
   private[this] def clean[T: CCCassFormatEncoder](toClean: T): (List[String], List[AnyRef]) =
     clean(implicitly[CCCassFormatEncoder[T]].encode(toClean).getOrThrow)
   @SuppressWarnings(Array("org.brianmckenna.wartremover.warts.Any", "org.brianmckenna.wartremover.warts.AsInstanceOf", "org.brianmckenna.wartremover.warts.IsInstanceOf"))
@@ -72,6 +65,8 @@ class ScalaSession(val keyspace: String)(implicit val session: Session) {
     case other                       => other
   }.unzip
 
+  def close(): Unit = session.close()
+
   def dropKeyspace(): ResultSet = session.execute(s"DROP KEYSPACE $keyspace")
 
   def createTable[T: CCCassFormatEncoder](name: String, numPartitionKeys: Int, numClusteringKeys: Int, tableProperties: String = ""): ResultSet = {
@@ -82,7 +77,7 @@ class ScalaSession(val keyspace: String)(implicit val session: Session) {
     val clusteringKeys = rest.take(numClusteringKeys)
     val pk = s"${partitionKeys.map(_._1).mkString("(", ", ", ")")}"
     val fullKey = if (numClusteringKeys > 0) s"($pk, ${clusteringKeys.map(_._1).mkString(", ")})" else s"($pk)"
-    val withClause = if (tableProperties.length > 0) s" WITH $tableProperties" else ""
+    val withClause = if (tableProperties.nonEmpty) s" WITH $tableProperties" else ""
     session.execute(s"CREATE TABLE $keyspace.$name (${allColumns.map(nt => s"${nt._1} ${nt._2}").mkString(", ")}, PRIMARY KEY $fullKey)" + withClause)
   }
 
