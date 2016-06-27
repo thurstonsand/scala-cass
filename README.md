@@ -35,7 +35,11 @@ val person_?: Option[Person] = r.getAs[Person]
 | timestamp      | org.joda.time.DateTime |
 | blob           | java.nio.ByteBuffer    |
 
-Also maps the following types to their equivalent in Cassandra:
+Additionally converts:
+* `java.math.BigInteger` and `java.math.BigDecimal` to `scala.math.BigInt` and `scala.math.BigDecimal`
+* `java.nio.ByteBuffer` to `scala.Array[Byte]`
+
+Maps the following types to their equivalent in Cassandra:
 * List
 * Set
 * Map
