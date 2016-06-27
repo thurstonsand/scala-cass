@@ -18,6 +18,29 @@ case class Person(name: String, age: Int, job: Option[String])
 val person: Person = r.as[Person]
 val person_?: Option[Person] = r.getAs[Person]
 ```
+#### Case Class Type Mapping
+
+| Cassandra Type |   Scala/Java Type    |
+|:--------------:|:--------------------:|
+| varchar        | String               |
+| uuid           | java.util.UUID       |
+| inet           | java.net.InetAddress |
+| int            | Int                  |
+| bigint         | Long                 |
+| boolean        | Boolean              |
+| double         | Double               |
+| varint         | BigInt               |
+| decimal        | BigDecimal           |
+| float          | Float                |
+| timestamp      | DateTime             |
+| blob           | java.nio.ByteBuffer  |
+
+Also maps the following types to their equivalent in Cassandra:
+* List
+* Set
+* Map
+
+The `Option` type can be used to indicate if a column should be used or not (if `None` it will skipped).
 
 ### Getting ScalaCass
 you can find it on bintray. Currently only supports **scala 2.11**  
