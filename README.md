@@ -55,7 +55,7 @@ if (row.getColumnDefinitions.contains("str") && !row.isNull("str")) Some(row.get
 | ScalaCass | 6.92us | 6.71us |
 |   Native  | 6.88us | 7.80us |
 ScalaCass is 99.392% the speed of native for `as`, 106.209% the speed of native for `getAs`  
-  
+
 compare the implementation of `as` for a case class:
 ```scala
 case class Strings(str1: String, str2: String, str3: String, str4: Option[String])
@@ -105,6 +105,7 @@ ss.selectOne("mytable", MyTable("a string", None)) // returns None
 * all queries are prepared and cached in ScalaSession
 * undefined behavior will throw whatever error the Java driver does unless otherwise explicitly mentioned
 
+#### createTable
 `createTable` can take an additional parameter tableProperties: String, containing all text after the WITH clause, eg:
 ```scala
 case class MyTable(str: String, i: Option[Int])
@@ -114,7 +115,7 @@ ss.createTable[MyTable]("mytable", 1, 0, "compression = { 'sstable_compression' 
 * an error is thrown if number of partition keys is set to 0 or number of partition and clustering keys is greater than the number of fields in the case class  
 * createTable is intended to be used primarily for testing frameworks.
 
-`insert` or `insertAsync`
+#### insert or insertAsync
 ```scala
 case class MyTable(str: String, i: Option[Int])
 // generates """INSERT INTO mykeyspace.mytable (str, i) VALUES ("asdf", 1234)"""
@@ -125,7 +126,7 @@ ss.insertAsync("mytable", MyTable("asdf2", None)).unsafePerformSync
 * nulls are not written into Cassandra for None case
 * queries are prepared and cached so they only need to be generated once
 
-`update` or `updateAsync`  
+#### update or updateAsync
 takes 2 types: the update case class and the query case class
 ```scala
 case class MyTable(str: String, i: Int, f: Float)
@@ -137,7 +138,7 @@ ss.createTable[MyTable]("mytable", 2, 0)
 ss.update[Update, Query]("mytable", Update(4.f), Query("asdf", 2))
 ```
 
-`select`, `selectAsync`, `selectOne`, or `selectOneAsync`  
+#### select, selectAsync, selectOne, or selectOneAsync
 can take an additional parameter includeColumns that specifies left-to-right how many fields to include in select query, otherwise use full primary key  
 \* NOTE: if includeColumns exceeds the number of keys in the primary key, ALLOW FILTERING is added to the query
 ```scala
@@ -160,10 +161,10 @@ if numColumns includes a field that is None, it counts as a column, but is not u
 ```scala
 ss.insert("mytable", MyTable("asdf3", None, "otherasdf")
 // generates """SELECT * FROM mykeyspace.mytable WHERE str="asdf2""""
-ss.selectOne("mytable", MyTable("asdf3", None, "junkField"), 2) // returns Some(MyTable("asdf3", None, "otherasdf") 
+ss.selectOne("mytable", MyTable("asdf3", None, "junkField"), 2) // returns Some(MyTable("asdf3", None, "otherasdf")
 ```
 
-`selectRaw`, `selectRawAsync`, `selectOneRaw`, or `selectOneRawAsync`  
+#### selectRaw, selectRawAsync, selectOneRaw, or selectOneRawAsync
 simply takes the query string and AnyRef args and executes, with the benefit of prepared statement caching
 ```scala
 case class MyTable(str: String, i: Option[Int], otherStr: Str)
@@ -173,7 +174,7 @@ ss.insert("mytable", MyTable("asdf", None, "otherasdf")
 ss.selectOneRaw("SELECT * FROM mykeyspace.mytable WHERE str=?", "asdf").getAs[MyTable] // returns Some(MyTable("asdf", None, "otherasdf"))
 ```
 
-`delete` or `deleteAsync`  
+#### delete or deleteAsync
 can take an additional parameter includeColumns that specifies left-to-right how many fields to include in delete query, otherwise use full primary key
 ```scala
 case class MyTable(str: String, str2: Option[String], i: Option[Int])
@@ -200,7 +201,7 @@ ss.delete("mytable", MyTable("asdf", None, None), 2)
 ss.select("mytable", MyTable("asdf", None, None)) // returns Iterator.empty[MyTable]
 ```
 
-`insertRaw`, `insertRawAsync`, `deleteRaw`, or `deleteRawAsync`  
+#### insertRaw, insertRawAsync, deleteRaw, or deleteRawAsync
 as with `selectRaw`, uses direct query string with benefits of caching
 ```scala
 ss.insertRaw("INSERT INTO mykeyspace.mytable (str str2) VALUES (?,?)", "asdf", "zxcv")
