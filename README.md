@@ -20,20 +20,20 @@ val person_?: Option[Person] = r.getAs[Person]
 ```
 #### Case Class Type Mapping
 
-| Cassandra Type |   Scala/Java Type    |
-|:--------------:|:--------------------:|
-| varchar        | String               |
-| uuid           | java.util.UUID       |
-| inet           | java.net.InetAddress |
-| int            | Int                  |
-| bigint         | Long                 |
-| boolean        | Boolean              |
-| double         | Double               |
-| varint         | BigInt               |
-| decimal        | BigDecimal           |
-| float          | Float                |
-| timestamp      | DateTime             |
-| blob           | java.nio.ByteBuffer  |
+| Cassandra Type |     Scala/Java Type    |
+|:--------------:|:----------------------:|
+| varchar        | String                 |
+| uuid           | java.util.UUID         |
+| inet           | java.net.InetAddress   |
+| int            | Int                    |
+| bigint         | Long                   |
+| boolean        | Boolean                |
+| double         | Double                 |
+| varint         | BigInt                 |
+| decimal        | BigDecimal             |
+| float          | Float                  |
+| timestamp      | org.joda.time.DateTime |
+| blob           | java.nio.ByteBuffer    |
 
 Also maps the following types to their equivalent in Cassandra:
 * List
