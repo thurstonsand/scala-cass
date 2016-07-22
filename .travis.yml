@@ -7,7 +7,6 @@ jdk:
 
 before_script:
   - wget https://github.com/Ichoran/thyme/raw/master/Thyme.jar -O /tmp/Thyme.jar
-  - echo $DOCKER_HOST
 script:
   - mkdir lib
   - cp /tmp/Thyme.jar lib
@@ -16,3 +15,7 @@ sudo: required
 
 services:
   - docker
+
+addons:
+  hosts:
+    - dockerhost
