@@ -20,7 +20,7 @@ libraryDependencies ++= Seq(
   "com.chuusai" %% "shapeless" % "2.3.1",
   "com.google.guava" % "guava" % "19.0",
   "org.scalatest" %% "scalatest" % "3.0.0-M15" % "test",
-  "com.whisk" %% "docker-testkit-scalatest" % "0.8.3" % "test"
+  "com.whisk" %% "docker-testkit-scalatest" % "0.6.1ß" % "test"
 )
 
 import scalariform.formatter.preferences._
