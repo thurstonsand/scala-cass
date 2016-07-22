@@ -26,7 +26,7 @@ class CreateTableUnitTests extends DockerCassandra with OptionValues {
 
   "createTable" should "reject a table without primary key" in {
     case class AA(str: String, str2: String, i: Int)
-    a [WrongPrimaryKeySizeException] should be thrownBy ssFixture.ss.createTable[AA]("createTableTest", 0, 0)(implicitly[CCCassFormatEncoder[AA]])
+    a[WrongPrimaryKeySizeException] should be thrownBy ssFixture.ss.createTable[AA]("createTableTest", 0, 0)(implicitly[CCCassFormatEncoder[AA]])
   }
 
   def getpk[T: CCCassFormatDecoder: CCCassFormatEncoder](tname: String, pkCount: Int, clustCount: Int) = {
