@@ -6,7 +6,7 @@ import ScalaCass._
 import com.weather.scalacass.util.DockerCassandra
 
 class PerfTest extends FlatSpec with DockerCassandra {
-  var session: Session = null
+  var session: Session = _
   val db = "perfdb"
   val table = "perftable"
 

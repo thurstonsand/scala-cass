@@ -42,12 +42,15 @@ object ScalaSession {
     def getP(k: K, toAdd: => V) = c.get(k, new Callable[V] { def call(): V = toAdd })
   }
 
-  class AllowFilteringNotEnabledException(m: String) extends QueryExecutionException(m)
+  //  class AllowFilteringNotEnabledException(m: String) extends QueryExecutionException(m)
   class WrongPrimaryKeySizeException(m: String) extends QueryExecutionException(m)
+
+  final case class Star(`*`: Nothing)
+  final case class NoQuery()
 }
 
 class ScalaSession(val keyspace: String)(implicit val session: Session) {
-  import ScalaSession.{resultSetFutureToScalaFuture, AllowFilteringNotEnabledException, WrongPrimaryKeySizeException, ScalaishCache}
+  import ScalaSession.{resultSetFutureToScalaFuture, WrongPrimaryKeySizeException, ScalaishCache, Star}
 
   private[this] def keyspaceMeta = session.getCluster.getMetadata.getKeyspace(keyspace)
 
@@ -155,28 +158,14 @@ class ScalaSession(val keyspace: String)(implicit val session: Session) {
   def batch(batches: Seq[Batch], batchType: BatchStatement.Type = BatchStatement.Type.LOGGED): ResultSet = session.execute(prepareBatch(batches, batchType))
   def batchAsync(batches: Seq[Batch], batchType: BatchStatement.Type = BatchStatement.Type.LOGGED): Future[ResultSet] = session.executeAsync(prepareBatch(batches, batchType))
 
-  private[this] def prepareSelect[T: CCCassFormatEncoder](table: String, selectable: T, allowFiltering: Boolean, limit: Long) = {
-    val (strArgs, anyrefArgs) = clean(selectable)
-    val prepared = queryCache.getP(strArgs.toSet + table + "SELECT", {
-      val limitStr = if (limit > 0) {
-        if (allowFiltering) s" LIMIT $limit"
-        else throw new AllowFilteringNotEnabledException("allowFiltering not enabled for query containing columns outside the primary key")
-      } else ""
-      val filteringStr = if (keyspaceMeta.getTable(table).getPrimaryKey.size() < anyrefArgs.length) s" ALLOW FILTERING" else ""
-      session.prepare(s"SELECT * FROM $keyspace.$table WHERE ${strArgs.map(_ + "=?").mkString(" AND ")}" + limitStr + filteringStr)
-    })
-    prepared.bind(anyrefArgs: _*)
-  }
-
-  private case class Star(`*`: Nothing)
-
-  def prepareSelect[Sub: CCCassFormatEncoder, Query: CCCassFormatEncoder](table: String, selectable: Query, allowFiltering: Boolean, limit: Long) = {
+  private[this] def prepareSelect[Sub: CCCassFormatEncoder, Query: CCCassFormatEncoder](table: String, selectable: Query, allowFiltering: Boolean, limit: Long) = {
     val sStrArgs = CCCassFormatEncoder[Sub].namesAndTypes.map(_._1)
     val (qStrArgs, qAnyRefArgs) = clean(selectable)
     val prepared = queryCache.getP(sStrArgs.toSet ++ qStrArgs.toSet + table + "SELECT", {
+      val whereClauseStr = if (qStrArgs.nonEmpty) s" WHERE ${qStrArgs.map(_ + "=?").mkString(" AND ")}" else ""
       val limitStr = if (limit > 0) s" LIMIT $limit" else ""
       val filteringStr = if (allowFiltering) s" ALLOW FILTERING" else ""
-      session.prepare(s"SELECT ${sStrArgs.mkString(", ")} FROM $keyspace.$table WHERE ${qStrArgs.map(_ + "=?").mkString(" AND ")}" + limitStr + filteringStr)
+      session.prepare(s"SELECT ${sStrArgs.mkString(", ")} FROM $keyspace.$table" + whereClauseStr + limitStr + filteringStr)
     })
     prepared.bind(qAnyRefArgs: _*)
   }
