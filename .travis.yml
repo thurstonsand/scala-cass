@@ -3,7 +3,7 @@ scala:
   - 2.11.8
 
 jdk:
-  - oraceljdk7
+  - oraclejdk7
 
 sudo: required
 
