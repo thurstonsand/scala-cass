@@ -9,7 +9,7 @@ before_script:
   - wget https://github.com/Ichoran/thyme/raw/master/Thyme.jar -O /tmp/Thyme.jar
   - mkdir lib
   - cp /tmp/Thyme.jar lib
-script: sbt +test
+script: sbt +test -l SkipTest
 
 sudo: required
 

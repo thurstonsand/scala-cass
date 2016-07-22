@@ -7,6 +7,8 @@ scalaVersion := "2.11.8"
 
 scalacOptions ++= Seq("-unchecked", "-deprecation", "-feature")
 
+parallelExecution in Test := false
+
 resolvers ++= Seq(
   Resolver.jcenterRepo,
   "Sonatype OSS Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots"
