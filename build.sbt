@@ -7,7 +7,7 @@ scalaVersion := "2.11.8"
 
 scalacOptions ++= Seq("-unchecked", "-deprecation", "-feature")
 
-parallelExecution in Test := false
+//parallelExecution in Test := false
 
 resolvers ++= Seq(
   Resolver.jcenterRepo,
@@ -20,7 +20,7 @@ libraryDependencies ++= Seq(
   "com.chuusai" %% "shapeless" % "2.3.1",
   "com.google.guava" % "guava" % "19.0",
   "org.scalatest" %% "scalatest" % "3.0.0-M15" % "test",
-  "com.whisk" %% "docker-testkit-scalatest" % "0.6.1" % "test"
+  "com.whisk" %% "docker-testkit-scalatest" % "0.8.3" % "test"
 )
 
 import scalariform.formatter.preferences._
