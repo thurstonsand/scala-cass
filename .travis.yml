@@ -5,18 +5,19 @@ scala:
 jdk:
   - oraclejdk7
 
-env:
-  - DOCKER_HOST=unix:///var/run/docker.sock
 before_script:
   - wget https://github.com/Ichoran/thyme/raw/master/Thyme.jar -O /tmp/Thyme.jar
-script:
   - mkdir lib
   - cp /tmp/Thyme.jar lib
-  - sbt +test
+script: sbt +test
+
 sudo: required
 
 services:
   - docker
+
+env:
+  - DOCKER_HOST=unix:///var/run/docker.sock
 
 addons:
   hosts:
