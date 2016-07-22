@@ -5,7 +5,7 @@ import org.scalatest.{FlatSpec, Tag}
 import ScalaCass._
 import com.weather.scalacass.util.DockerCassandra
 
-object SkipTest extends Tag("com.weather.scalacass.PerfTest")
+object PerfOnly extends Tag("com.weather.scalacass.PerfOnly")
 
 class PerfTest extends FlatSpec with DockerCassandra {
   var session: Session = _
@@ -19,7 +19,7 @@ class PerfTest extends FlatSpec with DockerCassandra {
 
   val th = ichi.bench.Thyme.warmed(verbose = print)
 
-  "string repeats" should "be decent" taggedAs SkipTest in {
+  "string repeats" should "be decent" taggedAs PerfOnly in {
     session.execute(s"CREATE KEYSPACE $db WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1};")
     session.execute(s"CREATE TABLE $db.$table (str varchar, str2 varchar, str3 varchar, str4 varchar, PRIMARY KEY ((str)))")
     def n = java.util.UUID.randomUUID.toString
