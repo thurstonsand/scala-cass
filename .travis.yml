@@ -1,4 +1,10 @@
 language: scala
+scala:
+  - 2.11.8
+
+jdk:
+  - oraceljdk7
+
 sudo: required
 
 services:
