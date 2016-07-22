@@ -5,6 +5,12 @@ scala:
 jdk:
   - oraclejdk7
 
+before_script:
+  - wget https://github.com/Ichoran/thyme/raw/master/Thyme.jar -O /tmp/Thyme.jar
+script:
+  - mkdir lib
+  - cp /tmp/Thyme.jar lib
+  - sbt +test
 sudo: required
 
 services:
