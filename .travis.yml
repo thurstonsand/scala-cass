@@ -9,7 +9,11 @@ before_script:
   - wget https://github.com/Ichoran/thyme/raw/master/Thyme.jar -O /tmp/Thyme.jar
   - mkdir lib
   - cp /tmp/Thyme.jar lib
-script: sbt +test -l SkipTest
+script: 
+  - sbt "testOnly com.weather.scalacass.CaseClassUnitTests"
+  - sbt "testOnly com.weather.scalacass.CreateTableUnitTests"
+  - sbt "testOnly com.weather.scalacass.ScalaCassUnitTests"
+  - sbt "testOnly com.weather.scalacass.SessionActionsUnitTest"
 
 sudo: required
 
