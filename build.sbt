@@ -1,7 +1,7 @@
 organization := "com.github.thurstonsand"
 name := "ScalaCass"
 
-version := "0.3.5"
+version := "0.3.4"
 
 scalaVersion := "2.11.8"
 
