@@ -1,27 +1,54 @@
 # ScalaCass
-### Light Cassandra wrapper that makes retrieval from Rows a little easier
+## [Cassandra Java Driver](https://github.com/datastax/java-driver) wrapper that makes retrieval from Rows a little easier
 [![Build Status](https://travis-ci.org/thurstonsand/scala-cass.svg?branch=master)](https://travis-ci.org/thurstonsand/scala-cass)
 
-usage is simple: `import com.weather.scalacass._, ScalaCass._` and you're on your way  
+### Getting ScalaCass
+you can find it on bintray. Currently only supports **scala 2.11**  
+**sbt**
 ```scala
-import com.weather.scalacass._, ScalaCass._
+resolvers += Resolver.jcenterRepo
+libraryDependencies += "com.github.thurstonsand" %% "scalacass" % "0.3.4"
+```
+**maven**  
+```xml
+<dependency>
+  <groupId>com.github.thurstonsand</groupId>
+  <artifactId>scalacass_2.11</artifactId>
+  <version>0.3.4</version>
+  <type>pom</type>
+</dependency>
+```
+
+### Overview
+* [row parsing](#row-parsing)
+* [type mappings](#type-mapping)
+* [parsing performance](#parsing-performance)
+* [session utilities](#session-utilities)
+  * [ScalaSession creation](#creating-a-scalasession)
+  * 
+
+### Row Parsing
+usage is simple: `import com.weather.scalacass.ScalaCass._` and you're on your way  
+```scala
+import com.weather.scalacass.ScalaCass._
 r: Row = getARow()
 val myStr: String = r.as[String]("mystr")
 val myMap: Map[String, Long] = r.as[Map[String, Long]]("mymap")
 val myBoolOpt: Option[Boolean] = r.getAs[Boolean]("mybool")
 val myBlobOpt: Option[Array[Byte]] = r.getAs[Array[Byte]]("myblob")
+val myInt: Int = r.getOrElse[Int]("myint", 5)
 ```
 etc
 
-and with case classes:
+and you can extract with case classes directly from a `Row`:
 ```scala
 case class Person(name: String, age: Int, job: Option[String])
 val person: Person = r.as[Person]
 val person_?: Option[Person] = r.getAs[Person]
+val personWithDefault: Person = r.getOrElse[Person](Person("default name", 24, None))
 ```
-#### Case Class Type Mapping
-
-| Cassandra Type |     Scala/Java Type    |
+### Type Mapping
+| Cassandra Type |       Scala Type       |
 |:--------------:|:----------------------:|
 | varchar        | String                 |
 | uuid           | java.util.UUID         |
@@ -34,37 +61,14 @@ val person_?: Option[Person] = r.getAs[Person]
 | decimal        | BigDecimal             |
 | float          | Float                  |
 | timestamp      | org.joda.time.DateTime |
-| blob           | java.nio.ByteBuffer    |
+| blob           | Array[Byte]            |
+| list           | List                   |
+| map            | Map                    |
+| set            | Set                    |
 
-Additionally converts:
-* `java.math.BigInteger` and `java.math.BigDecimal` to `scala.math.BigInt` and `scala.math.BigDecimal`
-* `java.nio.ByteBuffer` to `scala.Array[Byte]`
-
-Maps the following types to their equivalent in Cassandra:
-* List
-* Set
-* Map
-
-The `Option` type can be used to indicate if a column should be used or not (if `None` it will skipped).
-
-### Getting ScalaCass
-you can find it on bintray. Currently only supports **scala 2.11**  
-**sbt**
-```scala
-resolvers += Resolver.jcenterRepo
-libraryDependencies += "com.github.thurstonsand" %% "scalacass" % "0.1"
-```
-**maven**  
-```xml
-<dependency>
-  <groupId>com.github.thurstonsand</groupId>
-  <artifactId>scalacass_2.11</artifactId>
-  <version>0.1</version>
-  <type>pom</type>
-</dependency>
-```
-
-### Performance
+### Option
+in the same way that `getAs` will return a `None` if it does not exist, using `Option[SomeType]` will only extract the value if there are no errors.
+### Parsing Performance
 performance is pretty decent.
 
 Measurements taken by extracting a String/Case Class 10,000 times with [Thyme](https://github.com/Ichoran/thyme)  
@@ -82,6 +86,7 @@ if (row.getColumnDefinitions.contains("str") && !row.isNull("str")) Some(row.get
 |:---------:|:------:|:------:|
 | ScalaCass | 6.92us | 6.71us |
 |   Native  | 6.88us | 7.80us |
+
 ScalaCass is 99.392% the speed of native for `as`, 106.209% the speed of native for `getAs`  
 
 compare the implementation of `as` for a case class:
@@ -106,44 +111,47 @@ def ga(name: String) = if (row.getColumnDefinitions.contains(name) && !row.isNul
 |:---------------------------:|:------:|:------:|
 |          ScalaCass          | 68.1us | 65.7us |
 | ScalaCass w/ cachedImplicit | 39.3us | 39.1us |
-|            Native           | 30.5us | 36.5us |     
+|            Native           | 30.5us | 36.5us |
+
 ScalaCass alone is 44.844% the speed of native for `as`, 55.557% the speed of native for `getAs`  
 ScalaCass w/ `cachedImplicit` is 77.664% the speed of native for `as`, 93.372% the speed of native for `getAs`
-* `cachedImplicit` is a feature of shapeless that caches the underlying representation of a case class so that it does not need to be constantly recreated for every call.
+* `cachedImplicit` is a feature of shapeless that caches the underlying representation of a case class so that it does not need to be recreated on every call.
 
 ### Session utilities
-
-There are also utility functions that work with Cassandra Sessions:
+#### Creating a ScalaSession
 ```scala
 implicit val s: Session = someCassSession
-val ss = new ScalaSession("mykeyspace") // the session can be picked up implicitly
-case class MyTable(str: String, i: Option[Int])
-
-// name of table, number of partition keys (left-to-right), number of clustering keys (left-to-right)
-ss.createTable[MyTable]("mytable", 1, 0)
-ss.insert("mytable", MyTable("a string", Some(1234)))
-ss.selectOne("mytable", MyTable("a string", None)).getAs[MyTable] // returns Some(MyTable("a string", Some(1234)))
-ss.selectOneRaw("SELECT * FROM mykeyspace.mytable WHERE str=?", "a string").getAs[MyTable] // returns Some(MyTable("a string", Some(1234)))
-ss.delete("mytable", MyTable("a string", None))
-ss.selectOne("mytable", MyTable("a string", None)) // returns None
+val ss1 = ScalaSession("mykeyspace")(s) // either pass explicitly
+val ss2 = ScalaSession("mykeyspace") // or pick up implicitly
 ```
-* all case classes should be modeled left-to-right with partition keys -> clustering keys -> remaining columns
-* all functions have an async variant that returns a scala `Future[ResultSet]`
-* there is no need to convert types to AnyRef variants. That is all handled by ScalaCass (with the exception of `Raw` functions)
-* all queries are prepared and cached in ScalaSession
-* undefined behavior will throw whatever error the Java driver does unless otherwise explicitly mentioned
+* `ScalaSession` caches `PreparedStatement`s, and therefore needs a concrete instantiation vs an implicit conversion
+* `ScalaSession`s scope to the keyspace level. To access more than 1 keyspace, create multiple `ScalaSession`s with the same `Session`
 
-#### createTable
-`createTable` can take an additional parameter tableProperties: String, containing all text after the WITH clause, eg:
+It is also possible to create the keyspace when instantiating a ScalaSession by providing a non-empty "WITH" statement
+```scala
+val ss = ScalaSession("mykeyspace", "REPLICATION = { 'class' : 'SimpleStrategy', 'replication_factor' : 3 })"
+```
+* the String field is prepended with " WITH ", meaning the above cassandra call will look like `CREATE KEYSPACE mykeyspace WITH REPLICATION = { 'class' : 'SimpleStrategy', 'replication_factor' : 3 };`
+
+#### Creating Tables and Table Representation
+case class representations of a table are ordered left-to-right, partition keys -> clustering keys -> remaining columns
 ```scala
 case class MyTable(str: String, i: Option[Int])
-// generates "CREATE TABLE mykeyspace.mytable (str varchar, i int, PRIMARY KEY ((str))) WITH compression = { 'sstable_compression' : 'DeflateCompressor', 'chunk_length_kb' : 64 }"
-ss.createTable[MyTable]("mytable", 1, 0, "compression = { 'sstable_compression' : 'DeflateCompressor', 'chunk_length_kb' : 64 }")
+ss.createTable[MyTable]("mytable", 1, 0)
 ```
+* `createTable` takes parameters (tableName, number of partition keys, number of clustering keys)
+* The above table takes `str` as a partition key, no clustering keys, and `i` as a regular field
+* The underlying Cassandra call looks like `CREATE TABLE mykeyspace.mytable (str varchar, i int, PRIMARY KEY ((str)));`
 * an error is thrown if number of partition keys is set to 0 or number of partition and clustering keys is greater than the number of fields in the case class  
-* createTable is intended to be used primarily for testing frameworks.
+* createTable is intended to be used primarily for testing frameworks
 
-#### insert or insertAsync
+it is also possible to pass parameters to the create table function by providing a non-empty String
+```scala
+ss.createTable[MyTable]("mytable", 1, 0, "COMPACT STORAGE")
+```
+* like keyspace creation, " WITH " is appended to the String, meaning the above call looks like `CREATE TABLE mykeyspace.mytable (str varchar, i int, PRIMARY KEY ((str))) WITH COMPACT STORAGE;`
+
+#### `insert`/`insertAsync`
 ```scala
 case class MyTable(str: String, i: Option[Int])
 // generates """INSERT INTO mykeyspace.mytable (str, i) VALUES ("asdf", 1234)"""
@@ -151,11 +159,11 @@ ss.insert("mytable", MyTable("asdf", Some(1234)))
 // generates """INSERT INTO mykeyspace.mytable (str) VALUES ("asdf")"""
 ss.insertAsync("mytable", MyTable("asdf2", None)).unsafePerformSync
 ```
-* nulls are not written into Cassandra for None case
-* queries are prepared and cached so they only need to be generated once
+* `PreparedStatement`s are created and cached
+* In the case of `None` instances, they are removed before the caching phase, so `null` is never written to Cassandra
 
-#### update or updateAsync
-takes 2 types: the update case class and the query case class
+#### `update`/`updateAsync`
+requires both a query case class and update case class
 ```scala
 case class MyTable(str: String, i: Int, f: Float)
 case class Query(str: String, i: Int)
@@ -166,44 +174,62 @@ ss.createTable[MyTable]("mytable", 2, 0)
 ss.update[Update, Query]("mytable", Update(4.f), Query("asdf", 2))
 ```
 
-#### select, selectAsync, selectOne, or selectOneAsync
-can take an additional parameter includeColumns that specifies left-to-right how many fields to include in select query, otherwise use full primary key  
-\* NOTE: if includeColumns exceeds the number of keys in the primary key, ALLOW FILTERING is added to the query
+#### `select`/`selectAsync`/`selectOne`/`selectOneAsync`
+`select` functions return a Cassandra `Row`, which can be converted into case classes with the `.as` family of implicit functions
 ```scala
-case class MyTable(str: String, i: Option[Int], otherStr: Str)
+case class MyTable(str: String, i: Option[Int], otherStr: String)
 ss.createTable[MyTable]("mytable", 1, 0)
 
 ss.insert("mytable", MyTable("asdf", None, "otherasdf")
+
+case class MyQuery(str: String)
 // generates """SELECT * FROM mykeyspace.mytable WHERE str="asdf""""
-ss.selectOne("mytable", MyTable("asdf", None, "junkField"), 1) // returns Some(MyTable("asdf", None, "otherasdf"))
+val res = ss.selectOne("mytable", MyQuery("asdf")) // Some(Row)
+res.flatMap(_.getAs[MyTable]) // Some(MyTable("asdf", None, "otherasdf")
 ```
+* In the case of `None` instances, they are removed from the query before searching
+* If the `None` is part of a partition key, the query will fail and the underlying Cassandra driver will throw the appropriate error 
 
-if a value is None, it is removed from the query  
+`select` and `selectAsync` also take an optional `limit` parameter:
 ```scala
-ss.insert("mytable", MyTable("asdf2", None, "otherasdf")
-// generates """SELECT * FROM mykeyspace.mytable WHERE str="asdf2" AND otherstr="otherasdf" ALLOW FILTERING"""
-ss.select("mytable", MyTable("asdf2", None, "otherasdf"), 3) // returns Iterator(MyTable("asdf2", None, "otherasdf"))
+ss.select("mytable", MyQuery("asdf"), limit=100) // will return a max of 100 rows
 ```
-
-if numColumns includes a field that is None, it counts as a column, but is not ultimately used in the query
+all 4 functions also take an optional `allowFiltering` parameter
 ```scala
-ss.insert("mytable", MyTable("asdf3", None, "otherasdf")
-// generates """SELECT * FROM mykeyspace.mytable WHERE str="asdf2""""
-ss.selectOne("mytable", MyTable("asdf3", None, "junkField"), 2) // returns Some(MyTable("asdf3", None, "otherasdf")
+case class MyTable(str: String, i: Int, b: Boolean)
+ss.createTable[MyTable]("mytable", 2, 0) // str and i are partition keys
+case class MyQuery(str: String)
+ss.select("mytable", MyQuery("asdf")) // will fail with exception, requires "allow filtering"
+ss.select("mytable", MyQuery("asdf"), allowFiltering=true) // succeeds
 ```
-
-#### selectRaw, selectRawAsync, selectOneRaw, or selectOneRawAsync
-simply takes the query string and AnyRef args and executes, with the benefit of prepared statement caching
+if you want to select everything in table, `NoQuery` is provided
+ ```scala
+ // generates """SELECT * FROM mykeyspace.mytable"""
+ ss.select("mytable", ScalaSession.NoQuery()) // returns everything in "mytable"
+ ```
+#### `selectColumns`/`selectColumnsAsync`/`selectColumnsOne`/`selectColumnsOneAsync`
+function signatures are similar to their non-column counterparts, but with an extra type parameter describing which columns to extract
 ```scala
-case class MyTable(str: String, i: Option[Int], otherStr: Str)
+case class MyTable(str: String, i: Option[Int], otherStr: String)
 ss.createTable[MyTable]("mytable", 1, 0)
 
 ss.insert("mytable", MyTable("asdf", None, "otherasdf")
-ss.selectOneRaw("SELECT * FROM mykeyspace.mytable WHERE str=?", "asdf").getAs[MyTable] // returns Some(MyTable("asdf", None, "otherasdf"))
-```
 
-#### delete or deleteAsync
-can take an additional parameter includeColumns that specifies left-to-right how many fields to include in delete query, otherwise use full primary key
+case class MyInterestingFields(i: Option[Int], otherStr: String)
+case class MyQuery(str: String)
+// generates """SELECT i, otherstr FROM mykeyspace.mytable WHERE str="asdf""""
+val res = ss.selectColumnsOne[MyInterestingFields, MyQuery]("mytable", MyQuery("asdf")) // Some(Row)
+res.as[MyTable] // throws exception: missing "str" column
+res.as[MyInterestingFields] // MyInterestingFields(None, "otherasdf")
+```
+if you want to query with `*`, `Star` is provided:
+```scala
+// generates """SELECT * FROM mykeyspace.mytable WHERE str="asdf""""
+ss.selectColumns[ScalaSession.Star, MyQuery]("mytable", MyQuery("asdf"))
+```
+`Star` is impossible to instantiate because it takes an argument of type `Nothing`, but is useful as a type parameter to
+the "Columns" family of functions
+#### `delete`/`deleteAsync`
 ```scala
 case class MyTable(str: String, str2: Option[String], i: Option[Int])
 ss.createTable[MyTable]("mytable", 1, 1)
@@ -212,12 +238,12 @@ ss.insert("mytable", MyTable("asdf", Some("zxcv"), Some(1234))
 ss.insert("mytable", MyTable("asdf", Some("zxcv2"), None)
 // generates """DELETE * FROM mykeyspace.mytable WHERE str="asdf" AND str2="zxcv"""
 ss.delete("mytable", MyTable("asdf", Some("zxcv"), None))
-ss.select("mytable", MyTable("asdf", None, None)) // returns Iterator(MyTable("asdf", Some("zxcv2"), Some(1234)))
+ss.select("mytable", MyTable("asdf", None, None)).map(_.as[MyTable]) // returns Iterator(MyTable("asdf", Some("zxcv2"), Some(1234)))
 
 ss.insert("mytable", MyTable("asdf", Some("zxcv"), Some(1234))
 // generates """DELETE * FROM mykeyspace.mytable WHERE str="asdf""""
-ss.delete("mytable", MyTable("asdf", Some("zxcv"), None), 1)
-ss.select("mytable", MyTable("asdf", None, None)) // returns Iterator.empty[MyTable]
+ss.delete("mytable", MyTable("asdf", Some("zxcv"), None))
+ss.select("mytable", MyTable("asdf", None, None)) // returns Iterator.empty[Row]
 ```
 
 if a value is None, it is removed from the query
@@ -225,8 +251,17 @@ if a value is None, it is removed from the query
 ss.insert("mytable", MyTable("asdf", Some("zxcv"), None)
 ss.insert("mytable", MyTable("asdf", Some("zxcv2"), None)
 // generates """DELETE * FROM mykeyspace.mytable WHERE str="asdf""""
-ss.delete("mytable", MyTable("asdf", None, None), 2)
+ss.delete("mytable", MyTable("asdf", None, None))
 ss.select("mytable", MyTable("asdf", None, None)) // returns Iterator.empty[MyTable]
+```
+#### `selectRaw`/`selectRawAsync`/`selectOneRaw`/`selectOneRawAsync`
+simply takes the query string and AnyRef args, with the benefit of prepared statement caching
+```scala
+case class MyTable(str: String, i: Option[Int], otherStr: Str)
+ss.createTable[MyTable]("mytable", 1, 0)
+
+ss.insert("mytable", MyTable("asdf", None, "otherasdf")
+ss.selectOneRaw("SELECT * FROM mykeyspace.mytable WHERE str=?", "asdf").as[MyTable] // returns MyTable("asdf", None, "otherasdf")
 ```
 
 #### insertRaw, insertRawAsync, deleteRaw, or deleteRawAsync
@@ -238,12 +273,14 @@ ss.deleteRaw("DELETE * FROM mykeyspace.mytable WHERE str=? AND str2=?", "asdf", 
 ss.select("mytable", MyTable("asdf", None, None)) // returns Iterator(MyTable("asdf", Some("zxcv2"), Some(1234)))
 ```
 
-### Batch statements
+#### Batch statements
 batch statements are now supported via a handful of case classes:
 ```scala
 case class MyTable(str: String, i: Int, f: Float)
 case class Query(str: String, i: Int)
 case class Update(f: Float)
+
+ss.createTable[MyTable]("mytable", 1, 1)
 
 val updateBatch = UpdateBatch("mytable", Update(4.f), Query("asdf", 2))
 val deleteBatch = DeleteBatch("mytable", Query("asdf", 2)
@@ -252,4 +289,4 @@ val insertBatch = InsertBatch("mytable", MyTable("fdsa", 1234, 43.21f))
 ss.batch(Seq(updateBatch, deleteBatch, insertBatch))
 ```
 
-the session utilities are experimental, and suggestions are welcome on a better syntax
+the session utilities are experimental, and suggestions/pull requests are welcome

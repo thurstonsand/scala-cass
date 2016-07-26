@@ -30,11 +30,9 @@ object ScalaSession {
     )
     p.future
   }
-  def apply(keyspace: String, keyspaceProperties: Option[String] = None)(implicit session: Session): ScalaSession = {
-    keyspaceProperties.foreach { prop =>
-      val withClause = if (prop.length > 0) s" WITH $prop" else ""
-      session.execute(s"CREATE KEYSPACE IF NOT EXISTS $keyspace" + withClause)
-    }
+  def apply(keyspace: String, keyspaceProperties: String = "")(implicit session: Session): ScalaSession = {
+    if (keyspaceProperties.nonEmpty)
+      session.execute(s"CREATE KEYSPACE IF NOT EXISTS $keyspace WITH $keyspaceProperties")
     new ScalaSession(keyspace)
   }
 
@@ -46,7 +44,13 @@ object ScalaSession {
   class WrongPrimaryKeySizeException(m: String) extends QueryExecutionException(m)
 
   final case class Star(`*`: Nothing)
+  object Star {
+    implicit val ccCassEncoder: CCCassFormatEncoder[Star] = shapeless.cachedImplicit
+  }
   final case class NoQuery()
+  object NoQuery {
+    implicit val ccCassEncoder: CCCassFormatEncoder[NoQuery] = shapeless.cachedImplicit
+  }
 }
 
 class ScalaSession(val keyspace: String)(implicit val session: Session) {
@@ -183,9 +187,9 @@ class ScalaSession(val keyspace: String)(implicit val session: Session) {
     session.execute(prepareSelect[Sub, Query](table, selectable, allowFiltering, limit)).iterator.asScala
   def selectColumnsAsync[Sub: CCCassFormatEncoder, Query: CCCassFormatEncoder](table: String, selectable: Query, allowFiltering: Boolean = false, limit: Long = 0): Future[Iterator[Row]] =
     session.executeAsync(prepareSelect[Sub, Query](table, selectable, allowFiltering, limit)).map(_.iterator.asScala)
-  def selectColumnOne[Sub: CCCassFormatEncoder, Query: CCCassFormatEncoder](table: String, selectable: Query, allowFiltering: Boolean = false): Option[Row] =
+  def selectColumnsOne[Sub: CCCassFormatEncoder, Query: CCCassFormatEncoder](table: String, selectable: Query, allowFiltering: Boolean = false): Option[Row] =
     Option(session.execute(prepareSelect[Sub, Query](table, selectable, allowFiltering, 0)).one())
-  def selectColumnOneAsync[Sub: CCCassFormatEncoder, Query: CCCassFormatEncoder](table: String, selectable: Query, allowFiltering: Boolean = false): Future[Option[Row]] =
+  def selectColumnsOneAsync[Sub: CCCassFormatEncoder, Query: CCCassFormatEncoder](table: String, selectable: Query, allowFiltering: Boolean = false): Future[Option[Row]] =
     session.executeAsync(prepareSelect[Sub, Query](table, selectable, allowFiltering, 0)).map(rs => Option(rs.one()))
 
   private[this] def prepareRawSelect(query: String, anyrefArgs: Seq[AnyRef]) = {
