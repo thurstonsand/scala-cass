@@ -25,7 +25,14 @@ libraryDependencies += "com.github.thurstonsand" %% "scalacass" % "0.3.4"
 * [parsing performance](#parsing-performance)
 * [session utilities](#session-utilities)
   * [ScalaSession creation](#creating-a-scalasession)
-  * 
+  * [Creating tables and table representation](#creating-tables-and-table-representation)
+  * [Inserts](#insertinsertasync)
+  * [Updates](#updateupdateasync)
+  * [Selects](#selectselectasyncselectoneselectoneasync)
+  * [Selects for only specific columns](#selectcolumnsselectcolumnsasyncselectcolumnsoneselectcolumnsoneasync)
+  * [Deletes] (#deletedeleteasync)
+  * [Raw Queries](#selectrawselectrawasyncselectonerawselectonerawasync)
+  * [Batch statements](#batch-statements)
 
 ### Row Parsing
 usage is simple: `import com.weather.scalacass.ScalaCass._` and you're on your way  

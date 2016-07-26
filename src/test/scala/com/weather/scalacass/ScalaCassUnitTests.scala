@@ -44,7 +44,7 @@ class ScalaCassUnitTests extends CassandraTester("testDB", "testTable", List("st
     case class QueryCC(pkField: String)
     implicit val s = client.session
     val ss = new ScalaSession(dbName)
-    val tname = s"test${TestCC.hashCode.toString.take(5)}"
+    val tname = s"testdb${scala.util.Random.alphanumeric.take(12).mkString}"
     ss.createTable[TestCC](tname, 1, 0)(CCCassFormatEncoder[TestCC])
     val t1 = TestCC("t1", v)
     val q1 = QueryCC(t1.pkField)
@@ -59,6 +59,7 @@ class ScalaCassUnitTests extends CassandraTester("testDB", "testTable", List("st
     }
     ss.delete(tname, q1)
     ss.select(tname, q1).toList.map(_.as[TestCC]) shouldBe empty
+    ss.dropTable(tname)
   }
 
   "strings" should "be extracted correctly" in testType[String, Int]("str", "asdf", "qwerty")
