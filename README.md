@@ -30,8 +30,8 @@ libraryDependencies += "com.github.thurstonsand" %% "scalacass" % "0.3.4"
   * [updates](#updateupdateasync)
   * [selects](#selectselectasyncselectoneselectoneasync)
   * [selects for only specific columns](#selectcolumnsselectcolumnsasyncselectcolumnsoneselectcolumnsoneasync)
-  * [deletes] (#deletedeleteasync)
-  * [raw Queries](#selectrawselectrawasyncselectonerawselectonerawasync)
+  * [deletes](#deletedeleteasync)
+  * [raw queries](#selectrawselectrawasyncselectonerawselectonerawasync)
   * [batch statements](#batch-statements)
 
 ### Row Parsing
