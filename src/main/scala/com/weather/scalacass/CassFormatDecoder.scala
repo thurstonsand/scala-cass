@@ -135,12 +135,16 @@ trait LowPriorityCassFormatDecoder {
       def decode(r: Row, name: String): Either[Throwable, Map[A, B]] =
         tryDecodeE(r, name, (rr, nn) => f2t(rr.getMap(nn, underlyingA.clazz, underlyingB.clazz)))
     }
-  implicit val dateTimeFormat = new CassFormatDecoder[DateTime] {
+
+  implicit val dateFormat = new CassFormatDecoder[java.util.Date] {
     type From = java.util.Date
     val clazz = classOf[java.util.Date]
-    def f2t(f: From) = Try(new DateTime(f)).toEither
+    def f2t(f: From) = Right(f)
     def decode(r: Row, name: String) = tryDecodeE(r, name, (rr, nn) => f2t(r.getDate(name)))
   }
+
+  implicit val dateTimeFormat: CassFormatDecoder[DateTime] =
+    dateFormat.flatMap(d => Try(new DateTime(d)).toEither)
 
   implicit val blobFormat = new CassFormatDecoder[Array[Byte]] {
     type From = java.nio.ByteBuffer
