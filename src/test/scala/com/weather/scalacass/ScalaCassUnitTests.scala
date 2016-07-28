@@ -1,11 +1,10 @@
 package com.weather.scalacass
 
-import com.datastax.driver.core.exceptions.InvalidTypeException
+import com.datastax.driver.core.exceptions.{CodecNotFoundException, InvalidTypeException}
 import org.joda.time.DateTime
 import org.scalatest.OptionValues
 import com.weather.scalacass.util.CassandraTester
 import ScalaCass._
-import com.weather.scalacass.CassFormatDecoder.ValueNotDefinedException
 
 class ScalaCassUnitTests extends CassandraTester("testDB", "testTable", List("str varchar", "str2 ascii", "b blob",
   "d decimal", "f float", "net inet", "tid timeuuid", "vi varint", "i int", "bi bigint", "bool boolean", "dub double",
@@ -33,7 +32,7 @@ class ScalaCassUnitTests extends CassandraTester("testDB", "testTable", List("st
     }
 
     an[IllegalArgumentException] should be thrownBy res.as[GoodType](s"not$k")
-    an[InvalidTypeException] should be thrownBy res.as[BadType](k)
+    a[CodecNotFoundException] should be thrownBy res.as[BadType](k)
     an[IllegalArgumentException] should be thrownBy res.as[BadType](s"not$k")
 
     res.getAs[GoodType](s"not$k") shouldBe None
@@ -94,7 +93,7 @@ class ScalaCassUnitTests extends CassandraTester("testDB", "testTable", List("st
     val res = client.session.execute(s"SELECT * FROM $dbName.$counterTable").one()
     res.as[Long](k) shouldBe 1
     an[IllegalArgumentException] should be thrownBy res.as[Long](s"not$k")
-    an[InvalidTypeException] should be thrownBy res.as[String](k)
+    a[CodecNotFoundException] should be thrownBy res.as[String](k)
     an[IllegalArgumentException] should be thrownBy res.as[String](s"not$k")
 
     res.getAs[Long](k).value shouldBe 1

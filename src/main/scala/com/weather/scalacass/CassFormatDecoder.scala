@@ -1,6 +1,6 @@
 package com.weather.scalacass
 
-import com.datastax.driver.core.Row
+import com.datastax.driver.core.{DataType, Row}
 import com.datastax.driver.core.exceptions.{InvalidTypeException, QueryExecutionException}
 import org.joda.time.DateTime
 
@@ -153,22 +153,23 @@ trait LowPriorityCassFormatDecoder {
     def decode(r: Row, name: String) = tryDecodeE(r, name, (rr, nn) => f2t(r.getDate(name)))
   }
 
-  val timeAsLongFormat = new CassFormatDecoder[Long] {
-    type From = Long
-    val clazz = classOf[Long]
-    def f2t(f: From) = Right(f)
-    def decode(r: Row, name: String) = tryDecodeE(r, name, (rr, nn) => f2t(r.getTime(name)))
-  }
+  //  val timeAsLongFormat = new CassFormatDecoder[Long] {
+  //    type From = java.lang.Long
+  //    val clazz = classOf[java.lang.Long]
+  //    def f2t(f: From) = Right(f)
+  //    def decode(r: Row, name: String) = tryDecodeE(r, name, (rr, nn) => f2t(r.getTime(name)))
+  //  }
 
   implicit val blobFormat = new CassFormatDecoder[Array[Byte]] {
     type From = java.nio.ByteBuffer
-    val clazz = classOf[From]
+    val clazz = classOf[java.nio.ByteBuffer]
+
     def f2t(f: From) = Try(com.datastax.driver.core.utils.Bytes.getArray(f).toIndexedSeq.toArray).toEither
     def decode(r: Row, name: String) = Try[Either[Throwable, Array[Byte]]] {
-      val cassClass = r.getColumnDefinitions.getType(name).asJavaClass
+      val cassName = r.getColumnDefinitions.getType(name).getName
       if (r.isNull(name)) Left(new ValueNotDefinedException(s""""$name" was not defined in ${r.getColumnDefinitions.getTable(name)}"""))
-      else if (cassClass != clazz)
-        Left(new InvalidTypeException(s"Column $name is a $cassClass, cannot be retrieved as an Array[Byte]"))
+      else if (!(cassName isCompatibleWith DataType.Name.BLOB))
+        Left(new InvalidTypeException(s"Column $name is a $cassName, cannot be retrieved as an Array[Byte]"))
       else f2t(r.getBytes(name))
     } match {
       case TSuccess(v) => v
