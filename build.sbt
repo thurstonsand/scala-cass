@@ -15,7 +15,7 @@ resolvers ++= Seq(
 )
 
 libraryDependencies ++= Seq(
-  "com.datastax.cassandra" % "cassandra-driver-core" % "2.1.9" classifier "shaded" excludeAll ExclusionRule(organization = "io.netty", name = "netty-handler"),
+  "com.datastax.cassandra" % "cassandra-driver-core" % "3.0.3" classifier "shaded" excludeAll ExclusionRule(organization = "io.netty", name = "netty-handler"),
   "joda-time" % "joda-time" % "2.9.1",
   "com.chuusai" %% "shapeless" % "2.3.1",
   "com.google.guava" % "guava" % "19.0",

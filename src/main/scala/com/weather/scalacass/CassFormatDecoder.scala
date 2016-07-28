@@ -140,11 +140,25 @@ trait LowPriorityCassFormatDecoder {
     type From = java.util.Date
     val clazz = classOf[java.util.Date]
     def f2t(f: From) = Right(f)
-    def decode(r: Row, name: String) = tryDecodeE(r, name, (rr, nn) => f2t(r.getDate(name)))
+    def decode(r: Row, name: String) = tryDecodeE(r, name, (rr, nn) => f2t(r.getTimestamp(name)))
   }
 
   implicit val dateTimeFormat: CassFormatDecoder[DateTime] =
     dateFormat.flatMap(d => Try(new DateTime(d)).toEither)
+
+  implicit val datastaxLocalDateFormat = new CassFormatDecoder[com.datastax.driver.core.LocalDate] {
+    type From = com.datastax.driver.core.LocalDate
+    val clazz = classOf[com.datastax.driver.core.LocalDate]
+    def f2t(f: From) = Right(f)
+    def decode(r: Row, name: String) = tryDecodeE(r, name, (rr, nn) => f2t(r.getDate(name)))
+  }
+
+  val timeAsLongFormat = new CassFormatDecoder[Long] {
+    type From = Long
+    val clazz = classOf[Long]
+    def f2t(f: From) = Right(f)
+    def decode(r: Row, name: String) = tryDecodeE(r, name, (rr, nn) => f2t(r.getTime(name)))
+  }
 
   implicit val blobFormat = new CassFormatDecoder[Array[Byte]] {
     type From = java.nio.ByteBuffer
