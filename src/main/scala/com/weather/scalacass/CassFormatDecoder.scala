@@ -28,29 +28,9 @@ trait CassFormatDecoder[T] { self =>
   }
 }
 
-trait LowPriorityCassFormatDecoder {
-  import CassFormatDecoder.{TryEither, ValueNotDefinedException}
-  private def tryDecode[T](r: Row, name: String, decode: (Row, String) => T) = Try[Either[Throwable, T]](
-    if (r.isNull(name)) Left(new ValueNotDefinedException(s""""$name" was not defined in ${r.getColumnDefinitions.getTable(name)}"""))
-    else Right(decode(r, name))
-  ) match {
-      case TSuccess(v) => v
-      case TFailure(e) => Left(e)
-    }
-  private def tryDecodeE[T](r: Row, name: String, decode: (Row, String) => Either[Throwable, T]) = Try[Either[Throwable, T]](
-    if (r.isNull(name)) Left(new ValueNotDefinedException(s""""$name" was not defined in ${r.getColumnDefinitions.getTable(name)}"""))
-    else decode(r, name)
-  ) match {
-      case TSuccess(v) => v
-      case TFailure(e) => Left(e)
-    }
+trait LowPriorityCassFormatDecoder extends LowPriorityCassFormatDecoderVersionSpecific {
+  import CassFormatDecoder.{TryEither, ValueNotDefinedException, tryDecode, tryDecodeE, sameTypeCassFormat}
 
-  def sameTypeCassFormat[T <: AnyRef](_clazz: Class[T], _decode: (Row, String) => T) = new CassFormatDecoder[T] {
-    type From = T
-    val clazz = _clazz
-    def f2t(f: From) = Right(f)
-    def decode(r: Row, name: String) = tryDecode(r, name, _decode)
-  }
   implicit val stringFormat = sameTypeCassFormat(classOf[String], _ getString _)
   implicit val uuidFormat = sameTypeCassFormat(classOf[java.util.UUID], _ getUUID _)
   implicit val iNetFormat = sameTypeCassFormat[java.net.InetAddress](classOf[java.net.InetAddress], _ getInet _)
@@ -136,29 +116,8 @@ trait LowPriorityCassFormatDecoder {
         tryDecodeE(r, name, (rr, nn) => f2t(rr.getMap(nn, underlyingA.clazz, underlyingB.clazz)))
     }
 
-  implicit val dateFormat = new CassFormatDecoder[java.util.Date] {
-    type From = java.util.Date
-    val clazz = classOf[java.util.Date]
-    def f2t(f: From) = Right(f)
-    def decode(r: Row, name: String) = tryDecodeE(r, name, (rr, nn) => f2t(r.getTimestamp(name)))
-  }
-
   implicit val dateTimeFormat: CassFormatDecoder[DateTime] =
     dateFormat.flatMap(d => Try(new DateTime(d)).toEither)
-
-  implicit val datastaxLocalDateFormat = new CassFormatDecoder[com.datastax.driver.core.LocalDate] {
-    type From = com.datastax.driver.core.LocalDate
-    val clazz = classOf[com.datastax.driver.core.LocalDate]
-    def f2t(f: From) = Right(f)
-    def decode(r: Row, name: String) = tryDecodeE(r, name, (rr, nn) => f2t(r.getDate(name)))
-  }
-
-  //  val timeAsLongFormat = new CassFormatDecoder[Long] {
-  //    type From = java.lang.Long
-  //    val clazz = classOf[java.lang.Long]
-  //    def f2t(f: From) = Right(f)
-  //    def decode(r: Row, name: String) = tryDecodeE(r, name, (rr, nn) => f2t(r.getTime(name)))
-  //  }
 
   implicit val blobFormat = new CassFormatDecoder[Array[Byte]] {
     type From = java.nio.ByteBuffer
@@ -168,7 +127,7 @@ trait LowPriorityCassFormatDecoder {
     def decode(r: Row, name: String) = Try[Either[Throwable, Array[Byte]]] {
       val cassName = r.getColumnDefinitions.getType(name).getName
       if (r.isNull(name)) Left(new ValueNotDefinedException(s""""$name" was not defined in ${r.getColumnDefinitions.getTable(name)}"""))
-      else if (!(cassName isCompatibleWith DataType.Name.BLOB))
+      else if (!(cassName == DataType.Name.BLOB))
         Left(new InvalidTypeException(s"Column $name is a $cassName, cannot be retrieved as an Array[Byte]"))
       else f2t(r.getBytes(name))
     } match {
@@ -216,4 +175,25 @@ object CassFormatDecoder extends LowPriorityCassFormatDecoder {
   }
 
   class ValueNotDefinedException(m: String) extends QueryExecutionException(m)
+
+  private[scalacass] def tryDecode[T](r: Row, name: String, decode: (Row, String) => T) = Try[Either[Throwable, T]](
+    if (r.isNull(name)) Left(new ValueNotDefinedException(s""""$name" was not defined in ${r.getColumnDefinitions.getTable(name)}"""))
+    else Right(decode(r, name))
+  ) match {
+      case TSuccess(v) => v
+      case TFailure(e) => Left(e)
+    }
+  private[scalacass] def tryDecodeE[T](r: Row, name: String, decode: (Row, String) => Either[Throwable, T]) = Try[Either[Throwable, T]](
+    if (r.isNull(name)) Left(new ValueNotDefinedException(s""""$name" was not defined in ${r.getColumnDefinitions.getTable(name)}"""))
+    else decode(r, name)
+  ) match {
+      case TSuccess(v) => v
+      case TFailure(e) => Left(e)
+    }
+  private[scalacass] def sameTypeCassFormat[T <: AnyRef](_clazz: Class[T], _decode: (Row, String) => T) = new CassFormatDecoder[T] {
+    type From = T
+    val clazz = _clazz
+    def f2t(f: From) = Right(f)
+    def decode(r: Row, name: String) = tryDecode(r, name, _decode)
+  }
 }

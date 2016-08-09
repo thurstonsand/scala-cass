@@ -1,12 +1,12 @@
 package com.weather.scalacass
 
-import com.datastax.driver.core.exceptions.{CodecNotFoundException, InvalidTypeException}
+import com.weather.scalacass.ScalaCassUnitTestsVersionSpecific.BadTypeException
 import org.joda.time.DateTime
 import org.scalatest.OptionValues
 import com.weather.scalacass.util.CassandraTester
 import ScalaCass._
 
-class ScalaCassUnitTests extends CassandraTester("testDB", "testTable", List("str varchar", "str2 ascii", "b blob",
+abstract class ScalaCassUnitTests extends CassandraTester("testDB", "testTable", List("str varchar", "str2 ascii", "b blob",
   "d decimal", "f float", "net inet", "tid timeuuid", "vi varint", "i int", "bi bigint", "bool boolean", "dub double",
   "l list<varchar>", "m map<varchar, bigint>", "s set<double>", "ts timestamp", "id uuid", "sblob set<blob>"), List("str")) with OptionValues {
   def testType[GoodType: CassFormatDecoder, BadType: CassFormatDecoder](k: String, v: GoodType, default: GoodType)(implicit goodCF: CassFormatEncoder[GoodType]) = {
@@ -32,7 +32,7 @@ class ScalaCassUnitTests extends CassandraTester("testDB", "testTable", List("st
     }
 
     an[IllegalArgumentException] should be thrownBy res.as[GoodType](s"not$k")
-    a[CodecNotFoundException] should be thrownBy res.as[BadType](k)
+    a[BadTypeException] should be thrownBy res.as[BadType](k)
     an[IllegalArgumentException] should be thrownBy res.as[BadType](s"not$k")
 
     res.getAs[GoodType](s"not$k") shouldBe None
@@ -60,7 +60,8 @@ class ScalaCassUnitTests extends CassandraTester("testDB", "testTable", List("st
     ss.select(tname, q1).toList.map(_.as[TestCC]) shouldBe empty
     ss.dropTable(tname)
   }
-
+}
+class ScalaCassUnitTestsAll extends ScalaCassUnitTests with ScalaCassUnitTestsVersionSpecific {
   "strings" should "be extracted correctly" in testType[String, Int]("str", "asdf", "qwerty")
   "ints" should "be extracted correctly" in testType[Int, String]("i", 1234, 9876)
   "bigints" should "be extracted correctly" in testType[Long, String]("bi", 1234, 9876)
@@ -73,7 +74,8 @@ class ScalaCassUnitTests extends CassandraTester("testDB", "testTable", List("st
   "map" should "be extracted correctly (wrong 2nd type param)" in testType[Map[String, Long], Map[String, Int]]("m", Map("asdf" -> 10L), Map("fdsa" -> -10L))
   "set" should "be extracted correctly (wrong basic)" in testType[Set[Double], String]("s", Set(123.4), Set(987.6))
   "set" should "be extracted correctly (wrong type param)" in testType[Set[Double], Set[String]]("s", Set(123.4), Set(987.6))
-  "timestamp" should "be extracted correctly" in testType[DateTime, String]("ts", DateTime.now, DateTime.now.minusDays(20))
+  "timestamp (joda)" should "be extracted correctly" in testType[DateTime, String]("ts", DateTime.now, DateTime.now.minusDays(20))
+  "timestamp (java date)" should "be extracted correctly" in testType[java.util.Date, String]("ts", new java.util.Date(), new java.util.Date(System.currentTimeMillis - 1000))
   "uuid" should "be extracted correctly" in testType[java.util.UUID, String]("id", java.util.UUID.randomUUID, java.util.UUID.randomUUID)
   "ascii" should "be extracted correctly" in testType[String, Int]("str2", "asdf", "fdsa")
   "blob" should "be extracted correctly (wrong basic)" in testType[Array[Byte], String]("b", "asdf".getBytes, "fdsa".getBytes)
@@ -93,7 +95,7 @@ class ScalaCassUnitTests extends CassandraTester("testDB", "testTable", List("st
     val res = client.session.execute(s"SELECT * FROM $dbName.$counterTable").one()
     res.as[Long](k) shouldBe 1
     an[IllegalArgumentException] should be thrownBy res.as[Long](s"not$k")
-    a[CodecNotFoundException] should be thrownBy res.as[String](k)
+    a[BadTypeException] should be thrownBy res.as[String](k)
     an[IllegalArgumentException] should be thrownBy res.as[String](s"not$k")
 
     res.getAs[Long](k).value shouldBe 1

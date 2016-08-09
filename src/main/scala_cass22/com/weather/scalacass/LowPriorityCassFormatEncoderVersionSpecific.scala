@@ -1,0 +1,3 @@
+package com.weather.scalacass
+
+trait LowPriorityCassFormatEncoderVersionSpecific

@@ -3,17 +3,26 @@ scala:
   - 2.11.8
 
 jdk:
+  - oraclejdk8
   - oraclejdk7
 
 before_script:
   - wget https://github.com/Ichoran/thyme/raw/master/Thyme.jar -O /tmp/Thyme.jar
   - mkdir lib
   - cp /tmp/Thyme.jar lib
-script: 
+script:
+  - jdk_switcher use oraclejdk8
+  - sbt clean
   - sbt "testOnly com.weather.scalacass.CaseClassUnitTests"
   - sbt "testOnly com.weather.scalacass.CreateTableUnitTests"
-  - sbt "testOnly com.weather.scalacass.ScalaCassUnitTests"
+  - sbt "testOnly com.weather.scalacass.ScalaCassUnitTestsAll"
   - sbt "testOnly com.weather.scalacass.SessionActionsUnitTest"
+  - jdk_switcher use oraclejdk7
+  - sbt clean
+  - sbt "testOnly com.weather.scalacass.CaseClassUnitTests" -DcassVersion=22
+  - sbt "testOnly com.weather.scalacass.CreateTableUnitTests" -DcassVersion=22
+  - sbt "testOnly com.weather.scalacass.ScalaCassUnitTestsAll" -DcassVersion=22
+  - sbt "testOnly com.weather.scalacass.SessionActionsUnitTest" -DcassVersion=22
 
 sudo: required
 

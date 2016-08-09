@@ -1,4 +1,5 @@
 # ScalaCass
+## TODO: WRITE SOME DOCS
 ## [Cassandra Java Driver](https://github.com/datastax/java-driver) wrapper that makes retrieval from Rows a little easier
 [![Build Status](https://travis-ci.org/thurstonsand/scala-cass.svg?branch=master)](https://travis-ci.org/thurstonsand/scala-cass)
 
