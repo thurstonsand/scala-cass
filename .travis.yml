@@ -10,13 +10,13 @@ before_script:
   - wget https://github.com/Ichoran/thyme/raw/master/Thyme.jar -O /tmp/Thyme.jar
   - mkdir lib
   - cp /tmp/Thyme.jar lib
-  - apt-get -yyq update
-  - apt-cache showpkg docker-engine
-  - service docker stop
-  - apt-get -yyq rm docker-engine
-  - apt-get -yyq install docker-engine=1.11.2-0~xenial
-  - service docker start
-  - service docker run hello-world
+  - sudo apt-get -yyq update
+  - sudo apt-cache showpkg docker-engine
+  - sudo service docker stop
+  - sudo apt-get -yyq rm docker-engine
+  - sudo apt-get -yyq install docker-engine=1.11.2-0~xenial
+  - sudo service docker start
+  - sudo service docker run hello-world
 script:
   - sbt clean
   - sbt "testOnly com.weather.scalacass.CaseClassUnitTests"
