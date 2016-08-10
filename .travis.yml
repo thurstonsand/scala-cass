@@ -13,7 +13,7 @@ before_script:
   - sudo apt-get -y update
   - sudo apt-cache showpkg docker-engine
   - sudo service docker stop
-  - sudo apt-get rm docker-engine
+  - sudo apt-get uninstall docker-engine
   - sudo apt-get -y install docker-engine=1.11.2-0~xenial
   - sudo service docker start
   - sudo service docker run hello-world
