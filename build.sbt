@@ -1,13 +1,18 @@
 organization := "com.github.thurstonsand"
 name := "ScalaCass"
 
-val cassVersion = SettingKey[String]("cassVersion", "the version of cassandra to use for compilation")
-cassVersion := Option(System.getProperty("cassVersion")).getOrElse("3")
-val cassV3 = "3"
-val cassV22 = "22"
-def wrongCassVersion = new RuntimeException("unknown cassVersion. use either \"" + cassV3 + "\" or \"" + cassV22 + "\"")
 val javaVersion = SettingKey[String]("javaVersion", "the version of cassandra found in the system")
 javaVersion := sys.props("java.specification.version")
+
+val cassV3 = "3"
+val cassV22 = "22"
+val cassVersion = SettingKey[String]("cassVersion", "the version of cassandra to use for compilation")
+cassVersion := Option(System.getProperty("cassVersion")).getOrElse(javaVersion.value match {
+  case "1.7" => cassV22
+  case _     => cassV3
+})
+def wrongCassVersion = new RuntimeException("unknown cassVersion. use either \"" + cassV3 + "\" or \"" + cassV22 + "\"")
+
 version := {
   val majorVersion = (cassVersion.value, javaVersion.value) match {
     case (`cassV3`, "1.8") => "4"
