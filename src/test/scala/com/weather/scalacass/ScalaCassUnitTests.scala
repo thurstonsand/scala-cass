@@ -1,14 +1,13 @@
 package com.weather.scalacass
 
 import com.weather.scalacass.ScalaCassUnitTestsVersionSpecific.BadTypeException
-import org.joda.time.DateTime
 import org.scalatest.OptionValues
-import com.weather.scalacass.util.CassandraTester
+import com.weather.scalacass.util.CassandraWithTableTester
 import ScalaCass._
 
-abstract class ScalaCassUnitTests extends CassandraTester("testDB", "testTable", List("str varchar", "str2 ascii", "b blob",
+abstract class ScalaCassUnitTests extends CassandraWithTableTester("testDB", "testTable", ScalaCassUnitTestsVersionSpecific.extraHeaders ::: List("str varchar", "str2 ascii", "b blob",
   "d decimal", "f float", "net inet", "tid timeuuid", "vi varint", "i int", "bi bigint", "bool boolean", "dub double",
-  "l list<varchar>", "m map<varchar, bigint>", "s set<double>", "ts timestamp", "id uuid", "sblob set<blob>"), List("str")) with OptionValues {
+  "l list<varchar>", "m map<varchar, bigint>", "s set<double>", "id uuid", "sblob set<blob>"), List("str")) with OptionValues {
   def testType[GoodType: CassFormatDecoder, BadType: CassFormatDecoder](k: String, v: GoodType, default: GoodType)(implicit goodCF: CassFormatEncoder[GoodType]) = {
     val args = {
       val converted = goodCF.encode(v).getOrThrow.asInstanceOf[AnyRef]
@@ -74,12 +73,9 @@ class ScalaCassUnitTestsAll extends ScalaCassUnitTests with ScalaCassUnitTestsVe
   "map" should "be extracted correctly (wrong 2nd type param)" in testType[Map[String, Long], Map[String, Int]]("m", Map("asdf" -> 10L), Map("fdsa" -> -10L))
   "set" should "be extracted correctly (wrong basic)" in testType[Set[Double], String]("s", Set(123.4), Set(987.6))
   "set" should "be extracted correctly (wrong type param)" in testType[Set[Double], Set[String]]("s", Set(123.4), Set(987.6))
-  "timestamp (joda)" should "be extracted correctly" in testType[DateTime, String]("ts", DateTime.now, DateTime.now.minusDays(20))
-  "timestamp (java date)" should "be extracted correctly" in testType[java.util.Date, String]("ts", new java.util.Date(), new java.util.Date(System.currentTimeMillis - 1000))
   "uuid" should "be extracted correctly" in testType[java.util.UUID, String]("id", java.util.UUID.randomUUID, java.util.UUID.randomUUID)
   "ascii" should "be extracted correctly" in testType[String, Int]("str2", "asdf", "fdsa")
   "blob" should "be extracted correctly (wrong basic)" in testType[Array[Byte], String]("b", "asdf".getBytes, "fdsa".getBytes)
-  //  "blob" should "be extracted correctly (wrong type param)" in testType[Array[Byte], Array[Char]]("b", "asdf".getBytes, "fdsa".getBytes) // implicitly disallowed
   "inet" should "be extracted correctly" in testType[java.net.InetAddress, String]("net", java.net.InetAddress.getByName("localhost"), java.net.InetAddress.getByName("192.168.1.2"))
   "decimal" should "be extracted correctly" in testType[BigDecimal, Double]("d", BigDecimal(3.0), BigDecimal(2.0))
   "varint" should "be extracted correctly" in testType[BigInt, Long]("vi", 3, 2)

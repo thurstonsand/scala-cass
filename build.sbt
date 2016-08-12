@@ -38,10 +38,18 @@ libraryDependencies ++= Seq(
   "com.chuusai" %% "shapeless" % "2.3.1",
   "com.google.guava" % "guava" % "19.0",
   "org.scalatest" %% "scalatest" % "3.0.0-M15" % "test",
-  "com.whisk" %% "docker-testkit-scalatest" % "0.8.3" % "test"
-) :+ (cassVersion.value match {
-  case `cassV3` => "com.datastax.cassandra" % "cassandra-driver-core" % "3.1.0" classifier "shaded" excludeAll ExclusionRule(organization = "io.netty", name = "netty-handler")
-  case `cassV22` =>  "com.datastax.cassandra" % "cassandra-driver-core" % "2.1.10.2" classifier "shaded" excludeAll ExclusionRule(organization = "io.netty", name = "netty-handler")
+  "com.whisk" %% "docker-testkit-scalatest" % "0.9.0-M5" % "test"
+
+) ++ (cassVersion.value match {
+  case `cassV3` => Seq(
+    "com.datastax.cassandra" % "cassandra-driver-core" % "3.1.0" classifier "shaded" excludeAll ExclusionRule(organization = "io.netty", name = "netty-handler"),
+    "com.datastax.cassandra" % "cassandra-driver-extras" % "3.1.0",
+    "org.cassandraunit" % "cassandra-unit" % "3.0.0.1"
+  )
+  case `cassV22` =>  Seq(
+    "com.datastax.cassandra" % "cassandra-driver-core" % "2.1.10.2" classifier "shaded" excludeAll ExclusionRule(organization = "io.netty", name = "netty-handler"),
+    "org.cassandraunit" % "cassandra-unit" % "2.2.2.1"
+  )
   case _ => throw new RuntimeException("unknown cassVersion. use either \"" + cassV3 + "\" or \"" + cassV22 + "\"")
 })
 

@@ -29,7 +29,6 @@ trait LowPriorityCassFormatEncoder extends LowPriorityCassFormatEncoderVersionSp
   implicit val stringFormat = sameTypeCassFormatEncoder[String]("varchar")
   implicit val uuidFormat = sameTypeCassFormatEncoder[java.util.UUID]("uuid")
   implicit val iNetFormat = sameTypeCassFormatEncoder[java.net.InetAddress]("inet")
-  implicit val dateFormat = sameTypeCassFormatEncoder[java.util.Date]("timestamp")
 
   implicit val intFormat = transCassFormatEncoder("int", Int.box)
   implicit val longFormat = transCassFormatEncoder("bigint", Long.box)

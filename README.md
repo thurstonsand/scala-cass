@@ -1,21 +1,55 @@
 # ScalaCass
-## TODO: WRITE SOME DOCS
 ## [Cassandra Java Driver](https://github.com/datastax/java-driver) wrapper that makes retrieval from Rows a little easier
 [![Build Status](https://travis-ci.org/thurstonsand/scala-cass.svg?branch=master)](https://travis-ci.org/thurstonsand/scala-cass)
 
 ### Getting ScalaCass
-you can find it on bintray. Currently only supports **scala 2.11**  
-**sbt**
+you can find it on bintray. Currently only supports **scala 2.11**, with Cassandra 2.2 on Java 7 or Cassandra 3.1 on
+Java 8
+
+#### SBT
+Add the jcenter resolver
 ```scala
 resolvers += Resolver.jcenterRepo
+```
+Add the appropriate version of the library
+##### Cassandra 3.1 with Java 8
+```scala
+libraryDependencies += "com.github.thurstonsand" %% "scalacass" % "0.4.4"
+```
+##### Cassandra 2.2 with Java 7
+```scala
 libraryDependencies += "com.github.thurstonsand" %% "scalacass" % "0.3.4"
 ```
-**maven**  
+#### Maven
+Add the jcenter resolver
+```xml
+<repositories>
+    <repository>
+        <id>central</id>
+        <name>bintray</name>
+        <url>http://jcenter.bintray.com</url>
+    </repository>
+</repositories>
+```
+Pick a version
+##### Cassandra 2.2 with Java 7
+```xml
+<properties>
+    <scalaCass.version>0.3.4</scalaCassVersion>
+</properties>
+```
+##### Cassandra 3.1 with Java 8
+```xml
+<properties>
+    <scalaCass.version>0.4.4</scalaCassVersion>
+</properties>
+```
+Include the repo
 ```xml
 <dependency>
   <groupId>com.github.thurstonsand</groupId>
   <artifactId>scalacass_2.11</artifactId>
-  <version>0.3.4</version>
+  <version>${scalaCass.version}</version>
   <type>pom</type>
 </dependency>
 ```

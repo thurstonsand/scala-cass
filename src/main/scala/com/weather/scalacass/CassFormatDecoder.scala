@@ -2,7 +2,6 @@ package com.weather.scalacass
 
 import com.datastax.driver.core.{DataType, Row}
 import com.datastax.driver.core.exceptions.{InvalidTypeException, QueryExecutionException}
-import org.joda.time.DateTime
 
 import scala.collection.JavaConverters._
 import scala.collection.mutable.ListBuffer
@@ -29,26 +28,20 @@ trait CassFormatDecoder[T] { self =>
 }
 
 trait LowPriorityCassFormatDecoder extends LowPriorityCassFormatDecoderVersionSpecific {
-  import CassFormatDecoder.{TryEither, ValueNotDefinedException, tryDecode, tryDecodeE, sameTypeCassFormat}
+  import CassFormatDecoder.{TryEither, ValueNotDefinedException, tryDecode, tryDecodeE, sameTypeCassFormat, safeConvertCassFormat}
 
   implicit val stringFormat = sameTypeCassFormat(classOf[String], _ getString _)
   implicit val uuidFormat = sameTypeCassFormat(classOf[java.util.UUID], _ getUUID _)
   implicit val iNetFormat = sameTypeCassFormat[java.net.InetAddress](classOf[java.net.InetAddress], _ getInet _)
 
-  def noConvertCassFormat[T, F <: AnyRef](_clazz: Class[F], _f2t: F => T, _decode: (Row, String) => T) = new CassFormatDecoder[T] {
-    type From = F
-    val clazz = _clazz
-    def f2t(f: From) = Right(_f2t(f))
-    def decode(r: Row, name: String) = tryDecode(r, name, _decode)
-  }
-  implicit val intFormat = noConvertCassFormat(classOf[java.lang.Integer], Int.unbox, _ getInt _)
+  implicit val intFormat = safeConvertCassFormat(classOf[java.lang.Integer], Int.unbox, _ getInt _)
 
-  implicit val longFormat = noConvertCassFormat(classOf[java.lang.Long], Long.unbox, _ getLong _)
-  implicit val booleanFormat = noConvertCassFormat(classOf[java.lang.Boolean], Boolean.unbox, _ getBool _)
-  implicit val doubleFormat = noConvertCassFormat(classOf[java.lang.Double], Double.unbox, _ getDouble _)
-  implicit val floatFormat = noConvertCassFormat(classOf[java.lang.Float], Float.unbox, _ getFloat _)
-  implicit val bigIntegerFormat = noConvertCassFormat[BigInt, java.math.BigInteger](classOf[java.math.BigInteger], BigInt.javaBigInteger2bigInt, _ getVarint _)
-  implicit val bigDecimalFormat = noConvertCassFormat[BigDecimal, java.math.BigDecimal](classOf[java.math.BigDecimal], BigDecimal.javaBigDecimal2bigDecimal, _ getDecimal _)
+  implicit val longFormat = safeConvertCassFormat(classOf[java.lang.Long], Long.unbox, _ getLong _)
+  implicit val booleanFormat = safeConvertCassFormat(classOf[java.lang.Boolean], Boolean.unbox, _ getBool _)
+  implicit val doubleFormat = safeConvertCassFormat(classOf[java.lang.Double], Double.unbox, _ getDouble _)
+  implicit val floatFormat = safeConvertCassFormat(classOf[java.lang.Float], Float.unbox, _ getFloat _)
+  implicit val bigIntegerFormat = safeConvertCassFormat[BigInt, java.math.BigInteger](classOf[java.math.BigInteger], BigInt.javaBigInteger2bigInt, _ getVarint _)
+  implicit val bigDecimalFormat = safeConvertCassFormat[BigDecimal, java.math.BigDecimal](classOf[java.math.BigDecimal], BigDecimal.javaBigDecimal2bigDecimal, _ getDecimal _)
 
   def collectionCassFormat1[Coll[_], T, F <: AnyRef, JColl[_] <: java.util.Collection[_]](
     _clazz: Class[JColl[F]],
@@ -115,9 +108,6 @@ trait LowPriorityCassFormatDecoder extends LowPriorityCassFormatDecoderVersionSp
       def decode(r: Row, name: String): Either[Throwable, Map[A, B]] =
         tryDecodeE(r, name, (rr, nn) => f2t(rr.getMap(nn, underlyingA.clazz, underlyingB.clazz)))
     }
-
-  implicit val dateTimeFormat: CassFormatDecoder[DateTime] =
-    dateFormat.flatMap(d => Try(new DateTime(d)).toEither)
 
   implicit val blobFormat = new CassFormatDecoder[Array[Byte]] {
     type From = java.nio.ByteBuffer
@@ -194,6 +184,12 @@ object CassFormatDecoder extends LowPriorityCassFormatDecoder {
     type From = T
     val clazz = _clazz
     def f2t(f: From) = Right(f)
+    def decode(r: Row, name: String) = tryDecode(r, name, _decode)
+  }
+  def safeConvertCassFormat[T, F <: AnyRef](_clazz: Class[F], _f2t: F => T, _decode: (Row, String) => T) = new CassFormatDecoder[T] {
+    type From = F
+    val clazz = _clazz
+    def f2t(f: From) = Right(_f2t(f))
     def decode(r: Row, name: String) = tryDecode(r, name, _decode)
   }
 }
