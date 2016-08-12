@@ -1,8 +1,10 @@
 package com.weather.scalacass
 
 trait LowPriorityCassFormatDecoderVersionSpecific {
-  import CassFormatDecoder.sameTypeCassFormat
+  import CassFormatDecoder.sameTypeCassFormatDecoder
 
   implicit val dateFormat: CassFormatDecoder[java.util.Date] =
-    sameTypeCassFormat[java.util.Date](classOf[java.util.Date], _ getDate _)
+    sameTypeCassFormatDecoder[java.util.Date](classOf[java.util.Date], _ getDate _)
 }
+
+object LowPriorityCassFormatDecoderVersionSpecific extends LowPriorityCassFormatDecoderVersionSpecific

@@ -5,3 +5,5 @@ trait LowPriorityCassFormatEncoderVersionSpecific {
 
   implicit val dateFormat: CassFormatEncoder[java.util.Date] = sameTypeCassFormatEncoder("timestamp")
 }
+
+object LowPriorityCassFormatEncoderVersionSpecific extends LowPriorityCassFormatEncoderVersionSpecific

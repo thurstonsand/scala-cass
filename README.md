@@ -56,8 +56,8 @@ Include the repo
 
 ### Overview
 * [row parsing](#row-parsing)
-* [type mappings](#type-mapping)
 * [parsing performance](#parsing-performance)
+* [type mappings](#type-mapping)
 * [session utilities](#session-utilities)
   * [`ScalaSession` creation](#creating-a-scalasession)
   * [creating tables and table representation](#creating-tables-and-table-representation)
@@ -89,26 +89,7 @@ val person: Person = r.as[Person]
 val person_?: Option[Person] = r.getAs[Person]
 val personWithDefault: Person = r.getOrElse[Person](Person("default name", 24, None))
 ```
-### Type Mapping
-| Cassandra Type |       Scala Type       |
-|:--------------:|:----------------------:|
-| varchar        | String                 |
-| uuid           | java.util.UUID         |
-| inet           | java.net.InetAddress   |
-| int            | Int                    |
-| bigint         | Long                   |
-| boolean        | Boolean                |
-| double         | Double                 |
-| varint         | BigInt                 |
-| decimal        | BigDecimal             |
-| float          | Float                  |
-| timestamp      | org.joda.time.DateTime |
-| blob           | Array[Byte]            |
-| list           | List                   |
-| map            | Map                    |
-| set            | Set                    |
-
-### Option
+#### Option
 in the same way that `getAs` will return a `None` if it does not exist, using `Option[SomeType]` will only extract the value if there are no errors.
 ### Parsing Performance
 performance is pretty decent.
@@ -158,6 +139,90 @@ def ga(name: String) = if (row.getColumnDefinitions.contains(name) && !row.isNul
 ScalaCass alone is 44.844% the speed of native for `as`, 55.557% the speed of native for `getAs`  
 ScalaCass w/ `cachedImplicit` is 77.664% the speed of native for `as`, 93.372% the speed of native for `getAs`
 * `cachedImplicit` is a feature of shapeless that caches the underlying representation of a case class so that it does not need to be recreated on every call.
+
+### Type Mapping
+#### Cassandra 3.1 on Java 8
+| Cassandra Type |             Scala Type                 |
+|:--------------:|:--------------------------------------:|
+| varchar        | String                                 |
+| uuid           | java.util.UUID                         |
+| inet           | java.net.InetAddress                   |
+| int            | Int                                    |
+| bigint         | Long                                   |
+| boolean        | Boolean                                |
+| double         | Double                                 |
+| varint         | BigInt                                 |
+| decimal        | BigDecimal                             |
+| float          | Float                                  |
+| blob           | Array[Byte]                            |
+| list           | List                                   |
+| map            | Map                                    |
+| set            | Set                                    |
+| **timestamp**  | **java.util.Date**                     |
+| **date**       | **com.datastax.driver.core.LocalDate** |
+| **time**       | **Time**                               |
+
+* Time is a type specific to this library. it is defined as
+    ```scala
+    final case class Time(millis: Long)
+    ```
+    so as not to conflict with `bigint`
+* There are implicit overrides for both the Joda library and Jdk8 Time library that take advantage of Cassandra's new 
+codecs. These codecs have to be registered with your `Cluster` instance, which is included as a helper function
+
+##### Joda Implicits
+```scala
+val c: Cluster = _ // your cluster
+com.scalacass.joda.register(c)
+import com.scalacass.joda.Implicits._
+
+val r: Row = _ // some row from your cluster
+r.as[org.joda.time.Instant]("mytimestamp") // cassandra "timestamp"
+r.as[org.joda.time.LocalDate]("mydate") // cassandra "date"
+r.as[org.joda.time.LocalTime]("mytime") // cassandra "time"
+r.as[org.joda.time.DateTime]("mydt") // cassandra "tuple<timestamp,varchar>"
+```
+[See here](https://datastax.github.io/java-driver/manual/custom_codecs/extras/#joda-time) for information about the format of `DateTime`
+##### Jdk8 Date Implicits
+```scala
+val c: Cluster = _ // your cluster
+com.scalacass.jdk8.register(c)
+import com.scalacass.jdk8.Implicits._
+
+val r: Row = _ // some row from your cluster
+r.as[java.time.Instant]("mytimestamp") // cassandra "timestamp"
+r.as[java.time.LocalDate]("mydate") // cassandra "date"
+r.as[java.time.LocalTime]("mytime") // cassandra "time"
+r.as[java.time.ZonedDateTime]("myzdt") // cassandra "tuple<timestamp,varchar>"
+```
+[See here](https://datastax.github.io/java-driver/manual/custom_codecs/extras/#jdk-8) for information about the format of `ZonedDateTime`
+####Cassandra 2.2 on Java 7
+| Cassandra Type |      Scala Type      |
+|:--------------:|:--------------------:|
+| varchar        | String               |
+| uuid           | java.util.UUID       |
+| inet           | java.net.InetAddress |
+| int            | Int                  |
+| bigint         | Long                 |
+| boolean        | Boolean              |
+| double         | Double               |
+| varint         | BigInt               |
+| decimal        | BigDecimal           |
+| float          | Float                |
+| blob           | Array[Byte]          |
+| list           | List                 |
+| map            | Map                  |
+| set            | Set                  |
+| **timestamp**  | **java.util.Date**   |
+
+* There is an implicit override the Joda library. Unfortunately it still goes through `java.util.Date`,
+so there might be performance issues in parallel execution
+```scala
+import com.scalacass.joda.Implicits._
+
+val r: Row = _ // some row from your cluster
+r.as[org.joda.time.Instant]("mytimestamp") // cassandra "timestamp"
+```
 
 ### Session utilities
 #### Creating a ScalaSession

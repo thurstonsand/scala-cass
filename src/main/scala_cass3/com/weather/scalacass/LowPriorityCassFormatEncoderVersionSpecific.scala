@@ -6,5 +6,5 @@ trait LowPriorityCassFormatEncoderVersionSpecific {
   implicit val dateFormat: CassFormatEncoder[java.util.Date] = sameTypeCassFormatEncoder("timestamp")
   implicit val datastaxLocalDateFormat: CassFormatEncoder[com.datastax.driver.core.LocalDate] =
     sameTypeCassFormatEncoder("date")
-  implicit val timeFormat: CassFormatEncoder[Time] = transCassFormatEncoder("time", time => Long.box(time.t))
+  implicit val timeFormat: CassFormatEncoder[Time] = transCassFormatEncoder("time", time => Long.box(time.millis))
 }
