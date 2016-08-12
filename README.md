@@ -162,11 +162,10 @@ ScalaCass w/ `cachedImplicit` is 77.664% the speed of native for `as`, 93.372% t
 | **date**       | **com.datastax.driver.core.LocalDate** |
 | **time**       | **Time**                               |
 
-* Time is a type specific to this library. it is defined as
-    ```scala
-    final case class Time(millis: Long)
-    ```
-    so as not to conflict with `bigint`
+* Time is a type specific to this library so as not to conflict with `bigint` and `Long`. it is defined as
+```scala
+final case class Time(millis: Long)
+```
 * There are implicit overrides for both the Joda library and Jdk8 Time library that take advantage of Cassandra's new 
 codecs. These codecs have to be registered with your `Cluster` instance, which is included as a helper function
 
