@@ -1,3 +1,3 @@
 package com.weather.scalacass
 
-sealed case class Time(t: Long)
+final case class Time(t: Long)

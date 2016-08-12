@@ -26,7 +26,7 @@ scalaVersion := "2.11.8"
 
 scalacOptions ++= Seq("-unchecked", "-deprecation", "-feature")
 
-//parallelExecution in Test := false
+parallelExecution in Test := false
 
 resolvers ++= Seq(
   Resolver.jcenterRepo,
@@ -42,12 +42,12 @@ libraryDependencies ++= Seq(
 
 ) ++ (cassVersion.value match {
   case `cassV3` => Seq(
-    "com.datastax.cassandra" % "cassandra-driver-core" % "3.1.0" classifier "shaded" excludeAll ExclusionRule(organization = "io.netty", name = "netty-handler"),
+    "com.datastax.cassandra" % "cassandra-driver-core" % "3.1.0" classifier "shaded",
     "com.datastax.cassandra" % "cassandra-driver-extras" % "3.1.0",
     "org.cassandraunit" % "cassandra-unit" % "3.0.0.1"
   )
   case `cassV22` =>  Seq(
-    "com.datastax.cassandra" % "cassandra-driver-core" % "2.1.10.2" classifier "shaded" excludeAll ExclusionRule(organization = "io.netty", name = "netty-handler"),
+    "com.datastax.cassandra" % "cassandra-driver-core" % "2.1.10.2" classifier "shaded",
     "org.cassandraunit" % "cassandra-unit" % "2.2.2.1"
   )
   case _ => throw new RuntimeException("unknown cassVersion. use either \"" + cassV3 + "\" or \"" + cassV22 + "\"")

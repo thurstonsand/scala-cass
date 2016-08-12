@@ -7,31 +7,22 @@ jdk:
   - oraclejdk7
 
 before_script:
-  - wget https://github.com/Ichoran/thyme/raw/master/Thyme.jar -O /tmp/Thyme.jar
   - mkdir lib
-  - cp /tmp/Thyme.jar lib
-  - sudo apt-get -y update
-  - sudo apt-cache showpkg docker-engine
-  - sudo service docker stop
-  - sudo apt-get remove docker-engine
-  - echo N | sudo apt-get -y install docker-engine=1.11.2-0~trusty
-  - sudo service docker start
-  - sudo service docker run hello-world
-script:
-  - sbt clean
-  - sbt "testOnly com.weather.scalacass.CaseClassUnitTests"
-  - sbt "testOnly com.weather.scalacass.CreateTableUnitTests"
-  - sbt "testOnly com.weather.scalacass.ScalaCassUnitTestsAll"
-  - sbt "testOnly com.weather.scalacass.SessionActionsUnitTest"
+  - wget https://github.com/Ichoran/thyme/raw/master/Thyme.jar -O lib/Thyme.jar
+  - sudo apt-get update -qq
+  - sudo apt-cache showpkg cassandra
+  - sudo apt-cache search cassandra
+  - if java -version 2>&1 | egrep "java version \"1.7" > /dev/null; then sudo apt-get install -qq cassandra22; else sudo apt-get install -qq cassandra
+script: sbt test
 
 sudo: required
 
-services:
-  - docker
+#services:
+#  - docker
 
-env:
-  - DOCKER_HOST=unix:///var/run/docker.sock
+#env:
+#  - DOCKER_HOST=unix:///var/run/docker.sock
 
-addons:
-  hosts:
-    - dockerhost
+#addons:
+#  hosts:
+#    - dockerhost

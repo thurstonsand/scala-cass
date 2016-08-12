@@ -28,20 +28,20 @@ trait CassFormatDecoder[T] { self =>
 }
 
 trait LowPriorityCassFormatDecoder extends LowPriorityCassFormatDecoderVersionSpecific {
-  import CassFormatDecoder.{TryEither, ValueNotDefinedException, tryDecode, tryDecodeE, sameTypeCassFormat, safeConvertCassFormat}
+  import CassFormatDecoder.{TryEither, ValueNotDefinedException, tryDecode, tryDecodeE, sameTypeCassFormatDecoder, safeConvertCassFormatDecoder}
 
-  implicit val stringFormat = sameTypeCassFormat(classOf[String], _ getString _)
-  implicit val uuidFormat = sameTypeCassFormat(classOf[java.util.UUID], _ getUUID _)
-  implicit val iNetFormat = sameTypeCassFormat[java.net.InetAddress](classOf[java.net.InetAddress], _ getInet _)
+  implicit val stringFormat = sameTypeCassFormatDecoder(classOf[String], _ getString _)
+  implicit val uuidFormat = sameTypeCassFormatDecoder(classOf[java.util.UUID], _ getUUID _)
+  implicit val iNetFormat = sameTypeCassFormatDecoder[java.net.InetAddress](classOf[java.net.InetAddress], _ getInet _)
 
-  implicit val intFormat = safeConvertCassFormat(classOf[java.lang.Integer], Int.unbox, _ getInt _)
+  implicit val intFormat = safeConvertCassFormatDecoder(classOf[java.lang.Integer], Int.unbox, _ getInt _)
 
-  implicit val longFormat = safeConvertCassFormat(classOf[java.lang.Long], Long.unbox, _ getLong _)
-  implicit val booleanFormat = safeConvertCassFormat(classOf[java.lang.Boolean], Boolean.unbox, _ getBool _)
-  implicit val doubleFormat = safeConvertCassFormat(classOf[java.lang.Double], Double.unbox, _ getDouble _)
-  implicit val floatFormat = safeConvertCassFormat(classOf[java.lang.Float], Float.unbox, _ getFloat _)
-  implicit val bigIntegerFormat = safeConvertCassFormat[BigInt, java.math.BigInteger](classOf[java.math.BigInteger], BigInt.javaBigInteger2bigInt, _ getVarint _)
-  implicit val bigDecimalFormat = safeConvertCassFormat[BigDecimal, java.math.BigDecimal](classOf[java.math.BigDecimal], BigDecimal.javaBigDecimal2bigDecimal, _ getDecimal _)
+  implicit val longFormat = safeConvertCassFormatDecoder(classOf[java.lang.Long], Long.unbox, _ getLong _)
+  implicit val booleanFormat = safeConvertCassFormatDecoder(classOf[java.lang.Boolean], Boolean.unbox, _ getBool _)
+  implicit val doubleFormat = safeConvertCassFormatDecoder(classOf[java.lang.Double], Double.unbox, _ getDouble _)
+  implicit val floatFormat = safeConvertCassFormatDecoder(classOf[java.lang.Float], Float.unbox, _ getFloat _)
+  implicit val bigIntegerFormat = safeConvertCassFormatDecoder[BigInt, java.math.BigInteger](classOf[java.math.BigInteger], BigInt.javaBigInteger2bigInt, _ getVarint _)
+  implicit val bigDecimalFormat = safeConvertCassFormatDecoder[BigDecimal, java.math.BigDecimal](classOf[java.math.BigDecimal], BigDecimal.javaBigDecimal2bigDecimal, _ getDecimal _)
 
   def collectionCassFormat1[Coll[_], T, F <: AnyRef, JColl[_] <: java.util.Collection[_]](
     _clazz: Class[JColl[F]],
@@ -180,13 +180,13 @@ object CassFormatDecoder extends LowPriorityCassFormatDecoder {
       case TSuccess(v) => v
       case TFailure(e) => Left(e)
     }
-  private[scalacass] def sameTypeCassFormat[T <: AnyRef](_clazz: Class[T], _decode: (Row, String) => T) = new CassFormatDecoder[T] {
+  private[scalacass] def sameTypeCassFormatDecoder[T <: AnyRef](_clazz: Class[T], _decode: (Row, String) => T) = new CassFormatDecoder[T] {
     type From = T
     val clazz = _clazz
     def f2t(f: From) = Right(f)
     def decode(r: Row, name: String) = tryDecode(r, name, _decode)
   }
-  def safeConvertCassFormat[T, F <: AnyRef](_clazz: Class[F], _f2t: F => T, _decode: (Row, String) => T) = new CassFormatDecoder[T] {
+  def safeConvertCassFormatDecoder[T, F <: AnyRef](_clazz: Class[F], _f2t: F => T, _decode: (Row, String) => T) = new CassFormatDecoder[T] {
     type From = F
     val clazz = _clazz
     def f2t(f: From) = Right(_f2t(f))
