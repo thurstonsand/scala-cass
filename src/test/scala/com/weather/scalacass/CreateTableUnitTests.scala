@@ -1,14 +1,13 @@
 package com.weather.scalacass
 
-import com.weather.scalacass.util.DockerCassandra
-import org.scalatest.OptionValues
+import com.weather.scalacass.util.CassandraUnitTester
 import ScalaCass._
 import com.weather.scalacass.ScalaSession.WrongPrimaryKeySizeException
 
 import scala.collection.JavaConverters._
 import scala.language.reflectiveCalls
 
-class CreateTableUnitTests extends DockerCassandra with OptionValues {
+class CreateTableUnitTests extends CassandraUnitTester {
   val dbName = "testDB"
   val tableName = "testTable"
   val tableColumns = List("str varchar, str2 varchar, i int")

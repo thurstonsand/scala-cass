@@ -1,13 +1,13 @@
 package com.weather.scalacass
 
 import com.datastax.driver.core.Session
-import org.scalatest.{FlatSpec, Tag}
+import org.scalatest.Tag
 import ScalaCass._
-import com.weather.scalacass.util.DockerCassandra
+import com.weather.scalacass.util.CassandraUnitTester
 
 object LongRunning extends Tag("LongRunning")
 
-class PerfTest extends FlatSpec with DockerCassandra {
+class PerfTest extends CassandraUnitTester {
   var session: Session = _
   val db = "perfdb"
   val table = "perftable"

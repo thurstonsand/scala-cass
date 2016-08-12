@@ -23,21 +23,13 @@ trait CassFormatEncoder[F] { self =>
   }
 }
 
-trait LowPriorityCassFormatEncoder {
-  def sameTypeCassFormatEncoder[F <: AnyRef](_cassType: String): CassFormatEncoder[F] = new CassFormatEncoder[F] {
-    type To = F
-    val cassType = _cassType
-    def encode(f: F) = Right(f)
-  }
+trait LowPriorityCassFormatEncoder extends LowPriorityCassFormatEncoderVersionSpecific {
+  import CassFormatEncoder.{sameTypeCassFormatEncoder, transCassFormatEncoder}
+
   implicit val stringFormat = sameTypeCassFormatEncoder[String]("varchar")
   implicit val uuidFormat = sameTypeCassFormatEncoder[java.util.UUID]("uuid")
   implicit val iNetFormat = sameTypeCassFormatEncoder[java.net.InetAddress]("inet")
 
-  def transCassFormatEncoder[F, T <: AnyRef](_cassType: String, _encode: F => T): CassFormatEncoder[F] = new CassFormatEncoder[F] {
-    type To = T
-    val cassType = _cassType
-    def encode(f: F) = Right(_encode(f))
-  }
   implicit val intFormat = transCassFormatEncoder("int", Int.box)
   implicit val longFormat = transCassFormatEncoder("bigint", Long.box)
   implicit val booleanFormat = transCassFormatEncoder("boolean", Boolean.box)
@@ -120,4 +112,15 @@ trait LowPriorityCassFormatEncoder {
 object CassFormatEncoder extends LowPriorityCassFormatEncoder {
   type Aux[F, To0] = CassFormatEncoder[F] { type To = To0 }
   def apply[T: CassFormatEncoder] = implicitly[CassFormatEncoder[T]]
+
+  private[scalacass] def sameTypeCassFormatEncoder[F <: AnyRef](_cassType: String): CassFormatEncoder[F] = new CassFormatEncoder[F] {
+    type To = F
+    val cassType = _cassType
+    def encode(f: F) = Right(f)
+  }
+  private[scalacass] def transCassFormatEncoder[F, T <: AnyRef](_cassType: String, _encode: F => T): CassFormatEncoder[F] = new CassFormatEncoder[F] {
+    type To = T
+    val cassType = _cassType
+    def encode(f: F) = Right(_encode(f))
+  }
 }

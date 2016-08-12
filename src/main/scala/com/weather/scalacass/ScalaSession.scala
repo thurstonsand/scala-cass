@@ -45,10 +45,12 @@ object ScalaSession {
 
   final case class Star(`*`: Nothing)
   object Star {
+    @SuppressWarnings(Array("org.brianmckenna.wartremover.warts.AsInstanceOf"))
     implicit val ccCassEncoder: CCCassFormatEncoder[Star] = shapeless.cachedImplicit
   }
   final case class NoQuery()
   object NoQuery {
+    @SuppressWarnings(Array("org.brianmckenna.wartremover.warts.AsInstanceOf"))
     implicit val ccCassEncoder: CCCassFormatEncoder[NoQuery] = shapeless.cachedImplicit
   }
 }

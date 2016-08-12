@@ -1,10 +1,10 @@
 package com.weather.scalacass
 
-import com.weather.scalacass.util.CassandraTester
+import com.weather.scalacass.util.CassandraWithTableTester
 import ScalaCass._
 import org.scalatest.OptionValues
 
-class CaseClassUnitTests extends CassandraTester("testDB", "testTable", List("str varchar", "str2 ascii", "b blob",
+class CaseClassUnitTests extends CassandraWithTableTester("testDB", "testTable", List("str varchar", "str2 ascii", "b blob",
   "d decimal", "f float", "net inet", "tid timeuuid", "vi varint", "i int", "bi bigint", "bool boolean", "dub double",
   "l list<varchar>", "m map<varchar, bigint>", "s set<double>", "ts timestamp", "id uuid", "sblob set<blob>"), List("str")) with OptionValues {
   case class Everything(str: String, d: BigDecimal, f: Float, net: java.net.InetAddress, l: Option[List[String]])

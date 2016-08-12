@@ -1,14 +1,8 @@
 package com.weather.scalacass.util
 
-abstract class CassandraTester(val dbName: String, protected val tableName: String, tableColumns: List[String], primaryKeys: List[String]) extends DockerCassandra {
-  before {
-    client.session.execute(s"CREATE KEYSPACE $dbName WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1};")
-    client.session.execute(s"CREATE TABLE $dbName.$tableName ${tableColumns.mkString("(", ", ", ",")} PRIMARY KEY ${primaryKeys.mkString("((", ", ", "))")})")
-  }
+import org.scalatest.{FlatSpec, Matchers, BeforeAndAfter, BeforeAndAfterAll, OptionValues}
 
-  protected def insert(pairs: Seq[(String, AnyRef)]) = {
-    val (strs, objs) = pairs.unzip
-    client.session.execute(s"INSERT INTO $dbName.$tableName ${strs.mkString("(", ",", ")")} VALUES ${objs.map(_ => "?").mkString("(", ",", ")")}", objs: _*)
-  }
-  protected def getOne = client.session.execute(s"SELECT * FROM $dbName.$tableName").one()
+abstract class CassandraTester extends FlatSpec with Matchers with BeforeAndAfter with BeforeAndAfterAll with OptionValues {
+  private[util] var _client: Option[CassandraClient] = _
+  def client = _client getOrElse sys.error("client must be only be used after beforeAll. Did you override it?")
 }

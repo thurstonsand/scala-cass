@@ -3,26 +3,20 @@ scala:
   - 2.11.8
 
 jdk:
+  - oraclejdk8
   - oraclejdk7
 
-before_script:
-  - wget https://github.com/Ichoran/thyme/raw/master/Thyme.jar -O /tmp/Thyme.jar
-  - mkdir lib
-  - cp /tmp/Thyme.jar lib
-script: 
-  - sbt "testOnly com.weather.scalacass.CaseClassUnitTests"
-  - sbt "testOnly com.weather.scalacass.CreateTableUnitTests"
-  - sbt "testOnly com.weather.scalacass.ScalaCassUnitTests"
-  - sbt "testOnly com.weather.scalacass.SessionActionsUnitTest"
+before_script: sh .travis_script.sh
+script: sbt test
 
 sudo: required
 
-services:
-  - docker
+#services:
+#  - docker
 
-env:
-  - DOCKER_HOST=unix:///var/run/docker.sock
+#env:
+#  - DOCKER_HOST=unix:///var/run/docker.sock
 
-addons:
-  hosts:
-    - dockerhost
+#addons:
+#  hosts:
+#    - dockerhost
