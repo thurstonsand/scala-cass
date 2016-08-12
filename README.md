@@ -35,13 +35,13 @@ Pick a version
 ##### Cassandra 2.2 with Java 7
 ```xml
 <properties>
-    <scalaCass.version>0.3.4</scalaCassVersion>
+    <scalaCass.version>0.3.5</scalaCassVersion>
 </properties>
 ```
 ##### Cassandra 3.1 with Java 8
 ```xml
 <properties>
-    <scalaCass.version>0.4.4</scalaCassVersion>
+    <scalaCass.version>0.4.5</scalaCassVersion>
 </properties>
 ```
 Include the repo
