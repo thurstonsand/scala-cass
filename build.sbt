@@ -34,21 +34,21 @@ resolvers ++= Seq(
 )
 
 libraryDependencies ++= Seq(
-  "joda-time" % "joda-time" % "2.9.1",
+  "joda-time" % "joda-time" % "2.9.4",
   "com.chuusai" %% "shapeless" % "2.3.1",
   "com.google.guava" % "guava" % "19.0",
-  "org.scalatest" %% "scalatest" % "3.0.0-M15" % "test",
+  "org.scalatest" %% "scalatest" % "3.0.0" % "test",
   "com.whisk" %% "docker-testkit-scalatest" % "0.9.0-M5" % "test"
 
 ) ++ (cassVersion.value match {
   case `cassV3` => Seq(
     "com.datastax.cassandra" % "cassandra-driver-core" % "3.1.0" classifier "shaded",
     "com.datastax.cassandra" % "cassandra-driver-extras" % "3.1.0",
-    "org.cassandraunit" % "cassandra-unit" % "3.0.0.1"
+    "org.cassandraunit" % "cassandra-unit" % "3.0.0.1" % "test"
   )
   case `cassV22` =>  Seq(
     "com.datastax.cassandra" % "cassandra-driver-core" % "2.1.10.2" classifier "shaded",
-    "org.cassandraunit" % "cassandra-unit" % "2.2.2.1"
+    "org.cassandraunit" % "cassandra-unit" % "2.2.2.1" % "test"
   )
   case _ => throw new RuntimeException("unknown cassVersion. use either \"" + cassV3 + "\" or \"" + cassV22 + "\"")
 })
