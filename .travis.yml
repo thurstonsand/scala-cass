@@ -6,13 +6,7 @@ jdk:
   - oraclejdk8
   - oraclejdk7
 
-before_script:
-  - mkdir lib
-  - wget https://github.com/Ichoran/thyme/raw/master/Thyme.jar -O lib/Thyme.jar
-  - sudo apt-get update -qq
-  - sudo apt-cache showpkg cassandra
-  - sudo apt-cache search cassandra
-  - if java -version 2>&1 | egrep "java version \"1.7" > /dev/null; then sudo apt-get install -qq cassandra22; else sudo apt-get install -qq cassandra
+before_script: sh .travis_script.sh
 script: sbt test
 
 sudo: required
