@@ -15,6 +15,7 @@ object Implicits {
   implicit val instantEncoder: CassFormatEncoder[Instant] = sameTypeCassFormatEncoder("timestamp")
   implicit val instantDecoder: CassFormatDecoder[Instant] = codecCassFormatDecoder(classOf[Instant])
 
-  implicit val zonedDateTimeEncoder: CassFormatEncoder[ZonedDateTime] = sameTypeCassFormatEncoder("tuple<timestamp,varchar>")
+  implicit val zonedDateTimeEncoder: CassFormatEncoder[ZonedDateTime] =
+    sameTypeCassFormatEncoder("tuple<timestamp,varchar>")
   implicit val zonedDateTimeDecoder: CassFormatDecoder[ZonedDateTime] = codecCassFormatDecoder(classOf[ZonedDateTime])
 }

@@ -5,7 +5,7 @@ import com.datastax.driver.core.Row
 object ScalaCass {
   private[scalacass] implicit class RichEither[+A <: Throwable, +B](val e: Either[A, B]) extends AnyVal {
     def getOrThrow = e match {
-      case Right(v)  => v
+      case Right(v) => v
       case Left(exc) => throw exc
     }
     def getRightOpt = e.right.toOption
