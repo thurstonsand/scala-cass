@@ -53,29 +53,47 @@ libraryDependencies ++= Seq(
   case _ => throw new RuntimeException("unknown cassVersion. use either \"" + cassV3 + "\" or \"" + cassV22 + "\"")
 })
 
-unmanagedSourceDirectories in Compile <<= (unmanagedSourceDirectories in Compile, sourceDirectory in Compile, cassVersion) {
-  (sds: Seq[java.io.File], sd: java.io.File, v: String) =>
-    if (v == cassV3) sds ++ Seq(new java.io.File(sd, "scala_cass3"))
-    else if (v == cassV22) sds ++ Seq(new java.io.File(sd, "scala_cass22"))
-    else throw wrongCassVersion
-}
-unmanagedSourceDirectories in Test <<= (unmanagedSourceDirectories in Test, sourceDirectory in Test, cassVersion) {
-  (sds: Seq[java.io.File], sd: java.io.File, v: String) =>
-    if (v == cassV3) sds ++ Seq(new java.io.File(sd, "scala_cass3"))
-    else if (v == cassV22) sds ++ Seq(new java.io.File(sd, "scala_cass22"))
-    else throw wrongCassVersion
-}
+def addSourceFilesTo(conf: Configuration) =
+  unmanagedSourceDirectories in conf <<= (unmanagedSourceDirectories in conf,
+    sourceDirectory in conf,
+    cassVersion) {
+    (sds: Seq[java.io.File], sd: java.io.File, v: String) =>
+      if (v == cassV3) sds ++ Seq(new java.io.File(sd, "scala_cass3"))
+      else if (v == cassV22) sds ++ Seq(new java.io.File(sd, "scala_cass22"))
+      else throw wrongCassVersion
+  }
+addSourceFilesTo(Compile)
+addSourceFilesTo(Test)
+//unmanagedSourceDirectories in Compile <<= (unmanagedSourceDirectories in Compile,
+//                                           sourceDirectory in Compile,
+//                                           cassVersion) {
+//  (sds: Seq[java.io.File], sd: java.io.File, v: String) =>
+//    if (v == cassV3) sds ++ Seq(new java.io.File(sd, "scala_cass3"))
+//    else if (v == cassV22) sds ++ Seq(new java.io.File(sd, "scala_cass22"))
+//    else throw wrongCassVersion
+//}
+//
+//unmanagedSourceDirectories in Test <<= (unmanagedSourceDirectories in Test,
+//                                        sourceDirectory in Test,
+//                                        cassVersion) {
+//  (sds: Seq[java.io.File], sd: java.io.File, v: String) =>
+//    if (v == cassV3) sds ++ Seq(new java.io.File(sd, "scala_cass3"))
+//    else if (v == cassV22) sds ++ Seq(new java.io.File(sd, "scala_cass22"))
+//    else throw wrongCassVersion
+//}
 
-import scalariform.formatter.preferences._
-import com.typesafe.sbt.SbtScalariform, SbtScalariform.ScalariformKeys
+//import scalariform.formatter.preferences._
+//import com.typesafe.sbt.SbtScalariform, SbtScalariform.ScalariformKeys
+//
+//SbtScalariform.scalariformSettings
+//
+//ScalariformKeys.preferences := ScalariformKeys.preferences.value
+//  .setPreference(AlignSingleLineCaseStatements, true)
+//  .setPreference(DoubleIndentClassDeclaration, true)
+//  .setPreference(DanglingCloseParenthesis, Force)
+//  .setPreference(SpacesAroundMultiImports, false)
 
-SbtScalariform.scalariformSettings
-
-ScalariformKeys.preferences := ScalariformKeys.preferences.value
-  .setPreference(AlignSingleLineCaseStatements, true)
-  .setPreference(DoubleIndentClassDeclaration, true)
-  .setPreference(DanglingCloseParenthesis, Force)
-  .setPreference(SpacesAroundMultiImports, false)
+scalafmtConfig in ThisBuild := Some(file(".scalafmt"))
 
 wartremoverWarnings in (Compile, compile) ++= Seq(
   Wart.Any, Wart.Any2StringAdd, Wart.AsInstanceOf,
