@@ -14,11 +14,11 @@ resolvers += Resolver.jcenterRepo
 Add the appropriate version of the library
 ##### Cassandra 3.1 with Java 8
 ```scala
-libraryDependencies += "com.github.thurstonsand" %% "scalacass" % "0.4.4"
+libraryDependencies += "com.github.thurstonsand" %% "scalacass" % "0.4.5"
 ```
 ##### Cassandra 2.2 with Java 7
 ```scala
-libraryDependencies += "com.github.thurstonsand" %% "scalacass" % "0.3.4"
+libraryDependencies += "com.github.thurstonsand" %% "scalacass" % "0.3.5"
 ```
 #### Maven
 Add the jcenter resolver
@@ -35,13 +35,13 @@ Pick a version
 ##### Cassandra 2.2 with Java 7
 ```xml
 <properties>
-    <scalaCass.version>0.3.4</scalaCassVersion>
+    <scalaCass.version>0.3.5</scalaCassVersion>
 </properties>
 ```
 ##### Cassandra 3.1 with Java 8
 ```xml
 <properties>
-    <scalaCass.version>0.4.4</scalaCassVersion>
+    <scalaCass.version>0.4.5</scalaCassVersion>
 </properties>
 ```
 Include the repo
@@ -162,11 +162,10 @@ ScalaCass w/ `cachedImplicit` is 77.664% the speed of native for `as`, 93.372% t
 | **date**       | **com.datastax.driver.core.LocalDate** |
 | **time**       | **Time**                               |
 
-* Time is a type specific to this library. it is defined as
-    ```scala
-    final case class Time(millis: Long)
-    ```
-    so as not to conflict with `bigint`
+* Time is a type specific to this library so as not to conflict with `bigint` and `Long`. it is defined as
+```scala
+final case class Time(millis: Long)
+```
 * There are implicit overrides for both the Joda library and Jdk8 Time library that take advantage of Cassandra's new 
 codecs. These codecs have to be registered with your `Cluster` instance, which is included as a helper function
 
