@@ -1,7 +1,0 @@
---style default
---maxColumn 121
---scalaDocs
---allowNewlineBeforeColonInMassiveReturnTypes true
---alignByArrowEnumeratorGenerator true
---binPackParentConstructors false
---alignByOpenParenCallSite true
