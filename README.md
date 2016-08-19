@@ -1,6 +1,7 @@
 # ScalaCass
 ## [Cassandra Java Driver](https://github.com/datastax/java-driver) wrapper that makes retrieval from Rows a little easier
 [![Build Status](https://travis-ci.org/thurstonsand/scala-cass.svg?branch=master)](https://travis-ci.org/thurstonsand/scala-cass)
+[![Join the chat at https://gitter.im/scala-cass/Lobby](https://badges.gitter.im/scala-cass/Lobby.svg)](https://gitter.im/scala-cass/Lobby?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 
 ### Getting ScalaCass
 you can find it on bintray. Currently only supports **scala 2.11**, with Cassandra 2.2 on Java 7 or Cassandra 3.1 on
