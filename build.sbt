@@ -41,8 +41,8 @@ libraryDependencies ++= Seq(
   "com.whisk" %% "docker-testkit-scalatest" % "0.9.0-M5" % "test"
 ) ++ (cassVersion.value match {
   case `cassV3` => Seq(
-    "com.datastax.cassandra" % "cassandra-driver-core" % "3.1.0" classifier "shaded",
-    "com.datastax.cassandra" % "cassandra-driver-extras" % "3.1.0",
+    "com.datastax.cassandra" % "cassandra-driver-core" % "3.1.0" classifier "shaded" excludeAll ExclusionRule("com.google.guava", "guava"),
+    "com.datastax.cassandra" % "cassandra-driver-extras" % "3.1.0" excludeAll ExclusionRule("com.google.guava", "guava"),
     "org.cassandraunit" % "cassandra-unit" % "3.0.0.1" % "test"
   )
   case `cassV22` =>  Seq(
