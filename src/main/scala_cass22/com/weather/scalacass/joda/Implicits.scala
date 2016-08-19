@@ -1,11 +1,6 @@
 package com.weather.scalacass.joda
 
-import com.weather.scalacass.{
-  CassFormatDecoder,
-  CassFormatEncoder,
-  LowPriorityCassFormatDecoderVersionSpecific,
-  LowPriorityCassFormatEncoderVersionSpecific
-}
+import com.weather.scalacass.{CassFormatDecoder, CassFormatEncoder, LowPriorityCassFormatDecoderVersionSpecific, LowPriorityCassFormatEncoderVersionSpecific}
 import org.joda.time.Instant
 
 object Implicits {

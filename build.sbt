@@ -41,8 +41,8 @@ libraryDependencies ++= Seq(
   "com.whisk" %% "docker-testkit-scalatest" % "0.9.0-M5" % "test"
 ) ++ (cassVersion.value match {
   case `cassV3` => Seq(
-    "com.datastax.cassandra" % "cassandra-driver-core" % "3.1.0" classifier "shaded" excludeAll ExclusionRule("com.google.guava", "guava"),
-    "com.datastax.cassandra" % "cassandra-driver-extras" % "3.1.0" excludeAll ExclusionRule("com.google.guava", "guava"),
+    "com.datastax.cassandra" % "cassandra-driver-core" % "3.1.0" classifier "shaded",
+    "com.datastax.cassandra" % "cassandra-driver-extras" % "3.1.0",
     "org.cassandraunit" % "cassandra-unit" % "3.0.0.1" % "test"
   )
   case `cassV22` =>  Seq(
@@ -53,9 +53,7 @@ libraryDependencies ++= Seq(
 })
 
 def addSourceFilesTo(conf: Configuration) =
-  unmanagedSourceDirectories in conf <<= (unmanagedSourceDirectories in conf,
-    sourceDirectory in conf,
-    cassVersion) {
+  unmanagedSourceDirectories in conf <<= (unmanagedSourceDirectories in conf, sourceDirectory in conf, cassVersion) {
     (sds: Seq[java.io.File], sd: java.io.File, v: String) =>
       if (v == cassV3) sds ++ Seq(new java.io.File(sd, "scala_cass3"))
       else if (v == cassV22) sds ++ Seq(new java.io.File(sd, "scala_cass22"))

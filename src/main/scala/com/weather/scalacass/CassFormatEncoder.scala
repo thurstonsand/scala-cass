@@ -40,10 +40,7 @@ trait LowPriorityCassFormatEncoder extends LowPriorityCassFormatEncoderVersionSp
   implicit val dateTimeFormat = transCassFormatEncoder("timestamp", (_: DateTime).toDate)
   implicit val blobFormat = transCassFormatEncoder("blob", java.nio.ByteBuffer.wrap)
 
-  def containerCassFormatEncoder[Coll[_], F, JColl[_] <: java.util.Collection[_], T <: AnyRef](
-      _cassType: String,
-      _encode: F => Either[Throwable, T],
-      lb2JColl: ListBuffer[T] => JColl[T])(implicit ev: Coll[F] <:< Iterable[F]) =
+  def containerCassFormatEncoder[Coll[_], F, JColl[_] <: java.util.Collection[_], T <: AnyRef](_cassType: String, _encode: F => Either[Throwable, T], lb2JColl: ListBuffer[T] => JColl[T])(implicit ev: Coll[F] <:< Iterable[F]) =
     new CassFormatEncoder[Coll[F]] {
       type To = JColl[T]
       val cassType = _cassType
@@ -61,14 +58,8 @@ trait LowPriorityCassFormatEncoder extends LowPriorityCassFormatEncoderVersionSp
       }
     }
 
-  implicit def listFormat[A](implicit underlying: CassFormatEncoder[A]) =
-    containerCassFormatEncoder[List, A, java.util.List, underlying.To](s"list<${underlying.cassType}>",
-                                                                       underlying.encode(_),
-                                                                       _.asJava)
-  implicit def setFormat[A](implicit underlying: CassFormatEncoder[A]) =
-    containerCassFormatEncoder[Set, A, java.util.Set, underlying.To](s"set<${underlying.cassType}>",
-                                                                     underlying.encode(_),
-                                                                     _.toSet.asJava)
+  implicit def listFormat[A](implicit underlying: CassFormatEncoder[A]) = containerCassFormatEncoder[List, A, java.util.List, underlying.To](s"list<${underlying.cassType}>", underlying.encode(_), _.asJava)
+  implicit def setFormat[A](implicit underlying: CassFormatEncoder[A]) = containerCassFormatEncoder[Set, A, java.util.Set, underlying.To](s"set<${underlying.cassType}>", underlying.encode(_), _.toSet.asJava)
   implicit def mapFormat[A, B](implicit underlyingA: CassFormatEncoder[A], underlyingB: CassFormatEncoder[B]) =
     new CassFormatEncoder[Map[A, B]] {
       type To = java.util.Map[underlyingA.To, underlyingB.To]
@@ -76,20 +67,18 @@ trait LowPriorityCassFormatEncoder extends LowPriorityCassFormatEncoderVersionSp
       def encode(f: Map[A, B]): Either[Throwable, java.util.Map[underlyingA.To, underlyingB.To]] = {
         val acc = ListBuffer.empty[(underlyingA.To, underlyingB.To)]
         @scala.annotation.tailrec
-        def process(l: Iterable[(A, B)]): Either[Throwable, java.util.Map[underlyingA.To, underlyingB.To]] =
-          l.headOption.map {
-            case (k, v) =>
-              for {
-                kk <- underlyingA.encode(k).right
-                vv <- underlyingB.encode(v).right
-              } yield (kk, vv)
-          } match {
-            case Some(Left(ff)) => Left(ff)
-            case Some(Right(n)) =>
-              acc += n
-              process(l.tail)
-            case None => Right(acc.toMap.asJava)
-          }
+        def process(l: Iterable[(A, B)]): Either[Throwable, java.util.Map[underlyingA.To, underlyingB.To]] = l.headOption.map {
+          case (k, v) => for {
+            kk <- underlyingA.encode(k).right
+            vv <- underlyingB.encode(v).right
+          } yield (kk, vv)
+        } match {
+          case Some(Left(ff)) => Left(ff)
+          case Some(Right(n)) =>
+            acc += n
+            process(l.tail)
+          case None => Right(acc.toMap.asJava)
+        }
         process(f)
       }
     }
@@ -98,23 +87,20 @@ trait LowPriorityCassFormatEncoder extends LowPriorityCassFormatEncoderVersionSp
     type To = Option[underlying.To]
     val cassType = underlying.cassType
     def encode(f: Option[A]): Either[Throwable, Option[underlying.To]] = f.map(underlying.encode(_)) match {
-      case None => Right(None)
-      case Some(Left(_)) => Right(None)
+      case None           => Right(None)
+      case Some(Left(_))  => Right(None)
       case Some(Right(n)) => Right(Some(n))
     }
   }
-  implicit def eitherFormat[A](implicit underlying: CassFormatEncoder[A]) =
-    new CassFormatEncoder[Either[Throwable, A]] {
-      type To = Either[Throwable, underlying.To]
-      val cassType = underlying.cassType
-      @SuppressWarnings(
-        Array("org.brianmckenna.wartremover.warts.Product", "org.brianmckenna.wartremover.warts.Serializable"))
-      def encode(f: Either[Throwable, A]): Either[Throwable, Either[Throwable, underlying.To]] =
-        f.right.map(underlying.encode(_)) match {
-          case Left(ff) => Right(Left(ff))
-          case other => other
-        }
+  implicit def eitherFormat[A](implicit underlying: CassFormatEncoder[A]) = new CassFormatEncoder[Either[Throwable, A]] {
+    type To = Either[Throwable, underlying.To]
+    val cassType = underlying.cassType
+    @SuppressWarnings(Array("org.brianmckenna.wartremover.warts.Product", "org.brianmckenna.wartremover.warts.Serializable"))
+    def encode(f: Either[Throwable, A]): Either[Throwable, Either[Throwable, underlying.To]] = f.right.map(underlying.encode(_)) match {
+      case Left(ff) => Right(Left(ff))
+      case other    => other
     }
+  }
 
   implicit val nothingFormat = new CassFormatEncoder[Nothing] {
     type To = Nothing
@@ -127,17 +113,14 @@ object CassFormatEncoder extends LowPriorityCassFormatEncoder {
   type Aux[F, To0] = CassFormatEncoder[F] { type To = To0 }
   def apply[T: CassFormatEncoder] = implicitly[CassFormatEncoder[T]]
 
-  private[scalacass] def sameTypeCassFormatEncoder[F <: AnyRef](_cassType: String): CassFormatEncoder[F] =
-    new CassFormatEncoder[F] {
-      type To = F
-      val cassType = _cassType
-      def encode(f: F) = Right(f)
-    }
-  private[scalacass] def transCassFormatEncoder[F, T <: AnyRef](_cassType: String,
-                                                                _encode: F => T): CassFormatEncoder[F] =
-    new CassFormatEncoder[F] {
-      type To = T
-      val cassType = _cassType
-      def encode(f: F) = Right(_encode(f))
-    }
+  private[scalacass] def sameTypeCassFormatEncoder[F <: AnyRef](_cassType: String): CassFormatEncoder[F] = new CassFormatEncoder[F] {
+    type To = F
+    val cassType = _cassType
+    def encode(f: F) = Right(f)
+  }
+  private[scalacass] def transCassFormatEncoder[F, T <: AnyRef](_cassType: String, _encode: F => T): CassFormatEncoder[F] = new CassFormatEncoder[F] {
+    type To = T
+    val cassType = _cassType
+    def encode(f: F) = Right(_encode(f))
+  }
 }

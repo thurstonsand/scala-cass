@@ -6,7 +6,6 @@ import com.datastax.driver.extras.codecs.jdk8.{InstantCodec, LocalDateCodec, Loc
 package object jdk8 {
   def register(c: Cluster): Unit = {
     val tt = c.getMetadata.newTupleType(DataType.timestamp, DataType.varchar)
-    c.getConfiguration.getCodecRegistry
-      .register(new ZonedDateTimeCodec(tt), LocalDateCodec.instance, LocalTimeCodec.instance, InstantCodec.instance)
+    c.getConfiguration.getCodecRegistry.register(new ZonedDateTimeCodec(tt), LocalDateCodec.instance, LocalTimeCodec.instance, InstantCodec.instance)
   }
 }
