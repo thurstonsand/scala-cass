@@ -48,7 +48,6 @@ resolvers ++= Seq(
 
 addCompilerPlugin("org.scalamacros" % "paradise" % "2.1.0" cross CrossVersion.full)
 
-
 libraryDependencies ++= Seq(
   "joda-time" % "joda-time" % "2.9.4",
   "com.chuusai" %% "shapeless" % "2.3.1",

@@ -25,8 +25,8 @@ object ScalaSession {
     Futures.addCallback(
       f,
       new FutureCallback[ResultSet] {
-        def onSuccess(r: ResultSet) = { p.success(r); (): Unit }
-        def onFailure(t: Throwable) = { p.failure(t); (): Unit }
+        def onSuccess(r: ResultSet) = { p success r; (): Unit }
+        def onFailure(t: Throwable) = { p failure t; (): Unit }
       }
     )
     p.future
