@@ -3,14 +3,15 @@ package com.weather.scalacass
 import java.util.concurrent.Callable
 
 import com.datastax.driver.core._
+import com.google.common.cache.CacheBuilder
 import exceptions.QueryExecutionException
 import com.google.common.util.concurrent.{FutureCallback, Futures}
+import ScalaCass._
 
 import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.{Future, Promise}
-import ScalaCass._
-import com.google.common.cache.{Cache, CacheBuilder}
+import scala.language.implicitConversions
 
 sealed trait Batch extends Product with Serializable
 final case class UpdateBatch[T, S](table: String, item: T, query: T)(implicit val tEncoder: CCCassFormatEncoder[T], val sEncoder: CCCassFormatEncoder[S]) extends Batch
@@ -24,8 +25,8 @@ object ScalaSession {
     Futures.addCallback(
       f,
       new FutureCallback[ResultSet] {
-        def onSuccess(r: ResultSet) = p success r; (): Unit
-        def onFailure(t: Throwable) = p failure t; (): Unit
+        def onSuccess(r: ResultSet) = { p.success(r); (): Unit }
+        def onFailure(t: Throwable) = { p.failure(t); (): Unit }
       }
     )
     p.future
@@ -36,8 +37,8 @@ object ScalaSession {
     new ScalaSession(keyspace)
   }
 
-  private implicit class ScalaishCache[K, V](val c: Cache[K, V]) extends AnyVal {
-    def getP(k: K, toAdd: => V) = c.get(k, new Callable[V] { def call(): V = toAdd })
+  private implicit def Fn02Callable[V](f: => V): Callable[V] = new Callable[V] {
+    override def call(): V = f
   }
 
   //  class AllowFilteringNotEnabledException(m: String) extends QueryExecutionException(m)
@@ -56,7 +57,7 @@ object ScalaSession {
 }
 
 class ScalaSession(val keyspace: String)(implicit val session: Session) {
-  import ScalaSession.{resultSetFutureToScalaFuture, WrongPrimaryKeySizeException, ScalaishCache, Star}
+  import ScalaSession.{resultSetFutureToScalaFuture, WrongPrimaryKeySizeException, Fn02Callable, Star}
 
   private[this] def keyspaceMeta = session.getCluster.getMetadata.getKeyspace(keyspace)
 
@@ -95,7 +96,7 @@ class ScalaSession(val keyspace: String)(implicit val session: Session) {
 
   private[this] def prepareInsert[T: CCCassFormatEncoder](table: String, insertable: T): BoundStatement = {
     val (strArgs, anyrefArgs) = clean(insertable)
-    val prepared = queryCache.getP(
+    val prepared = queryCache.get(
       strArgs.toSet + table + "INSERT",
       session.prepare(s"INSERT INTO $keyspace.$table ${strArgs.mkString("(", ",", ")")} VALUES ${List.fill(anyrefArgs.length)("?").mkString("(", ",", ")")}")
     )
@@ -107,7 +108,7 @@ class ScalaSession(val keyspace: String)(implicit val session: Session) {
   def insertAsync[T: CCCassFormatEncoder](table: String, insertable: T): Future[ResultSet] = session.executeAsync(prepareInsert(table, insertable))
 
   private[this] def prepareInsertRaw(query: String, anyrefArgs: Seq[AnyRef]) = {
-    val prepared = queryCache.getP(Set(query), session.prepare(query))
+    val prepared = queryCache.get(Set(query), session.prepare(query))
     prepared.bind(anyrefArgs)
   }
   def insertRaw(query: String, anyrefArgs: AnyRef*): ResultSet =
@@ -118,7 +119,7 @@ class ScalaSession(val keyspace: String)(implicit val session: Session) {
   private[this] def prepareUpdate[T: CCCassFormatEncoder, S: CCCassFormatEncoder](table: String, updateable: T, query: S): BoundStatement = {
     val (updateStrArgs, updateAnyrefArgs) = clean(updateable)
     val (queryStrArgs, queryAnyrefArgs) = clean(query)
-    val prepared = queryCache.getP(
+    val prepared = queryCache.get(
       updateStrArgs.toSet ++ queryStrArgs.toSet + table + "UPDATE",
       session.prepare(s"UPDATE $keyspace.$table SET ${updateStrArgs.map(_ + "=?").mkString(",")} WHERE ${queryStrArgs.map(_ + "=?").mkString(" AND ")}")
     )
@@ -130,7 +131,7 @@ class ScalaSession(val keyspace: String)(implicit val session: Session) {
 
   private[this] def prepareDelete[T: CCCassFormatEncoder](table: String, deletable: T): BoundStatement = {
     val (strArgs, anyrefArgs) = clean(deletable)
-    val prepared = queryCache.getP(
+    val prepared = queryCache.get(
       strArgs.toSet + table + "DELETE",
       session.prepare(s"DELETE FROM $keyspace.$table WHERE ${strArgs.map(_ + "=?").mkString(" AND ")}")
     )
@@ -143,7 +144,7 @@ class ScalaSession(val keyspace: String)(implicit val session: Session) {
     session.executeAsync(prepareDelete(table, deletable))
 
   private[this] def prepareRawDelete(query: String, anyrefArgs: Seq[AnyRef]) = {
-    val prepared = queryCache.getP(Set(query), session.prepare(query))
+    val prepared = queryCache.get(Set(query), session.prepare(query))
     prepared.bind(anyrefArgs)
   }
   def deleteRaw(query: String, anyrefArgs: AnyRef*): ResultSet =
@@ -167,7 +168,7 @@ class ScalaSession(val keyspace: String)(implicit val session: Session) {
   private[this] def prepareSelect[Sub: CCCassFormatEncoder, Query: CCCassFormatEncoder](table: String, selectable: Query, allowFiltering: Boolean, limit: Long) = {
     val sStrArgs = CCCassFormatEncoder[Sub].namesAndTypes.map(_._1)
     val (qStrArgs, qAnyRefArgs) = clean(selectable)
-    val prepared = queryCache.getP(sStrArgs.toSet ++ qStrArgs.toSet + table + "SELECT", {
+    val prepared = queryCache.get(sStrArgs.toSet ++ qStrArgs.toSet + table + "SELECT", {
       val whereClauseStr = if (qStrArgs.nonEmpty) s" WHERE ${qStrArgs.map(_ + "=?").mkString(" AND ")}" else ""
       val limitStr = if (limit > 0) s" LIMIT $limit" else ""
       val filteringStr = if (allowFiltering) s" ALLOW FILTERING" else ""
@@ -195,7 +196,7 @@ class ScalaSession(val keyspace: String)(implicit val session: Session) {
     session.executeAsync(prepareSelect[Sub, Query](table, selectable, allowFiltering, 0)).map(rs => Option(rs.one()))
 
   private[this] def prepareRawSelect(query: String, anyrefArgs: Seq[AnyRef]) = {
-    val prepared = queryCache.getP(Set(query), session.prepare(query))
+    val prepared = queryCache.get(Set(query), session.prepare(query))
     prepared.bind(anyrefArgs: _*)
   }
   def selectRaw[T: CCCassFormatDecoder](query: String, anyrefArgs: AnyRef*): Iterator[Row] =

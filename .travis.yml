@@ -7,7 +7,7 @@ jdk:
   - oraclejdk7
 
 before_script: sh .travis_script.sh
-script: sbt test
+script: sbt +test
 
 sudo: required
 
