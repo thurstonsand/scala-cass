@@ -58,7 +58,7 @@ libraryDependencies ++= Seq(
 ) ++ (cassVersion.value match {
   case `cassV3` => Seq(
     "com.datastax.cassandra" % "cassandra-driver-core" % "3.1.0" classifier "shaded" excludeAll ExclusionRule("com.google.guava", "guava"),
-    "com.datastax.cassandra" % "cassandra-driver-extras" % "3.1.0",
+    "com.datastax.cassandra" % "cassandra-driver-extras" % "3.1.0" excludeAll (ExclusionRule("com.datastax.cassandra", "cassandra-driver-core"), ExclusionRule("com.google.guava", "guava")),
     "org.cassandraunit" % "cassandra-unit" % "3.0.0.1" % "test"
   )
   case `cassV22` =>  Seq(

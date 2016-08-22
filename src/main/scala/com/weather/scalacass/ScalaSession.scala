@@ -59,7 +59,7 @@ object ScalaSession {
 class ScalaSession(val keyspace: String)(implicit val session: Session) {
   import ScalaSession.{resultSetFutureToScalaFuture, WrongPrimaryKeySizeException, Fn02Callable, Star}
 
-  private[this] def keyspaceMeta = session.getCluster.getMetadata.getKeyspace(keyspace)
+  //  private[this] def keyspaceMeta = session.getCluster.getMetadata.getKeyspace(keyspace)
 
   //  private[this] val queryCache = new LRUCache[Set[String], PreparedStatement](100)
   private[this] val queryCache = CacheBuilder.newBuilder().maximumSize(1000).build[Set[String], PreparedStatement]()
