@@ -4,7 +4,7 @@
 [![Join the chat at https://gitter.im/scala-cass/Lobby](https://badges.gitter.im/scala-cass/Lobby.svg)](https://gitter.im/scala-cass/Lobby?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 
 ### Getting ScalaCass
-you can find it on bintray.
+[you can find it on bintray](https://bintray.com/thurstonsand/maven/scalacass).
 
 Supports **scala 2.10** and **scala 2.11** and
 - Cassandra 2.2 on Java 7
