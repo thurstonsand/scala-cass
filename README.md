@@ -4,7 +4,7 @@
 [![Join the chat at https://gitter.im/scala-cass/Lobby](https://badges.gitter.im/scala-cass/Lobby.svg)](https://gitter.im/scala-cass/Lobby?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 
 ### Getting ScalaCass
-you can find it on bintray. Currently only supports **scala 2.11**, with Cassandra 2.2 on Java 7 or Cassandra 3.1 on
+you can find it on bintray. Supports **scala 2.10** and **scala 2.11**, with Cassandra 2.2 on Java 7 or Cassandra 3.1 on
 Java 8
 
 #### SBT
@@ -15,11 +15,11 @@ resolvers += Resolver.jcenterRepo
 Add the appropriate version of the library
 ##### Cassandra 3.1 with Java 8
 ```scala
-libraryDependencies += "com.github.thurstonsand" %% "scalacass" % "0.4.5"
+libraryDependencies += "com.github.thurstonsand" %% "scalacass" % "0.4.6"
 ```
 ##### Cassandra 2.2 with Java 7
 ```scala
-libraryDependencies += "com.github.thurstonsand" %% "scalacass" % "0.3.5"
+libraryDependencies += "com.github.thurstonsand" %% "scalacass" % "0.3.6"
 ```
 #### Maven
 Add the jcenter resolver
