@@ -36,20 +36,20 @@ Pick a version
 ##### Cassandra 2.2 with Java 7
 ```xml
 <properties>
-    <scalaCass.version>0.3.5</scalaCassVersion>
+    <scalaCass.version>0.3.6</scalaCassVersion>
 </properties>
 ```
 ##### Cassandra 3.1 with Java 8
 ```xml
 <properties>
-    <scalaCass.version>0.4.5</scalaCassVersion>
+    <scalaCass.version>0.4.6</scalaCassVersion>
 </properties>
 ```
 Include the repo
 ```xml
 <dependency>
   <groupId>com.github.thurstonsand</groupId>
-  <artifactId>scalacass_2.11</artifactId>
+  <artifactId>scalacass_${scala.version}</artifactId>
   <version>${scalaCass.version}</version>
   <type>pom</type>
 </dependency>
