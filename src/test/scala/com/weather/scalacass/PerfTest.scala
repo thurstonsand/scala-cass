@@ -12,7 +12,7 @@ class PerfTest extends CassandraUnitTester {
   val db = "perfdb"
   val table = "perftable"
 
-  override def beforeAll() {
+  override def beforeAll(): Unit = {
     super.beforeAll()
     session = client.session
   }
