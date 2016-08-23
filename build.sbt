@@ -19,7 +19,7 @@ version := {
     case (`cassV22`, "1.7") => "3"
     case (cv, jv) => throw new RuntimeException("invalid cassandra/java version combination: " + cv + "/" + jv + ". use either cass \"" + cassV3 + "\" with java 8 or cass \"" + cassV22 + "\" with java 7")
   }
-  s"0.$majorVersion.6"
+  s"0.$majorVersion.7"
 }
 
 scalaVersion := "2.11.8"

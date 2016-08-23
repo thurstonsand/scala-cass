@@ -2,7 +2,7 @@ package com.weather.scalacass.joda
 
 import com.weather.scalacass.{CassFormatDecoder, CassFormatEncoder}
 import com.weather.scalacass.CassFormatEncoder.sameTypeCassFormatEncoder
-import com.weather.scalacass.LowPriorityCassFormatDecoderVersionSpecific.codecCassFormatDecoder
+import com.weather.scalacass.CassFormatDecoderVersionSpecific.codecCassFormatDecoder
 import org.joda.time.{DateTime, Instant, LocalDate, LocalTime}
 
 object Implicits {

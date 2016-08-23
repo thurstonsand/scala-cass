@@ -1,11 +1,11 @@
 package com.weather.scalacass.joda
 
-import com.weather.scalacass.{CassFormatDecoder, CassFormatEncoder, LowPriorityCassFormatDecoderVersionSpecific, LowPriorityCassFormatEncoderVersionSpecific}
+import com.weather.scalacass.{CassFormatDecoder, CassFormatEncoder, CassFormatDecoderVersionSpecific, CassFormatEncoderVersionSpecific}
 import org.joda.time.Instant
 
 object Implicits {
   implicit val instantEncoder: CassFormatEncoder[Instant] =
-    LowPriorityCassFormatEncoderVersionSpecific.dateFormat.map(i => new java.util.Date(i.getMillis))
+    CassFormatEncoderVersionSpecific.dateFormat.map(i => new java.util.Date(i.getMillis))
   implicit val instantDecoder: CassFormatDecoder[Instant] =
-    LowPriorityCassFormatDecoderVersionSpecific.dateFormat.map(d => new Instant(d))
+    CassFormatDecoderVersionSpecific.dateFormat.map(new Instant(_))
 }
