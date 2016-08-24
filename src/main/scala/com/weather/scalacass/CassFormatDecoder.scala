@@ -5,8 +5,6 @@ import java.nio.ByteBuffer
 import com.datastax.driver.core.{DataType, Row}
 import com.datastax.driver.core.exceptions.{InvalidTypeException, QueryExecutionException}
 
-import scala.collection.mutable.ListBuffer
-import scala.language.higherKinds
 import scala.util.{Try, Failure => TFailure, Success => TSuccess}
 
 trait CassFormatDecoder[T] { self =>

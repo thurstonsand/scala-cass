@@ -26,18 +26,21 @@ scalaVersion := "2.11.8"
 crossScalaVersions := Seq("2.11.8", "2.10.6")
 
 scalacOptions ++= Seq(
-  "-unchecked",
   "-deprecation",
-  "-feature",
   "-encoding", "UTF-8",
+  "-feature",
+  "-language:existentials",
+  "-language:higherKinds",
+  "-language:implicitConversions",
+  "-unchecked",
+  "-Xfatal-warnings",
+  "-Xlint",
   "-Yno-adapted-args",
   "-Ywarn-numeric-widen",
   "-Ywarn-value-discard",
-//  "-Ywarn-dead-code", // not used because `Nothing` is used for type inference purposes
-  "-Xfuture",
-  "-Xfatal-warnings"
+  "-Xfuture"
 ) ++ (CrossVersion.partialVersion(scalaVersion.value) match {
-  case Some((2, 11)) => Seq("-Ywarn-unused")
+  case Some((2, 11)) => Seq("-Ywarn-unused", "-Ywarn-unused-import")
   case _ => Seq.empty[String]
 })
 

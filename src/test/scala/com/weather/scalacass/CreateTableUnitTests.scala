@@ -1,7 +1,6 @@
 package com.weather.scalacass
 
 import com.weather.scalacass.util.CassandraUnitTester
-import ScalaCass._
 import com.weather.scalacass.ScalaSession.WrongPrimaryKeySizeException
 
 import scala.collection.JavaConverters._
