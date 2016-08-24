@@ -9,16 +9,15 @@ object ScalaCass {
       case Left(exc) => throw exc
     }
     def getRightOpt = e.right.toOption
-    def getRightOptFlatten[Underlying](implicit ev: B <:< Option[Underlying]) = e.right.toOption.flatten
   }
 
   implicit class RichRow(val r: Row) extends AnyVal {
     def as[T: CassFormatDecoder](name: String): T = CassFormatDecoder[T].decode(r, name).getOrThrow
-    def getAs[T](name: String)(implicit optDecoder: CassFormatDecoder[Option[T]]): Option[T] = optDecoder.decode(r, name).getRightOptFlatten
+    def getAs[T](name: String)(implicit optDecoder: CassFormatDecoder[Option[T]]): Option[T] = optDecoder.decode(r, name).getRightOpt.flatten
     def getOrElse[T: CassFormatDecoder](name: String, default: => T): T = getAs[T](name).getOrElse(default)
 
     def as[T: CCCassFormatDecoder]: T = CCCassFormatDecoder[T].decode(r).getOrThrow
-    def getAs[T: CCCassFormatDecoder]: Option[T] = implicitly[CCCassFormatDecoder[T]].decode(r).getRightOpt
+    def getAs[T: CCCassFormatDecoder]: Option[T] = CCCassFormatDecoder[T].decode(r).getRightOpt
     def getOrElse[T: CCCassFormatDecoder](default: => T): T = getAs[T].getOrElse(default)
   }
 

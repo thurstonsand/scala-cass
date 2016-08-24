@@ -34,7 +34,8 @@ scalacOptions ++= Seq(
   "-Ywarn-numeric-widen",
   "-Ywarn-value-discard",
 //  "-Ywarn-dead-code", // not used because `Nothing` is used for type inference purposes
-  "-Xfuture"
+  "-Xfuture",
+  "-Xfatal-warnings"
 ) ++ (CrossVersion.partialVersion(scalaVersion.value) match {
   case Some((2, 11)) => Seq("-Ywarn-unused")
   case _ => Seq.empty[String]
@@ -49,6 +50,8 @@ resolvers ++= Seq(
 addCompilerPlugin("org.scalamacros" % "paradise" % "2.1.0" cross CrossVersion.full)
 
 libraryDependencies ++= Seq(
+  "com.google.code.findbugs" % "jsr305" % "3.0.1" % "compile-internal, test-internal",
+  "org.joda" % "joda-convert" % "1.8.1" % "compile-internal, test-internal",
   "joda-time" % "joda-time" % "2.9.4",
   "com.chuusai" %% "shapeless" % "2.3.1",
   "com.google.guava" % "guava" % "19.0",

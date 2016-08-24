@@ -150,7 +150,7 @@ object CassFormatDecoder extends CassFormatDecoderVersionSpecific {
       if (r.isNull(name)) Left(new ValueNotDefinedException(s""""$name" was not defined in ${r.getColumnDefinitions.getTable(name)}"""))
       else {
         val cassName = r.getColumnDefinitions.getType(name).getName
-        if (!(cassName == DataType.Name.BLOB))
+        if (cassName != DataType.Name.BLOB)
           Left(new InvalidTypeException(s"Column $name is a $cassName, cannot be retrieved as a blob"))
         else f2t(extract(r, name))
       }
