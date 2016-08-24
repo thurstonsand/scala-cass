@@ -18,11 +18,11 @@ resolvers += Resolver.jcenterRepo
 Add the appropriate version of the library
 ##### Cassandra 3.0+ with Java 8
 ```scala
-libraryDependencies += "com.github.thurstonsand" %% "scalacass" % "0.4.6"
+libraryDependencies += "com.github.thurstonsand" %% "scalacass" % "0.4.7"
 ```
 ##### Cassandra 2.2 with Java 7
 ```scala
-libraryDependencies += "com.github.thurstonsand" %% "scalacass" % "0.3.6"
+libraryDependencies += "com.github.thurstonsand" %% "scalacass" % "0.3.7"
 ```
 #### Maven
 Add the jcenter resolver
@@ -39,13 +39,13 @@ Pick a version
 ##### Cassandra 2.2 with Java 7
 ```xml
 <properties>
-    <scalaCass.version>0.3.6</scalaCassVersion>
+    <scalaCass.version>0.3.7</scalaCassVersion>
 </properties>
 ```
 ##### Cassandra 3.0+ with Java 8
 ```xml
 <properties>
-    <scalaCass.version>0.4.6</scalaCassVersion>
+    <scalaCass.version>0.4.7</scalaCassVersion>
 </properties>
 ```
 Include the repo
