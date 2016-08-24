@@ -8,7 +8,7 @@ cassVersion=""
 if java -version 2>&1 | egrep "java version \"1.7" > /dev/null; then
     cassVersion="22x"
 else
-    cassVersion="31x"
+    cassVersion="30x"
 fi
 echo "deb http://www.apache.org/dist/cassandra/debian $cassVersion main" | sudo tee -a /etc/apt/sources.list.d/cassandra.sources.list
 echo "deb-src http://www.apache.org/dist/cassandra/debian $cassVersion main" | sudo tee -a /etc/apt/sources.list.d/cassandra.sources.list

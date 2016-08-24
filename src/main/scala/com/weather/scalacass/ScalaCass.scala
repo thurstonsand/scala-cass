@@ -13,7 +13,7 @@ object ScalaCass {
 
   implicit class RichRow(val r: Row) extends AnyVal {
     def as[T: CassFormatDecoder](name: String): T = CassFormatDecoder[T].decode(r, name).getOrThrow
-    def getAs[T: CassFormatDecoder](name: String): Option[T] = CassFormatDecoder[T].decode(r, name).getRightOpt
+    def getAs[T](name: String)(implicit optDecoder: CassFormatDecoder[Option[T]]): Option[T] = optDecoder.decode(r, name).getRightOpt.flatten
     def getOrElse[T: CassFormatDecoder](name: String, default: => T): T = getAs[T](name).getOrElse(default)
 
     def as[T: CCCassFormatDecoder]: T = CCCassFormatDecoder[T].decode(r).getOrThrow
@@ -23,7 +23,7 @@ object ScalaCass {
 
   implicit class RichIteratorRow(val ir: Iterator[Row]) extends AnyVal {
     def as[T: CassFormatDecoder](name: String): Iterator[T] = ir.map(_.as[T](name))
-    def getAs[T: CassFormatDecoder](name: String): Iterator[T] = ir.flatMap(_.getAs[T](name))
+    def getAs[T](name: String)(implicit optDecoder: CassFormatDecoder[Option[T]]): Iterator[T] = ir.flatMap(_.getAs[T](name))
     def getOrElse[T: CassFormatDecoder](name: String, default: => T): Iterator[T] = {
       lazy val d = default
       ir.map(_.getOrElse[T](name, d))
@@ -39,7 +39,7 @@ object ScalaCass {
 
   implicit class RichOptionRow(val or: Option[Row]) extends AnyVal {
     def as[T: CassFormatDecoder](name: String): Option[T] = or.map(_.as[T](name))
-    def getAs[T: CassFormatDecoder](name: String): Option[T] = or.flatMap(_.getAs[T](name))
+    def getAs[T](name: String)(implicit optDecoder: CassFormatDecoder[Option[T]]): Option[T] = or.flatMap(_.getAs[T](name))
     def getOrElse[T: CassFormatDecoder](name: String, default: => T) = or.map(_.getOrElse[T](name, default))
 
     def as[T: CCCassFormatDecoder]: Option[T] = or.map(_.as[T])

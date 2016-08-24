@@ -1,7 +1,7 @@
 package com.weather.scalacass.jdk8
 
 import com.weather.scalacass.{CassFormatEncoder, CassFormatDecoder}
-import com.weather.scalacass.LowPriorityCassFormatDecoderVersionSpecific.codecCassFormatDecoder
+import com.weather.scalacass.CassFormatDecoderVersionSpecific.codecCassFormatDecoder
 import CassFormatEncoder.sameTypeCassFormatEncoder
 import java.time.{LocalTime, LocalDate, ZonedDateTime, Instant}
 

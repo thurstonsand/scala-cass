@@ -1,6 +1,6 @@
 package com.weather.scalacass
 
-trait LowPriorityCassFormatEncoderVersionSpecific {
+trait CassFormatEncoderVersionSpecific {
   import CassFormatEncoder.{sameTypeCassFormatEncoder, transCassFormatEncoder}
 
   implicit val dateFormat: CassFormatEncoder[java.util.Date] = sameTypeCassFormatEncoder("timestamp")

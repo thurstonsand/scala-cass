@@ -8,7 +8,7 @@
 
 Supports **scala 2.10** and **scala 2.11** and
 - Cassandra 2.2 on Java 7
-- Cassandra 3.1 on Java 8
+- Cassandra 3.0+ on Java 8
 
 #### SBT
 Add the jcenter resolver
@@ -16,7 +16,7 @@ Add the jcenter resolver
 resolvers += Resolver.jcenterRepo
 ```
 Add the appropriate version of the library
-##### Cassandra 3.1 with Java 8
+##### Cassandra 3.0+ with Java 8
 ```scala
 libraryDependencies += "com.github.thurstonsand" %% "scalacass" % "0.4.6"
 ```
@@ -42,7 +42,7 @@ Pick a version
     <scalaCass.version>0.3.6</scalaCassVersion>
 </properties>
 ```
-##### Cassandra 3.1 with Java 8
+##### Cassandra 3.0+ with Java 8
 ```xml
 <properties>
     <scalaCass.version>0.4.6</scalaCassVersion>
@@ -62,6 +62,7 @@ Include the repo
 * [row parsing](#row-parsing)
 * [parsing performance](#parsing-performance)
 * [type mappings](#type-mapping)
+* [custom types](#custom-types)
 * [session utilities](#session-utilities)
   * [`ScalaSession` creation](#creating-a-scalasession)
   * [creating tables and table representation](#creating-tables-and-table-representation)
@@ -145,7 +146,7 @@ ScalaCass w/ `cachedImplicit` is 77.664% the speed of native for `as`, 93.372% t
 * `cachedImplicit` is a feature of shapeless that caches the underlying representation of a case class so that it does not need to be recreated on every call.
 
 ### Type Mapping
-#### Cassandra 3.1 on Java 8
+#### Cassandra 3.0+ on Java 8
 | Cassandra Type |             Scala Type                 |
 |:--------------:|:--------------------------------------:|
 | varchar        | String                                 |
@@ -225,6 +226,67 @@ import com.scalacass.joda.Implicits._
 
 val r: Row = _ // some row from your cluster
 r.as[org.joda.time.Instant]("mytimestamp") // cassandra "timestamp"
+```
+
+### Custom Types
+If you have a Scala type outside those listed above, you can provide a custom encoder/decoder for it in 2 ways:
+#### Map Over an Existing Type
+This is the easier way to create a custom type since you only need to provide conversions to/from existing types
+```scala
+implicit val iDecoder = CassFormatDecoder[java.util.Date].map(d: java.util.Date => new org.joda.time.Instant(d))
+val r: Row = _ // some row
+r.as[org.joda.time.Instant]("mytimestamp") // reads from a timestamp
+
+implicit val iEncoder = CassFormatEncoder[java.util.Date].map(i: org.joda.time.Instant => new java.util.Date(i.getMillis))
+case class Person(name: String, birthday: org.joda.time.Instant)
+val p = Person("newborn-baby", org.joda.time.Instant.now)
+val ss: ScalaSession = _ // your session instance
+ss.insert("mytable", p) // writes a (string, timestamp)
+```
+* **CassFormatDecoder** and **CassFormatEncoder** `apply` methods summon an existing implicit conversion, which is done above
+(`CassFormatDecoder[java.util.Date]`) to utilize the `map` function. It is equivalent to `implicitly[CassFormatDecoder[T]]`
+* for more about `ScalaSession`, [see below](#creating-a-scalasession)
+
+if your conversion has a chance to fail, you can also use `flatMap` that utilizes the `Either[Throwable, T]` type
+```scala
+// let's imagine you are storing java.util.UUID as a varchar instead of uuid in cassandra...
+
+implicit val uuidDecoder = CassFormatDecoder[String].flatMap(str: String => Try(java.util.UUID.fromString(str)) match {
+  case scala.util.Success(uuid) => Right(uuid)
+  case scala.util.Failure(exc) => Left(exc)
+})
+val r: Row = _ // some row
+r.as[java.util.UUID]("myvarchar") // reads from a varchar, throws IllegalArgumentException if "str" is not a UUID
+
+implicit val uuidEncoder = CassFormatEncoder[String].map(uuid: java.util.UUID => uuid.toString) // this one can't fail, so no flatMap
+case class Item(uuid: java.util.UUID, name: String)
+val i = Item(java.util.UUID.randomUUID, "my-item")
+val ss: ScalaSession = _ // your session instance
+ss.insert("mytable", i) // writes a (varchar, varchar)
+}
+```
+#### Create a New Type From Scratch
+If there is any special logic not possible in a `map`/`flatMap`, you can construct an instance to handle it
+```scala
+implicit val iDecoder = new CassFormatDecoder[org.joda.time.Instant] {
+  type From = java.util.Date // describes the type of the value as directly extracted from the Java driver
+  val clazz = classOf[From] // just the Class of From. If you know a way to specify this inside the trait, let me know
+  def f2t(f: From): Either[Throwable, T] = Right(new org.joda.time.Instant(f)) // failable conversion between From and T
+  def extract(r: Row, name: String): From = r getTimestamp name // how to get an instance of From from Cassandra
+}
+val r: Row = _ // some row
+r.as[org.joda.time.Instant]("mytimestamp") // reads from a timestamp
+
+implicit val iEncoder = new CassFormatEncoder[org.joda.time.Instant] {
+  type To = java.util.Date // describes the type of the value needed for the Java driver
+  val cassType = "timestamp" // the Cassandra data type
+  def encode(t: org.joda.time.Instant): Either[Throwable, To] = Right(new java.util.Date(i.getMillis)) // can't fail
+}
+case class Person(name: String, birthday: org.joda.time.Instant)
+val p = Person("newborn-baby", org.joda.time.Instant.now)
+val ss: ScalaSession = _ // your session instance
+ss.insert("mytable", p) // writes a (string, timestamp)
+
 ```
 
 ### Session utilities

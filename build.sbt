@@ -19,24 +19,28 @@ version := {
     case (`cassV22`, "1.7") => "3"
     case (cv, jv) => throw new RuntimeException("invalid cassandra/java version combination: " + cv + "/" + jv + ". use either cass \"" + cassV3 + "\" with java 8 or cass \"" + cassV22 + "\" with java 7")
   }
-  s"0.$majorVersion.6"
+  s"0.$majorVersion.7"
 }
 
 scalaVersion := "2.11.8"
 crossScalaVersions := Seq("2.11.8", "2.10.6")
 
 scalacOptions ++= Seq(
-  "-unchecked",
   "-deprecation",
-  "-feature",
   "-encoding", "UTF-8",
+  "-feature",
+  "-language:existentials",
+  "-language:higherKinds",
+  "-language:implicitConversions",
+  "-unchecked",
+  "-Xfatal-warnings",
+  "-Xlint",
   "-Yno-adapted-args",
   "-Ywarn-numeric-widen",
   "-Ywarn-value-discard",
-//  "-Ywarn-dead-code", // not used because `Nothing` is used for type inference purposes
   "-Xfuture"
 ) ++ (CrossVersion.partialVersion(scalaVersion.value) match {
-  case Some((2, 11)) => Seq("-Ywarn-unused")
+  case Some((2, 11)) => Seq("-Ywarn-unused", "-Ywarn-unused-import")
   case _ => Seq.empty[String]
 })
 
@@ -49,6 +53,8 @@ resolvers ++= Seq(
 addCompilerPlugin("org.scalamacros" % "paradise" % "2.1.0" cross CrossVersion.full)
 
 libraryDependencies ++= Seq(
+  "com.google.code.findbugs" % "jsr305" % "3.0.1" % "compile-internal, test-internal",
+  "org.joda" % "joda-convert" % "1.8.1" % "compile-internal, test-internal",
   "joda-time" % "joda-time" % "2.9.4",
   "com.chuusai" %% "shapeless" % "2.3.1",
   "com.google.guava" % "guava" % "19.0",
