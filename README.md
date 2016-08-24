@@ -8,7 +8,7 @@
 
 Supports **scala 2.10** and **scala 2.11** and
 - Cassandra 2.2 on Java 7
-- Cassandra 3.1 on Java 8
+- Cassandra 3.0+ on Java 8
 
 #### SBT
 Add the jcenter resolver
@@ -16,7 +16,7 @@ Add the jcenter resolver
 resolvers += Resolver.jcenterRepo
 ```
 Add the appropriate version of the library
-##### Cassandra 3.1 with Java 8
+##### Cassandra 3.0+ with Java 8
 ```scala
 libraryDependencies += "com.github.thurstonsand" %% "scalacass" % "0.4.6"
 ```
@@ -42,7 +42,7 @@ Pick a version
     <scalaCass.version>0.3.6</scalaCassVersion>
 </properties>
 ```
-##### Cassandra 3.1 with Java 8
+##### Cassandra 3.0+ with Java 8
 ```xml
 <properties>
     <scalaCass.version>0.4.6</scalaCassVersion>
@@ -146,7 +146,7 @@ ScalaCass w/ `cachedImplicit` is 77.664% the speed of native for `as`, 93.372% t
 * `cachedImplicit` is a feature of shapeless that caches the underlying representation of a case class so that it does not need to be recreated on every call.
 
 ### Type Mapping
-#### Cassandra 3.1 on Java 8
+#### Cassandra 3.0+ on Java 8
 | Cassandra Type |             Scala Type                 |
 |:--------------:|:--------------------------------------:|
 | varchar        | String                                 |
