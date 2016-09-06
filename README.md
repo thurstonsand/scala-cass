@@ -177,8 +177,8 @@ codecs. These codecs have to be registered with your `Cluster` instance, which i
 ##### Joda Implicits
 ```scala
 val c: Cluster = _ // your cluster
-com.scalacass.joda.register(c)
-import com.scalacass.joda.Implicits._
+com.weather.scalacass.joda.register(c)
+import com.weather.scalacass.joda.Implicits._
 
 val r: Row = _ // some row from your cluster
 r.as[org.joda.time.Instant]("mytimestamp") // cassandra "timestamp"
@@ -190,8 +190,8 @@ r.as[org.joda.time.DateTime]("mydt") // cassandra "tuple<timestamp,varchar>"
 ##### Jdk8 Date Implicits
 ```scala
 val c: Cluster = _ // your cluster
-com.scalacass.jdk8.register(c)
-import com.scalacass.jdk8.Implicits._
+com.weather.scalacass.jdk8.register(c)
+import com.weather.scalacass.jdk8.Implicits._
 
 val r: Row = _ // some row from your cluster
 r.as[java.time.Instant]("mytimestamp") // cassandra "timestamp"
@@ -222,7 +222,7 @@ r.as[java.time.ZonedDateTime]("myzdt") // cassandra "tuple<timestamp,varchar>"
 * There is an implicit override the Joda library. Unfortunately it still goes through `java.util.Date`,
 so there might be performance issues in parallel execution
 ```scala
-import com.scalacass.joda.Implicits._
+import com.weather.scalacass.joda.Implicits._
 
 val r: Row = _ // some row from your cluster
 r.as[org.joda.time.Instant]("mytimestamp") // cassandra "timestamp"
