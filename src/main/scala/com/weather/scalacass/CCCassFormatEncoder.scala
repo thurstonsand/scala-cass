@@ -9,6 +9,8 @@ trait CCCassFormatEncoder[F] {
 }
 
 object CCCassFormatEncoder {
+  def apply[T: CCCassFormatEncoder] = implicitly[CCCassFormatEncoder[T]]
+
   implicit val hNilEncoder = new CCCassFormatEncoder[HNil] {
     def encode(f: HNil) = Right(Nil)
     val namesAndTypes = Nil
@@ -28,6 +30,4 @@ object CCCassFormatEncoder {
       def encode(f: T) = hListDecoder.value.encode(gen.to(f))
       def namesAndTypes = hListDecoder.value.namesAndTypes
     }
-
-  def apply[T: CCCassFormatEncoder] = implicitly[CCCassFormatEncoder[T]]
 }

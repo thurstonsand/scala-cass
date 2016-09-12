@@ -19,7 +19,7 @@ version := {
     case (`cassV22`, "1.7") => "3"
     case (cv, jv) => throw new RuntimeException("invalid cassandra/java version combination: " + cv + "/" + jv + ". use either cass \"" + cassV3 + "\" with java 8 or cass \"" + cassV22 + "\" with java 7")
   }
-  s"0.$majorVersion.7"
+  s"0.$majorVersion.8"
 }
 
 scalaVersion := "2.11.8"
@@ -44,6 +44,9 @@ scalacOptions ++= Seq(
   case _ => Seq.empty[String]
 })
 
+scalacOptions in (Compile, console) ~= (_ filterNot (_ == "-Ywarn-unused-import"))
+scalacOptions in (Test, console) := (scalacOptions in (Compile, console)).value
+
 parallelExecution in Test := false
 
 resolvers ++= Seq(
@@ -53,8 +56,9 @@ resolvers ++= Seq(
 addCompilerPlugin("org.scalamacros" % "paradise" % "2.1.0" cross CrossVersion.full)
 
 libraryDependencies ++= Seq(
-  "com.google.code.findbugs" % "jsr305" % "3.0.1" % "compile-internal, test-internal",
-  "org.joda" % "joda-convert" % "1.8.1" % "compile-internal, test-internal",
+  "com.google.code.findbugs" % "jsr305" % "3.0.1" % "compile-internal, test-internal", // Intellij does not like "compile-internal, test-internal", use "provided" instead
+  "org.joda" % "joda-convert" % "1.8.1" % "compile-internal, test-internal", // Intellij does not like "compile-internal, test-internal", use "provided" instead
+  "org.slf4j" % "slf4j-api" % "1.7.21" % "compile-internal, test-internal", // Intellij does not like "compile-internal, test-internal", use "provided" instead
   "joda-time" % "joda-time" % "2.9.4",
   "com.chuusai" %% "shapeless" % "2.3.1",
   "com.google.guava" % "guava" % "19.0",
@@ -101,6 +105,7 @@ wartremoverWarnings in (Compile, compile) ++= Seq(
   Wart.Product, Wart.Return, Wart.Serializable,
   Wart.TryPartial, Wart.Var,
   Wart.Enumeration, Wart.FinalCaseClass, Wart.JavaConversions)
+wartremoverWarnings in (Compile, console) := Seq.empty
 
 publishMavenStyle := true
 pomIncludeRepository := (_ => false)

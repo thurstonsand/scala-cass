@@ -9,6 +9,8 @@ trait CCCassFormatDecoder[T] {
 }
 
 object CCCassFormatDecoder {
+  def apply[T: CCCassFormatDecoder] = implicitly[CCCassFormatDecoder[T]]
+
   implicit val hNilDecoder = new CCCassFormatDecoder[HNil] {
     def decode(r: Row) = Right(HNil)
   }
@@ -25,6 +27,4 @@ object CCCassFormatDecoder {
     new CCCassFormatDecoder[T] {
       def decode(r: Row): Either[Throwable, T] = hListDecoder.value.decode(r).right.map(gen.from)
     }
-
-  def apply[T: CCCassFormatDecoder] = implicitly[CCCassFormatDecoder[T]]
 }

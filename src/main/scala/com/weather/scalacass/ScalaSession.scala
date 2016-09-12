@@ -18,7 +18,6 @@ final case class DeleteBatch[T](table: String, item: T)(implicit val tEncoder: C
 final case class InsertBatch[T](table: String, item: T)(implicit val tEncoder: CCCassFormatEncoder[T]) extends Batch
 
 object ScalaSession {
-  import scala.language.implicitConversions
   private implicit def resultSetFutureToScalaFuture(f: ResultSetFuture): Future[ResultSet] = {
     val p = Promise[ResultSet]()
     Futures.addCallback(

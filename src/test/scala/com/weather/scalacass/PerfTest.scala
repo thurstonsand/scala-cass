@@ -1,6 +1,5 @@
 package com.weather.scalacass
 
-import com.datastax.driver.core.Session
 import org.scalatest.Tag
 import ScalaCass._
 import com.weather.scalacass.util.CassandraUnitTester
@@ -8,14 +7,8 @@ import com.weather.scalacass.util.CassandraUnitTester
 object LongRunning extends Tag("LongRunning")
 
 class PerfTest extends CassandraUnitTester {
-  var session: Session = _
   val db = "perfdb"
   val table = "perftable"
-
-  override def beforeAll(): Unit = {
-    super.beforeAll()
-    session = client.session
-  }
 
   ignore /* "string repeats" */ should "be decent" taggedAs LongRunning in {
     val th = ichi.bench.Thyme.warmed(verbose = print)
