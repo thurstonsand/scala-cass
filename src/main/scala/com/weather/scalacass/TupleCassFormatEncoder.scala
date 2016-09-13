@@ -30,7 +30,7 @@ object TupleCassFormatEncoder {
 
   implicit def tupleEncoder[T <: Product, Repr <: HList](implicit gen: Generic.Aux[T, Repr], hListEncoder: TupleCassFormatEncoder[Repr]): TupleCassFormatEncoder[T] =
     new TupleCassFormatEncoder[T] {
-      override def encode(tup: T): Either[Throwable, List[AnyRef]] = hListEncoder.encode(gen.to(tup))
+      def encode(tup: T): Either[Throwable, List[AnyRef]] = hListEncoder.encode(gen.to(tup))
       def types = hListEncoder.types
       def dataTypes = hListEncoder.dataTypes
     }

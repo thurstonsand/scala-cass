@@ -58,6 +58,10 @@ trait LowPriorityCassFormatDecoder {
       case Left(f: java.lang.ArrayIndexOutOfBoundsException) => Left(new InvalidTypeException("tuple of wrong arity", f))
       case other => other
     }
+    override def tupleDecode(tup: TupleValue, pos: Int): Either[Throwable, TUP] = super.tupleDecode(tup, pos) match {
+      case Left(f: java.lang.ArrayIndexOutOfBoundsException) => Left(new InvalidTypeException("tuple of wrong arity", f))
+      case other => other
+    }
   }
 }
 
@@ -175,14 +179,22 @@ object CassFormatDecoder extends CassFormatDecoderVersionSpecific {
 
     def f2t(f: From) = Try(com.datastax.driver.core.utils.Bytes.getArray(f).toIndexedSeq.toArray).toEither
     def extract(r: Row, name: String): ByteBuffer = r getBytes name
-    def tupleExtract(tup: TupleValue, pos: Int): ByteBuffer = tup getBytes pos
     override def decode(r: Row, name: String): Either[Throwable, Array[Byte]] =
       if (r.isNull(name)) Left(new ValueNotDefinedException(s""""$name" was not defined in ${r.getColumnDefinitions.getTable(name)}"""))
       else {
         val cassName = r.getColumnDefinitions.getType(name).getName
         if (cassName != DataType.Name.BLOB)
-          Left(new InvalidTypeException(s"Column $name is a $cassName, cannot be retrieved as a blob"))
+          Left(new InvalidTypeException(s"Column $name is a $cassName, is not a blob"))
         else f2t(extract(r, name))
+      }
+    def tupleExtract(tup: TupleValue, pos: Int): ByteBuffer = tup getBytes pos
+    override def tupleDecode(tup: TupleValue, pos: Int): Either[Throwable, Array[Byte]] =
+      if (tup.isNull(pos)) Left(new ValueNotDefinedException(s"""position $pos was not defined in tuple $tup"""))
+      else {
+        val cassName = tup.getType.getComponentTypes.get(pos).getName
+        if (cassName != DataType.Name.BLOB)
+          Left(new InvalidTypeException(s"position $pos in tuple $tup is not a blob"))
+        else f2t(tupleExtract(tup, pos))
       }
   }
 
@@ -191,8 +203,10 @@ object CassFormatDecoder extends CassFormatDecoderVersionSpecific {
     val clazz = underlying.clazz
     def f2t(f: From): Either[Throwable, Option[A]] = underlying.f2t(f).right.map(Option(_))
     def extract(r: Row, name: String) = underlying.extract(r, name)
-    def tupleExtract(tup: TupleValue, pos: Int) = underlying.tupleExtract(tup, pos)
     override def decode(r: Row, name: String): Either[Throwable, Option[A]] = Right(super.decode(r, name).right getOrElse None)
+    def tupleExtract(tup: TupleValue, pos: Int) = underlying.tupleExtract(tup, pos)
+    override def tupleDecode(tup: TupleValue, pos: Int): Either[Throwable, Option[A]] =
+      Right(super.tupleDecode(tup, pos).right getOrElse None)
   }
 
   implicit def eitherFormat[A](implicit underlying: CassFormatDecoder[A]): CassFormatDecoder[Either[Throwable, A]] = new CassFormatDecoder[Either[Throwable, A]] {
@@ -200,8 +214,12 @@ object CassFormatDecoder extends CassFormatDecoderVersionSpecific {
     val clazz = underlying.clazz
     def f2t(f: From) = Right(underlying.f2t(f))
     def extract(r: Row, name: String) = underlying.extract(r, name)
-    def tupleExtract(tup: TupleValue, pos: Int) = underlying.tupleExtract(tup, pos)
     override def decode(r: Row, name: String) = super.decode(r, name) match {
+      case Left(l) => Right(Left(l))
+      case same    => same
+    }
+    def tupleExtract(tup: TupleValue, pos: Int) = underlying.tupleExtract(tup, pos)
+    override def tupleDecode(tup: TupleValue, pos: Int) = super.tupleDecode(tup, pos) match {
       case Left(l) => Right(Left(l))
       case same    => same
     }
