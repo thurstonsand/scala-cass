@@ -58,6 +58,7 @@ trait LowPriorityCassFormatDecoder {
       case Left(f: java.lang.ArrayIndexOutOfBoundsException) => Left(new InvalidTypeException("tuple of wrong arity", f))
       case other => other
     }
+    @SuppressWarnings(Array("org.brianmckenna.wartremover.warts.AsInstanceOf", "org.brianmckenna.wartremover.warts.IsInstanceOf"))
     override def tupleDecode(tup: TupleValue, pos: Int): Either[Throwable, TUP] = super.tupleDecode(tup, pos) match {
       case Left(f: java.lang.ArrayIndexOutOfBoundsException) => Left(new InvalidTypeException("tuple of wrong arity", f))
       case other => other

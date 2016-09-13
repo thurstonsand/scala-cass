@@ -126,6 +126,8 @@ class ScalaSession(val keyspace: String)(implicit val session: Session) {
 
   def update[T: CCCassFormatEncoder, S: CCCassFormatEncoder](table: String, updateable: T, query: S): ResultSet =
     session.execute(prepareUpdate(table, updateable, query))
+  def updateAsync[T: CCCassFormatEncoder, S: CCCassFormatEncoder](table: String, updateable: T, query: S): Future[ResultSet] =
+    session.executeAsync(prepareUpdate(table, updateable, query))
 
   private[this] def prepareDelete[T: CCCassFormatEncoder](table: String, deletable: T): BoundStatement = {
     val (strArgs, anyrefArgs) = clean(deletable)
