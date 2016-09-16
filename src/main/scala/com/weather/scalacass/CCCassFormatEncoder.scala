@@ -3,9 +3,18 @@ package com.weather.scalacass
 import shapeless.labelled.FieldType
 import shapeless.{::, HList, HNil, LabelledGeneric, Lazy, Witness}
 
-trait CCCassFormatEncoder[F] {
+trait CCCassFormatEncoder[F] { self =>
   def encode(f: F): Either[Throwable, List[(String, AnyRef)]]
   def namesAndTypes: List[(String, String)]
+
+  final def map[G](fn: G => F): CCCassFormatEncoder[G] = new CCCassFormatEncoder[G] {
+    def encode(f: G): Either[Throwable, List[(String, AnyRef)]] = self.encode(fn(f))
+    def namesAndTypes: List[(String, String)] = self.namesAndTypes
+  }
+  final def flatMap[G](fn: G => Either[Throwable, F]): CCCassFormatEncoder[G] = new CCCassFormatEncoder[G] {
+    def encode(f: G): Either[Throwable, List[(String, AnyRef)]] = fn(f).right.flatMap(self.encode)
+    def namesAndTypes: List[(String, String)] = self.namesAndTypes
+  }
 }
 
 object CCCassFormatEncoder {

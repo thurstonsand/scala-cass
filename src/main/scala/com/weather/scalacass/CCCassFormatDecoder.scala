@@ -4,8 +4,14 @@ import com.datastax.driver.core.Row
 import shapeless.labelled.{FieldType, field}
 import shapeless.{::, HList, HNil, LabelledGeneric, Lazy, Witness}
 
-trait CCCassFormatDecoder[T] {
+trait CCCassFormatDecoder[T] { self =>
   def decode(r: Row): Either[Throwable, T]
+  final def map[U](f: T => U): CCCassFormatDecoder[U] = new CCCassFormatDecoder[U] {
+    def decode(r: Row): Either[Throwable, U] = self.decode(r).right.map(f)
+  }
+  final def flatMap[U](f: T => Either[Throwable, U]): CCCassFormatDecoder[U] = new CCCassFormatDecoder[U] {
+    def decode(r: Row): Either[Throwable, U] = self.decode(r).right.flatMap(f)
+  }
 }
 
 object CCCassFormatDecoder {
