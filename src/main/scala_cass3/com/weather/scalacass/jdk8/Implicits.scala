@@ -17,7 +17,6 @@ object Implicits {
   implicit val instantEncoder: CassFormatEncoder[Instant] = sameTypeCassFormatEncoder(DataType.timestamp)
   implicit val instantDecoder: CassFormatDecoder[Instant] = codecCassFormatDecoder(classOf[Instant])
 
-  // not sure if this is ok, or if I should ask for a cluster instance
   implicit def zonedDateTimeEncoder(implicit cluster: Cluster): CassFormatEncoder[ZonedDateTime] =
     sameTypeCassFormatEncoder(cluster.getMetadata.newTupleType(DataType.timestamp, DataType.varchar))
   implicit val zonedDateTimeDecoder: CassFormatDecoder[ZonedDateTime] = codecCassFormatDecoder(classOf[ZonedDateTime])

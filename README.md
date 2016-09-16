@@ -1,31 +1,45 @@
 # ScalaCass
-## [Cassandra Java Driver](https://github.com/datastax/java-driver) wrapper that makes retrieval from Rows a little easier
+
+##### [Cassandra Java Driver](https://github.com/datastax/java-driver) wrapper that makes retrieval from Rows a little easier
+
 [![Build Status](https://travis-ci.org/thurstonsand/scala-cass.svg?branch=master)](https://travis-ci.org/thurstonsand/scala-cass)
 [![Join the chat at https://gitter.im/scala-cass/Lobby](https://badges.gitter.im/scala-cass/Lobby.svg)](https://gitter.im/scala-cass/Lobby?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 
 ### Getting ScalaCass
+
 [you can find it on bintray](https://bintray.com/thurstonsand/maven/scalacass).
 
 Supports **scala 2.10** and **scala 2.11** and
-- Cassandra 2.2 on Java 7
-- Cassandra 3.0+ on Java 8
+
+* Cassandra 2.1 on Java 7
+* Cassandra 3.0+ on Java 8
 
 #### SBT
+
 Add the jcenter resolver
+
 ```scala
 resolvers += Resolver.jcenterRepo
 ```
+
 Add the appropriate version of the library
+
 ##### Cassandra 3.0+ with Java 8
+
 ```scala
-libraryDependencies += "com.github.thurstonsand" %% "scalacass" % "0.4.7"
+libraryDependencies += "com.github.thurstonsand" %% "scalacass" % "0.4.8"
 ```
-##### Cassandra 2.2 with Java 7
+
+##### Cassandra 2.1 with Java 7
+
 ```scala
-libraryDependencies += "com.github.thurstonsand" %% "scalacass" % "0.3.7"
+libraryDependencies += "com.github.thurstonsand" %% "scalacass" % "0.3.8"
 ```
+
 #### Maven
+
 Add the jcenter resolver
+
 ```xml
 <repositories>
     <repository>
@@ -35,20 +49,27 @@ Add the jcenter resolver
     </repository>
 </repositories>
 ```
+
 Pick a version
-##### Cassandra 2.2 with Java 7
+
+##### Cassandra 2.1 with Java 7
+
 ```xml
 <properties>
-    <scalaCass.version>0.3.7</scalaCassVersion>
+    <scalaCass.version>0.3.8</scalaCassVersion>
 </properties>
 ```
+
 ##### Cassandra 3.0+ with Java 8
+
 ```xml
 <properties>
-    <scalaCass.version>0.4.7</scalaCassVersion>
+    <scalaCass.version>0.4.8</scalaCassVersion>
 </properties>
 ```
+
 Include the repo
+
 ```xml
 <dependency>
   <groupId>com.github.thurstonsand</groupId>
@@ -59,48 +80,447 @@ Include the repo
 ```
 
 ### Overview
-* [row parsing](#row-parsing)
-* [parsing performance](#parsing-performance)
-* [type mappings](#type-mapping)
-* [custom types](#custom-types)
-* [session utilities](#session-utilities)
-  * [`ScalaSession` creation](#creating-a-scalasession)
-  * [creating tables and table representation](#creating-tables-and-table-representation)
-  * [inserts](#insertinsertasync)
-  * [updates](#updateupdateasync)
-  * [selects](#selectselectasyncselectoneselectoneasync)
-  * [selects for only specific columns](#selectcolumnsselectcolumnsasyncselectcolumnsoneselectcolumnsoneasync)
-  * [deletes](#deletedeleteasync)
-  * [raw queries](#selectrawselectrawasyncselectonerawselectonerawasync)
-  * [batch statements](#batch-statements)
 
-### Row Parsing
-usage is simple: `import com.weather.scalacass.ScalaCass._` and you're on your way  
+* [Components](#components)
+  * [Session creation](#session-creation)
+  * [Table creation](#table-creation)
+  * [General characteristics of all Cassandra statements](#characteristics-of-cassandra-statements)
+  * [Insert](#insert)
+  * [Update](#update)
+  * [Delete](#delete)
+  * [Select](#select)
+    * [Row extraction](#row-extraction)
+* [Additional functionality](#additional-functionality)
+  * [Batch statements](#batch-statements)
+  * [Raw statements](#raw-statements)
+* [Type mapping](#type-mapping)
+* [Custom types](#custom-types)
+  * [Map over existing type](#map-over-an-existing-type)
+  * [Create new type](#create-a-new-type-from-scratch)
+
+## Components
+
+### Session creation
+
+using a ScalaSession follows the same general rules as creating the regular Java Session. The major difference is that, 
+in Cassandra 3.0+, this library requires a cluster instance in implicit scope when working with tuples. This is because
+tuple types are defined based on the specific codecs associated with a cluster instance. effectively, this means that,
+
+##### for Cassandra 2.1 / Java 7
+
 ```scala
+val cluster = Cluster.builder.addContactPoint("localhost").build()
+```
+
+##### for Cassandra 3.0+ / Java 8
+
+```scala
+// implicit is only necessary if using tuple types
+implicit val cluster = Cluster.builder.addContactPoint("localhost").build()
+```
+
+#### Characteristics
+
+* `PreparedStatement` caching
+* acts on a single keyspace
+* can optionally create a keyspace on instantiation
+* can pick up Java `Session` implicitly
+
+The session itself is a class that you must keep around, much like you would a Cassandra Java Session. This is because
+the ScalaSession caches PreparedStatements automatically, so if you are calling the same request multiple times, it will
+use an existing PreparedStatement instead of instantiating a new request every time. the instantiation takes an optional
+String with the right hand side of the keyspace definition, if you want it to automatically create the keyspace for you
+(this will likely only really be used for testing purposes).
+
+```scala
+import com.weather.scalacass.ScalaSession
+
+implicit val session = cluster.connect()
+
+val sSessionCreateKeyspace = ScalaSession("mykeyspace",
+  "replication = {'class':'SimpleStrategy', 'replication_factor' : 3}") // session can be picked up implicitly
+val sSession = ScalaSession("mykeyspace")(session) // if mykeyspace already exists
+```
+
+In addition to creating a keyspace, a `ScalaSession` can delete the keyspace. This would make any subsequent calls via
+that `ScalaSession` invalid
+
+```scala
+sSession.dropKeyspace()
+```
+
+Finally, you can close the associated `Session` for shutdown.
+
+```scala
+sSession.close()
+```
+
+### Table creation
+
+This feature will likely be useful mostly for testing purposes, but there is a method to create a table for a given
+ScalaSession, which already specifies the keyspace. This takes advantage of case classes to model the data, so the type
+of the data maps to a cassandra type, and the names in the case class match to the cassandra column names.
+
+#### Characteristics
+
+* the createTable method takes 4 properties
+  * name of table
+  * number of partition keys
+  * number of clustering keys
+  * the right hand side of the table definition
+  * optional parameters take the underlying type parameter as its type for table creation
+* you must have at least 1 partition key
+* the number of partition keys + clustering keys must be less than the number of fields in the case class
+* any rules associated with cassandra semantics for data types must be followed (eg no counters in the primary key)
+* to see all scala-cassandra type mappings, [jump to this section](#type-mapping)
+
+```scala
+case class MyTable(s: String, i: Int, l: Option[Long])
+// generates """CREATE TABLE mykeyspace.mytable (s varchar, i int, l bigint, PRIMARY KEY ((s, i))) WITH COMPACT STORAGE"""
+sSession.createTable[MyTable]("mytable", 2, 0, "COMPACT STORAGE")
+
+case class MyTableWithClustering(s: String, i: Int, b: Boolean, l: Option[Long])
+// generates """CREATE TABLE mykeyspace.mytablewithclustering (s varchar, i int, b bool, l bigint, PRIMARY KEY ((s, i), b))"""
+sSession.createTable[MyTableWithClustering]("mytablewithclustering", 2, 1)
+```
+
+In addition, you can both truncate and drop existing tables
+
+```scala
+sSession.truncateTable("mytable")
+sSession.dropTable("mytable")
+```
+
+### Characteristics of Cassandra statements
+
+These are some characteristics shared by the remaining functions in the `ScalaSession`
+
+* the first parameter of the function is the table name
+* the names and types of the case class should match up to the underlying cassandra names and types
+* there is a synchronous and asynchronous implementation of each statement. ScalaCass returns a `ResultSet`/
+  `scala.concurrent.Future[ResultSet]` for insert/delete/update statements, and `Iterator[Row]`/`Future[Iterator[Row]]` for
+  select/selectOne statements
+* any columns missing from the table are not entered as `null` to cassandra. They are left out of the query
+* optional values are included in the query if they are `Some`, and left out of the query if they are `None`. This
+  includes values in any queries, and if there is a problem with the underlying Cassandra query, an exception will be 
+  thrown by the Cassandra Java driver
+
+### Insert
+
+Use case classes to model the data to insert. If you are inserting an entire row, the same definition as the table can
+be used.
+
+```scala
+// given the table definition
+case class MyTable(s: String, i: Int, l: Option[Long])
+
+// generates """INSERT INTO mykeyspace.mytable (s, i, l) VALUES ('asdf', 1234, 123)"""
+val insertRes: ResultSet = sSession.insert("mytable", MyTable("asdf", 123, Some(1234L)))
+
+// generates """INSERT INTO mykeyspace.mytable (s, i) VALUES ('asdf', 1234)"""
+val insertRes2: ResultSet = sSession.insert("mytable", MyTable("asdf", 123, None))
+
+case class InsertSome(s: String, i: Int)
+// generates """INSERT INTO mykeyspace.mytable (s, i) VALUES ('asdf', 1234)"""
+val insertRes3: ResultSet = sSession.insert("mytable", InsertSome("asdf", 123))
+
+val insertRes4: Future[ResultSet] = sSession.insertAsync("mytable", MyTable("asdf", 123, None))
+```
+
+### Update
+
+Use case classes to model the data to update. For update, 2 case classes are used -- one to specify the query parameter,
+and one to specify the data to update.
+
+```scala
+// given the table definition
+case class MyTable(s: String, i: Int, l: Option[Long])
+
+case class Update(l: Long)
+case class Query(s: String, i: Int)
+
+// generates """UPDATE mykeyspace.mytable SET l=321 WHERE str='asdf' AND i=1234"""
+val updateRes: ResultSet = sSession.update("mytable", Update(5678L), Query("asdf", 123))
+val updateRes2: Future[ResultSet] = sSession.updateAsync("mytable", Update(5678L), Query("asdf", 123))
+
+// NOTE:
+// generates """UPDATE mykeyspace.mytable SET s='asdf', i=123 where l=5678""", which will throw an exception
+sSession.update("mytable", Query("asdf", 123), Update(5678L))
+```
+
+### Delete
+
+Use case classes to model the query for the data to delete.
+
+```scala
+// given the table and query definition
+case class MyTable(s: String, i: Int, l: Option[Long])
+case class Query(s: String, i: Int)
+
+// generates """DELETE FROM mykeyspace.mytable WHERE s='asdf' AND i=123"""
+val deleteRes: ResultSet = sSession.delete("mytable", Query("asdf", 123))
+val deleteRes2: Future[ResultSet] = sSession.deleteAsync("mytable", Query("asdf", 123))
+```
+
+### Select
+
+Use case classes to model the query for the data to select. You can either use `select`, which returns an 
+`Iterator[Row]`, or `selectOne`, which returns an `Option[Row]` representing the first result returned from Cassandra if
+it exists (using the underlying `(r: Row).one()`)
+
+```scala
+// given the table and query definition
+case class MyTable(s: String, i: Int, l: Option[Long])
+case class Query(s: String, i: Int)
+
+// generates """SELECT * FROM mykeyspace.mytable WHERE s='asdf' AND i=123"""
+val selectRes: Iterator[Row] = sSession.select("mytable", Query("asdf", 123))
+val selectRes2: Future[Iterator[Row]] = sSession.selectAsync("mytable", Query("asdf", 123))
+
+// generates """SELECT * FROM mykeyspace.mytable WHERE s='asdf' AND i=123""" and only returns first value found, if any
+val selectOneRes: Option[Row] = sSession.selectOne("mytable", Query("asdf", 123))
+val selectOneRes2: Future[Option[Row]] = sSession.selectOneAsync("mytable", Query("asdf", 123))
+```
+
+`select`/`selectOne` also takes an optional `allowFiltering` boolean, [as described here](http://www.datastax.com/dev/blog/allow-filtering-explained-2)
+
+```scala
+case class RequiresFilteringQuery(i: Int)
+val selectWithFiltering: Iterator[Row] = sSession.select("mytable", RequiresFilteringQuery(123), allowFiltering=true)
+```
+
+`select` also takes an optional `limit` parameter, to limit the number of results returned
+
+```scala
+val selectResWithLimit: Iterator[Row] = sSession.select("mytable", Query("asdf", 123), limit=100)
+```
+
+If you want to pull out the entire table with the select statement, this can be achieved by using the `NoQuery` type
+
+```scala
+val selectAll: Iterator[Row] = sSession.select("mytable", ScalaSession.NoQuery())
+```
+
+Finally, in case you only want to extract certain columns in a Row, this is provided by the `columns` variant of the 
+select functions.
+
+```scala
+case class ColumnsIWant(i: Int, l: Long)
+val someColumns: Option[Row] = sSession.selectColumnsOne[ColumnsIWant, Query]("mytable", Query("asdf", 123))
+val aRowSomeColumns = someColumns.get
+aRowSomeColumns.isNull("s") // true
+aRowSomeColumns.getInt("i") // 123
+aRowSomeColumns.getLong("l") // 1234L
+// see "Row Extraction" for a better way to extract values from the Row
+
+// other variants
+sSession.selectColumns[ColumnsIWant, Query]("mytable", Query("asdf", 123))
+sSession.selectColumnsAsync[ColumnsIWant, Query]("mytable", Query("asdf", 123))
+sSession.selectColumnsOneAsync[ColumnsIWant, Query]("mytable", Query("asdf", 123))
+```
+
+#### Row Extraction
+
+After a select, you will have one or more `Row`s. Instead of the usual `getString`, `getInt`, etc, ScalaCass offers
+a friendlier syntax
+
+##### Characteristics
+
+* requires an import of `com.weather.scalacass.Scalacass._`
+* no column parameter is passed to these functions, since it is acting on the entire row, not on a single column
+* This functionality comes with no additional code cost thanks to the [Shapeless library](https://github.com/milessabin/shapeless)
+* For a complete mapping between Cassandra and Scala types, [see the type mappings section](#type-mapping)
+
+```scala
+val aRow = selectOneRes.get // for demonstration purposes
+// Java driver way
+val s1: String = aRow.getString("s")
+
+// ScalaCass way
 import com.weather.scalacass.ScalaCass._
-r: Row = getARow()
-val myStr: String = r.as[String]("mystr")
-val myMap: Map[String, Long] = r.as[Map[String, Long]]("mymap")
-val myBoolOpt: Option[Boolean] = r.getAs[Boolean]("mybool")
-val myBlobOpt: Option[Array[Byte]] = r.getAs[Array[Byte]]("myblob")
-val myInt: Int = r.getOrElse[Int]("myint", 5)
+val s2: String = aRow.as[String]("s")
 ```
-etc
 
-and you can extract with case classes directly from a `Row`:
+This opens up a number of possibilities, including optional extractions that return `None` if the value is not found
+
 ```scala
-case class Person(name: String, age: Int, job: Option[String])
-val person: Person = r.as[Person]
-val person_?: Option[Person] = r.getAs[Person]
-val personWithDefault: Person = r.getOrElse[Person](Person("default name", 24, None))
+val s1_?: Option[String] = aRow.as[Option[String]]("s")
+// alternate syntax
+val s2_?: Option[String] = aRow.getAs[String]("s")
+
+val sWithDefault: String = aRow.getOrElse[String]("s", "defaultValue")
 ```
-#### Option
-in the same way that `getAs` will return a `None` if it does not exist, using `Option[SomeType]` will only extract the value if there are no errors.
-### Parsing Performance
+
+and perhaps most helpfully, allows extraction of an entire Row directly into a case class
+
+```scala
+// given the table definition
+case class MyTable(s: String, i: Int, l: Option[Long])
+
+val allValues: MyTable = aRow.as[MyTable]
+val allValues_?: Option[MyTable] = aRow.getAs[MyTable]
+val allValuesOrDefault: MyTable = aRow.getOrElse[MyTable](MyTable("default_s", 0, None))
+```
+
+## Additional Functionality
+
+Outside of the core statements for Cassandra, there are a few other bits of Cassandra behavior improved by Scala-ization.
+
+### Batch Statements
+
+inserts, updates, and deletes can be batched into a single statement sent to Cassandra, and with a log level of
+`LOGGED`, will either all succeed or all fail. ScalaCass provides a way to pass in a `Seq` of case class definitions to
+be batched.
+
+**Note**: These case classes exist under `com.weather.scalacass`
+
+```scala
+import com.weather.scalacass._
+
+val updateBatch = UpdateBatch("mytable", MyUpdate(320L), MyQuery("asdf", 1234))
+val deleteBatch = DeleteBatch("mytable", MyQuery("qwer", 1234))
+val insertBatch = InsertBatch("mytable", MyTable("hjkl", 678, Some(6789L)))
+
+val batchRes: ResultSet = sSession.batch(Seq(updateBatch, deleteBatch, insertBatch))
+val batchResFut: Future[ResultSet] = sSession.batchAsync(Seq(updateBatch, deleteBatch, insertBatch))
+```
+
+the batch methods default to using `LOGGED`, but you can pass in whatever type is available
+
+```scala
+val batchResUnlogged: ResultSet = sSession.batch(Seq(updateBatch, deleteBatch, insertBatch), BatchStatement.Type.UNLOGGED)
+```
+
+### Raw Statements
+
+There are raw variants to insert, update, delete, select, and batch statements, primarily for cases where this library
+cannot fulfill a specific need you have. Raw variants simply take a Cassandra query as String and the anyref arguments, if
+any. The primary advantage is that the queries are cached as `PreparedStatement`s and can be mixed with other, more
+well behaved queries. As with other queries, there are asynchronous variants.
+
+```scala
+val insertQuery = "INSERT INTO mykeyspace.mytable (s, i, l) VALUES (?, ?, ?)"
+val insertRes: ResultSet = sSession.rawStatement(insertQuery, "asdf", Int.box(123), Long.box(1234L))
+
+val deleteQuery = "DELETE FROM mykeyspace.mytable WHERE s=? AND i=?"
+val deleteRes: ResultSet = sSession.rawStatement(deleteQuery, "asdf", Int.box(123))
+
+val updateQuery = "UPDATE mykeyspace.mytable SET l=? WHERE str=? AND i=?"
+val updateRes: Future[ResultSet] = sSession.rawStatementAsync(updateQuery, Long.box(5678L), "asdf", Int.box(123))
+
+val selectQuery = "SELECT * FROM mykeyspace.mytable WHERE s=? AND i=?"
+val selectRes: Iterator[Row] = sSession.rawSelect(selectQuery, "asdf", Int.box(123))
+val selectResFut: Future[Iterator[Row]] = sSession.rawSelectAsync(selectQuery, "asdf", Int.box(123))
+
+val selectOneRes: Option[Row] = sSession.rawSelectOne(selectQuery, "asdf", Int.box(123))
+val selectOneRes: Future[Option[Row]] = sSession.rawSelectOneAsync(selectQuery, "asdf", Int.box(123))
+```
+
+## Type Mapping
+
+### Cassandra 3.0+ on Java 8
+
+| Cassandra Type |             Scala Type                 |
+|:--------------:|:--------------------------------------:|
+| varchar        | String                                 |
+| uuid           | java.util.UUID                         |
+| inet           | java.net.InetAddress                   |
+| int            | Int                                    |
+| bigint         | Long                                   |
+| boolean        | Boolean                                |
+| double         | Double                                 |
+| varint         | BigInt                                 |
+| decimal        | BigDecimal                             |
+| float          | Float                                  |
+| blob           | Array[Byte]                            |
+| list           | List                                   |
+| map            | Map                                    |
+| set            | Set                                    |
+| tuple          | Tuple*
+| **timestamp**  | **java.util.Date**                     |
+| **date**       | **com.datastax.driver.core.LocalDate** |
+| **time**       | **Time**                               |
+
+* Time is a type specific to this library so as not to conflict with `bigint` and `Long`. it is defined as
+  ```scala
+  final case class Time(millis: Long)
+  ```
+* There are implicit overrides for both the Joda library and Jdk8 Time library that take advantage of Cassandra's new 
+  codecs. These codecs have to be registered with your `Cluster` instance, which is included as a helper function
+* when using tuples, you must make the `Cluster` instance implicit, due to the nature of tuples in Cassandra 3.0+.
+
+#### Joda Implicits
+
+```scala
+// under the hood, DateTime uses a tuple, meaning the cluster must be implicit
+implicit val c: Cluster = _ // your cluster
+com.weather.scalacass.joda.register(c)
+import com.weather.scalacass.joda.Implicits._
+
+val r: Row = _ // some row from your cluster
+r.as[org.joda.time.Instant]("mytimestamp") // cassandra "timestamp"
+r.as[org.joda.time.LocalDate]("mydate") // cassandra "date"
+r.as[org.joda.time.LocalTime]("mytime") // cassandra "time"
+r.as[org.joda.time.DateTime]("mydt") // cassandra "tuple<timestamp,varchar>"
+```
+
+[See here](https://datastax.github.io/java-driver/manual/custom_codecs/extras/#joda-time) for information about the format of `DateTime`
+
+#### Jdk8 Date Implicits
+
+```scala
+// under the hood ZonedDateTime uses a tuple, meaning the cluster must be implicit
+implicit val c: Cluster = _ // your cluster
+com.weather.scalacass.jdk8.register(c)
+import com.weather.scalacass.jdk8.Implicits._
+
+val r: Row = _ // some row from your cluster
+r.as[java.time.Instant]("mytimestamp") // cassandra "timestamp"
+r.as[java.time.LocalDate]("mydate") // cassandra "date"
+r.as[java.time.LocalTime]("mytime") // cassandra "time"
+r.as[java.time.ZonedDateTime]("myzdt") // cassandra "tuple<timestamp,varchar>"
+```
+
+[See here](https://datastax.github.io/java-driver/manual/custom_codecs/extras/#jdk-8) for information about the format of `ZonedDateTime`
+
+### Cassandra 2.1 on Java 7
+
+| Cassandra Type |      Scala Type      |
+|:--------------:|:--------------------:|
+| varchar        | String               |
+| uuid           | java.util.UUID       |
+| inet           | java.net.InetAddress |
+| int            | Int                  |
+| bigint         | Long                 |
+| boolean        | Boolean              |
+| double         | Double               |
+| varint         | BigInt               |
+| decimal        | BigDecimal           |
+| float          | Float                |
+| blob           | Array[Byte]          |
+| list           | List                 |
+| map            | Map                  |
+| set            | Set                  |
+| tuple          | Tuple*               |
+| **timestamp**  | **java.util.Date**   |
+
+* There is an implicit override for the Joda library. Unfortunately it still goes through `java.util.Date`,
+  so there might be performance issues in parallel execution
+
+```scala
+import com.weather.scalacass.joda.Implicits._
+
+val r: Row = _ // some row from your cluster
+r.as[org.joda.time.Instant]("mytimestamp") // cassandra "timestamp"
+```
+
+## Parsing Performance
+
 performance is pretty decent.
 
 Measurements taken by extracting a String/Case Class 10,000 times with [Thyme](https://github.com/Ichoran/thyme)  
 compare the implementation of `as`:
+
 ```scala
 // with scala-cass
 row.as[String]("str")
@@ -118,6 +538,7 @@ if (row.getColumnDefinitions.contains("str") && !row.isNull("str")) Some(row.get
 ScalaCass is 99.392% the speed of native for `as`, 106.209% the speed of native for `getAs`  
 
 compare the implementation of `as` for a case class:
+
 ```scala
 case class Strings(str1: String, str2: String, str3: String, str4: Option[String])
 // with scala-cass
@@ -135,103 +556,27 @@ def ga(name: String) = if (row.getColumnDefinitions.contains(name) && !row.isNul
       s4  = ga("str4")
     } yield Strings(s1, s2, s3, s4)
 ```
+
 |                             |   as   |  getAs |
 |:---------------------------:|:------:|:------:|
 |          ScalaCass          | 68.1us | 65.7us |
 | ScalaCass w/ cachedImplicit | 39.3us | 39.1us |
 |            Native           | 30.5us | 36.5us |
 
-ScalaCass alone is 44.844% the speed of native for `as`, 55.557% the speed of native for `getAs`  
+ScalaCass alone is 44.844% the speed of native for `as`, 55.557% the speed of native for `getAs`
+
 ScalaCass w/ `cachedImplicit` is 77.664% the speed of native for `as`, 93.372% the speed of native for `getAs`
+
 * `cachedImplicit` is a feature of shapeless that caches the underlying representation of a case class so that it does not need to be recreated on every call.
 
-### Type Mapping
-#### Cassandra 3.0+ on Java 8
-| Cassandra Type |             Scala Type                 |
-|:--------------:|:--------------------------------------:|
-| varchar        | String                                 |
-| uuid           | java.util.UUID                         |
-| inet           | java.net.InetAddress                   |
-| int            | Int                                    |
-| bigint         | Long                                   |
-| boolean        | Boolean                                |
-| double         | Double                                 |
-| varint         | BigInt                                 |
-| decimal        | BigDecimal                             |
-| float          | Float                                  |
-| blob           | Array[Byte]                            |
-| list           | List                                   |
-| map            | Map                                    |
-| set            | Set                                    |
-| **timestamp**  | **java.util.Date**                     |
-| **date**       | **com.datastax.driver.core.LocalDate** |
-| **time**       | **Time**                               |
+## Custom Types
 
-* Time is a type specific to this library so as not to conflict with `bigint` and `Long`. it is defined as
-```scala
-final case class Time(millis: Long)
-```
-* There are implicit overrides for both the Joda library and Jdk8 Time library that take advantage of Cassandra's new 
-codecs. These codecs have to be registered with your `Cluster` instance, which is included as a helper function
-
-##### Joda Implicits
-```scala
-val c: Cluster = _ // your cluster
-com.weather.scalacass.joda.register(c)
-import com.weather.scalacass.joda.Implicits._
-
-val r: Row = _ // some row from your cluster
-r.as[org.joda.time.Instant]("mytimestamp") // cassandra "timestamp"
-r.as[org.joda.time.LocalDate]("mydate") // cassandra "date"
-r.as[org.joda.time.LocalTime]("mytime") // cassandra "time"
-r.as[org.joda.time.DateTime]("mydt") // cassandra "tuple<timestamp,varchar>"
-```
-[See here](https://datastax.github.io/java-driver/manual/custom_codecs/extras/#joda-time) for information about the format of `DateTime`
-##### Jdk8 Date Implicits
-```scala
-val c: Cluster = _ // your cluster
-com.weather.scalacass.jdk8.register(c)
-import com.weather.scalacass.jdk8.Implicits._
-
-val r: Row = _ // some row from your cluster
-r.as[java.time.Instant]("mytimestamp") // cassandra "timestamp"
-r.as[java.time.LocalDate]("mydate") // cassandra "date"
-r.as[java.time.LocalTime]("mytime") // cassandra "time"
-r.as[java.time.ZonedDateTime]("myzdt") // cassandra "tuple<timestamp,varchar>"
-```
-[See here](https://datastax.github.io/java-driver/manual/custom_codecs/extras/#jdk-8) for information about the format of `ZonedDateTime`
-####Cassandra 2.2 on Java 7
-| Cassandra Type |      Scala Type      |
-|:--------------:|:--------------------:|
-| varchar        | String               |
-| uuid           | java.util.UUID       |
-| inet           | java.net.InetAddress |
-| int            | Int                  |
-| bigint         | Long                 |
-| boolean        | Boolean              |
-| double         | Double               |
-| varint         | BigInt               |
-| decimal        | BigDecimal           |
-| float          | Float                |
-| blob           | Array[Byte]          |
-| list           | List                 |
-| map            | Map                  |
-| set            | Set                  |
-| **timestamp**  | **java.util.Date**   |
-
-* There is an implicit override the Joda library. Unfortunately it still goes through `java.util.Date`,
-so there might be performance issues in parallel execution
-```scala
-import com.weather.scalacass.joda.Implicits._
-
-val r: Row = _ // some row from your cluster
-r.as[org.joda.time.Instant]("mytimestamp") // cassandra "timestamp"
-```
-
-### Custom Types
 If you have a Scala type outside those listed above, you can provide a custom encoder/decoder for it in 2 ways:
-#### Map Over an Existing Type
+
+### Map Over an Existing Type
+
 This is the easier way to create a custom type since you only need to provide conversions to/from existing types
+
 ```scala
 implicit val iDecoder = CassFormatDecoder[java.util.Date].map(d: java.util.Date => new org.joda.time.Instant(d))
 val r: Row = _ // some row
@@ -243,11 +588,13 @@ val p = Person("newborn-baby", org.joda.time.Instant.now)
 val ss: ScalaSession = _ // your session instance
 ss.insert("mytable", p) // writes a (string, timestamp)
 ```
+
 * **CassFormatDecoder** and **CassFormatEncoder** `apply` methods summon an existing implicit conversion, which is done above
-(`CassFormatDecoder[java.util.Date]`) to utilize the `map` function. It is equivalent to `implicitly[CassFormatDecoder[T]]`
+  (`CassFormatDecoder[java.util.Date]`) to utilize the `map` function. It is equivalent to `implicitly[CassFormatDecoder[T]]`
 * for more about `ScalaSession`, [see below](#creating-a-scalasession)
 
 if your conversion has a chance to fail, you can also use `flatMap` that utilizes the `Either[Throwable, T]` type
+
 ```scala
 // let's imagine you are storing java.util.UUID as a varchar instead of uuid in cassandra...
 
@@ -265,8 +612,11 @@ val ss: ScalaSession = _ // your session instance
 ss.insert("mytable", i) // writes a (varchar, varchar)
 }
 ```
-#### Create a New Type From Scratch
+
+### Create a New Type From Scratch
+
 If there is any special logic not possible in a `map`/`flatMap`, you can construct an instance to handle it
+
 ```scala
 implicit val iDecoder = new CassFormatDecoder[org.joda.time.Instant] {
   type From = java.util.Date // describes the type of the value as directly extracted from the Java driver
@@ -286,179 +636,4 @@ case class Person(name: String, birthday: org.joda.time.Instant)
 val p = Person("newborn-baby", org.joda.time.Instant.now)
 val ss: ScalaSession = _ // your session instance
 ss.insert("mytable", p) // writes a (string, timestamp)
-
 ```
-
-### Session utilities
-#### Creating a ScalaSession
-```scala
-implicit val s: Session = someCassSession
-val ss1 = ScalaSession("mykeyspace")(s) // either pass explicitly
-val ss2 = ScalaSession("mykeyspace") // or pick up implicitly
-```
-* `ScalaSession` caches `PreparedStatement`s, and therefore needs a concrete instantiation vs an implicit conversion
-* `ScalaSession`s scope to the keyspace level. To access more than 1 keyspace, create multiple `ScalaSession`s with the same `Session`
-
-It is also possible to create the keyspace when instantiating a ScalaSession by providing a non-empty "WITH" statement
-```scala
-val ss = ScalaSession("mykeyspace", "REPLICATION = { 'class' : 'SimpleStrategy', 'replication_factor' : 3 })"
-```
-* the String field is prepended with " WITH ", meaning the above cassandra call will look like `CREATE KEYSPACE mykeyspace WITH REPLICATION = { 'class' : 'SimpleStrategy', 'replication_factor' : 3 };`
-
-#### Creating Tables and Table Representation
-case class representations of a table are ordered left-to-right, partition keys -> clustering keys -> remaining columns
-```scala
-case class MyTable(str: String, i: Option[Int])
-ss.createTable[MyTable]("mytable", 1, 0)
-```
-* `createTable` takes parameters (tableName, number of partition keys, number of clustering keys)
-* The above table takes `str` as a partition key, no clustering keys, and `i` as a regular field
-* The underlying Cassandra call looks like `CREATE TABLE mykeyspace.mytable (str varchar, i int, PRIMARY KEY ((str)));`
-* an error is thrown if number of partition keys is set to 0 or number of partition and clustering keys is greater than the number of fields in the case class  
-* createTable is intended to be used primarily for testing frameworks
-
-it is also possible to pass parameters to the create table function by providing a non-empty String
-```scala
-ss.createTable[MyTable]("mytable", 1, 0, "COMPACT STORAGE")
-```
-* like keyspace creation, " WITH " is appended to the String, meaning the above call looks like `CREATE TABLE mykeyspace.mytable (str varchar, i int, PRIMARY KEY ((str))) WITH COMPACT STORAGE;`
-
-#### `insert`/`insertAsync`
-```scala
-case class MyTable(str: String, i: Option[Int])
-// generates """INSERT INTO mykeyspace.mytable (str, i) VALUES ("asdf", 1234)"""
-ss.insert("mytable", MyTable("asdf", Some(1234)))
-// generates """INSERT INTO mykeyspace.mytable (str) VALUES ("asdf")"""
-ss.insertAsync("mytable", MyTable("asdf2", None)).unsafePerformSync
-```
-* `PreparedStatement`s are created and cached
-* In the case of `None` instances, they are removed before the caching phase, so `null` is never written to Cassandra
-
-#### `update`/`updateAsync`
-requires both a query case class and update case class
-```scala
-case class MyTable(str: String, i: Int, f: Float)
-case class Query(str: String, i: Int)
-case class Update(f: Float)
-// table with 2 primary keys, 'str' and 'i', and 1 column 'f'
-ss.createTable[MyTable]("mytable", 2, 0)
-// generates """UPDATE mykeyspace.mytable SET asdf=4.0 WHERE str="asdf" AND i=2"""
-ss.update[Update, Query]("mytable", Update(4.f), Query("asdf", 2))
-```
-
-#### `select`/`selectAsync`/`selectOne`/`selectOneAsync`
-`select` functions return a Cassandra `Row`, which can be converted into case classes with the `.as` family of implicit functions
-```scala
-case class MyTable(str: String, i: Option[Int], otherStr: String)
-ss.createTable[MyTable]("mytable", 1, 0)
-
-ss.insert("mytable", MyTable("asdf", None, "otherasdf")
-
-case class MyQuery(str: String)
-// generates """SELECT * FROM mykeyspace.mytable WHERE str="asdf""""
-val res = ss.selectOne("mytable", MyQuery("asdf")) // Some(Row)
-res.flatMap(_.getAs[MyTable]) // Some(MyTable("asdf", None, "otherasdf")
-```
-* In the case of `None` instances, they are removed from the query before searching
-* If the `None` is part of a partition key, the query will fail and the underlying Cassandra driver will throw the appropriate error 
-
-`select` and `selectAsync` also take an optional `limit` parameter:
-```scala
-ss.select("mytable", MyQuery("asdf"), limit=100) // will return a max of 100 rows
-```
-all 4 functions also take an optional `allowFiltering` parameter
-```scala
-case class MyTable(str: String, i: Int, b: Boolean)
-ss.createTable[MyTable]("mytable", 2, 0) // str and i are partition keys
-case class MyQuery(str: String)
-ss.select("mytable", MyQuery("asdf")) // will fail with exception, requires "allow filtering"
-ss.select("mytable", MyQuery("asdf"), allowFiltering=true) // succeeds
-```
-if you want to select everything in table, `NoQuery` is provided
- ```scala
- // generates """SELECT * FROM mykeyspace.mytable"""
- ss.select("mytable", ScalaSession.NoQuery()) // returns everything in "mytable"
- ```
-#### `selectColumns`/`selectColumnsAsync`/`selectColumnsOne`/`selectColumnsOneAsync`
-function signatures are similar to their non-column counterparts, but with an extra type parameter describing which columns to extract
-```scala
-case class MyTable(str: String, i: Option[Int], otherStr: String)
-ss.createTable[MyTable]("mytable", 1, 0)
-
-ss.insert("mytable", MyTable("asdf", None, "otherasdf")
-
-case class MyInterestingFields(i: Option[Int], otherStr: String)
-case class MyQuery(str: String)
-// generates """SELECT i, otherstr FROM mykeyspace.mytable WHERE str="asdf""""
-val res = ss.selectColumnsOne[MyInterestingFields, MyQuery]("mytable", MyQuery("asdf")) // Some(Row)
-res.as[MyTable] // throws exception: missing "str" column
-res.as[MyInterestingFields] // MyInterestingFields(None, "otherasdf")
-```
-if you want to query with `*`, `Star` is provided:
-```scala
-// generates """SELECT * FROM mykeyspace.mytable WHERE str="asdf""""
-ss.selectColumns[ScalaSession.Star, MyQuery]("mytable", MyQuery("asdf"))
-```
-`Star` is impossible to instantiate because it takes an argument of type `Nothing`, but is useful as a type parameter to
-the "Columns" family of functions
-#### `delete`/`deleteAsync`
-```scala
-case class MyTable(str: String, str2: Option[String], i: Option[Int])
-ss.createTable[MyTable]("mytable", 1, 1)
-
-ss.insert("mytable", MyTable("asdf", Some("zxcv"), Some(1234))
-ss.insert("mytable", MyTable("asdf", Some("zxcv2"), None)
-// generates """DELETE * FROM mykeyspace.mytable WHERE str="asdf" AND str2="zxcv"""
-ss.delete("mytable", MyTable("asdf", Some("zxcv"), None))
-ss.select("mytable", MyTable("asdf", None, None)).map(_.as[MyTable]) // returns Iterator(MyTable("asdf", Some("zxcv2"), Some(1234)))
-
-ss.insert("mytable", MyTable("asdf", Some("zxcv"), Some(1234))
-// generates """DELETE * FROM mykeyspace.mytable WHERE str="asdf""""
-ss.delete("mytable", MyTable("asdf", Some("zxcv"), None))
-ss.select("mytable", MyTable("asdf", None, None)) // returns Iterator.empty[Row]
-```
-
-if a value is None, it is removed from the query
-```scala
-ss.insert("mytable", MyTable("asdf", Some("zxcv"), None)
-ss.insert("mytable", MyTable("asdf", Some("zxcv2"), None)
-// generates """DELETE * FROM mykeyspace.mytable WHERE str="asdf""""
-ss.delete("mytable", MyTable("asdf", None, None))
-ss.select("mytable", MyTable("asdf", None, None)) // returns Iterator.empty[MyTable]
-```
-#### `selectRaw`/`selectRawAsync`/`selectOneRaw`/`selectOneRawAsync`
-simply takes the query string and AnyRef args, with the benefit of prepared statement caching
-```scala
-case class MyTable(str: String, i: Option[Int], otherStr: Str)
-ss.createTable[MyTable]("mytable", 1, 0)
-
-ss.insert("mytable", MyTable("asdf", None, "otherasdf")
-ss.selectOneRaw("SELECT * FROM mykeyspace.mytable WHERE str=?", "asdf").as[MyTable] // returns MyTable("asdf", None, "otherasdf")
-```
-
-#### insertRaw, insertRawAsync, deleteRaw, or deleteRawAsync
-as with `selectRaw`, uses direct query string with benefits of caching
-```scala
-ss.insertRaw("INSERT INTO mykeyspace.mytable (str str2) VALUES (?,?)", "asdf", "zxcv")
-ss.insertRaw("INSERT INTO mykeyspace.mytable (str str2) VALUES (?,?)", "asdf", "zxcv2")
-ss.deleteRaw("DELETE * FROM mykeyspace.mytable WHERE str=? AND str2=?", "asdf", "zxcv")
-ss.select("mytable", MyTable("asdf", None, None)) // returns Iterator(MyTable("asdf", Some("zxcv2"), Some(1234)))
-```
-
-#### Batch statements
-batch statements are now supported via a handful of case classes:
-```scala
-case class MyTable(str: String, i: Int, f: Float)
-case class Query(str: String, i: Int)
-case class Update(f: Float)
-
-ss.createTable[MyTable]("mytable", 1, 1)
-
-val updateBatch = UpdateBatch("mytable", Update(4.f), Query("asdf", 2))
-val deleteBatch = DeleteBatch("mytable", Query("asdf", 2)
-val insertBatch = InsertBatch("mytable", MyTable("fdsa", 1234, 43.21f))
-// results in a single row with ("fdsa", 1234, 43.21)
-ss.batch(Seq(updateBatch, deleteBatch, insertBatch))
-```
-
-the session utilities are experimental, and suggestions/pull requests are welcome
