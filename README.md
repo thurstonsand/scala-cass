@@ -97,6 +97,7 @@ Include the repo
 * [Custom types](#custom-types)
   * [Map over existing type](#map-over-an-existing-type)
   * [Create new type](#create-a-new-type-from-scratch)
+* [Parsing performance](#parsing-performance)
 
 ## Components
 
@@ -128,7 +129,7 @@ implicit val cluster = Cluster.builder.addContactPoint("localhost").build()
 
 The session itself is a class that you must keep around, much like you would a Cassandra Java Session. This is because
 the ScalaSession caches PreparedStatements automatically, so if you are calling the same request multiple times, it will
-use an existing PreparedStatement instead of instantiating a new request every time. the instantiation takes an optional
+use an existing PreparedStatement instead of generating a new statement every time. the instantiation takes an optional
 String with the right hand side of the keyspace definition, if you want it to automatically create the keyspace for you
 (this will likely only really be used for testing purposes).
 
@@ -157,9 +158,7 @@ sSession.close()
 
 ### Table creation
 
-This feature will likely be useful mostly for testing purposes, but there is a method to create a table for a given
-ScalaSession, which already specifies the keyspace. This takes advantage of case classes to model the data, so the type
-of the data maps to a cassandra type, and the names in the case class match to the cassandra column names.
+This feature will likely be useful mostly for testing purposes. It takes advantage of case classes to model the data, so the type of the data maps to a cassandra type, and the names in the case class match to the cassandra column names.
 
 #### Characteristics
 
@@ -168,7 +167,7 @@ of the data maps to a cassandra type, and the names in the case class match to t
   * number of partition keys
   * number of clustering keys
   * the right hand side of the table definition
-  * optional parameters take the underlying type parameter as its type for table creation
+* parameters wrapped in `Option` take the underlying type parameter as its type for table creation
 * you must have at least 1 partition key
 * the number of partition keys + clustering keys must be less than the number of fields in the case class
 * any rules associated with cassandra semantics for data types must be followed (eg no counters in the primary key)
@@ -198,17 +197,16 @@ These are some characteristics shared by the remaining functions in the `ScalaSe
 * the first parameter of the function is the table name
 * the names and types of the case class should match up to the underlying cassandra names and types
 * there is a synchronous and asynchronous implementation of each statement. ScalaCass returns a `ResultSet`/
-  `scala.concurrent.Future[ResultSet]` for insert/delete/update statements, and `Iterator[Row]`/`Future[Iterator[Row]]` for
-  select/selectOne statements
+  `scala.concurrent.Future[ResultSet]` for insert/delete/update statements, `Iterator[Row]`/`Future[Iterator[Row]]` for
+  select statements, and `Option[Row]`/`Future[Option[Row]]` for selectOne statements
 * any columns missing from the table are not entered as `null` to cassandra. They are left out of the query
-* optional values are included in the query if they are `Some`, and left out of the query if they are `None`. This
-  includes values in any queries, and if there is a problem with the underlying Cassandra query, an exception will be 
+* optional values are included in the statement if they are `Some`, and left out of the statement if they are `None`. This
+  includes values in any queries, and if there is a problem with the generated Cassandra query, an exception will be 
   thrown by the Cassandra Java driver
 
 ### Insert
 
-Use case classes to model the data to insert. If you are inserting an entire row, the same definition as the table can
-be used.
+Use case classes to model the data to insert. If you are inserting an entire row, the same case class used for the definition of the table can be used.
 
 ```scala
 // given the table definition
@@ -229,7 +227,7 @@ val insertRes4: Future[ResultSet] = sSession.insertAsync("mytable", MyTable("asd
 
 ### Update
 
-Use case classes to model the data to update. For update, 2 case classes are used -- one to specify the query parameter,
+Use case classes to model the data to update. For update, 2 case classes are used -- one to specify the query,
 and one to specify the data to update.
 
 ```scala
@@ -286,18 +284,21 @@ val selectOneRes2: Future[Option[Row]] = sSession.selectOneAsync("mytable", Quer
 
 ```scala
 case class RequiresFilteringQuery(i: Int)
+// generates """SELECT * FROM mykeyspace.mytable WHERE i=123 ALLOW FILTERING"""
 val selectWithFiltering: Iterator[Row] = sSession.select("mytable", RequiresFilteringQuery(123), allowFiltering=true)
 ```
 
 `select` also takes an optional `limit` parameter, to limit the number of results returned
 
 ```scala
+// generates """SELECT * FROM mykeyspace.mytable WHERE s='asdf' AND i=123 LIMIT 100"""
 val selectResWithLimit: Iterator[Row] = sSession.select("mytable", Query("asdf", 123), limit=100)
 ```
 
 If you want to pull out the entire table with the select statement, this can be achieved by using the `NoQuery` type
 
 ```scala
+// generates """SELECT * FROM mykeyspace.mytable"""
 val selectAll: Iterator[Row] = sSession.select("mytable", ScalaSession.NoQuery())
 ```
 
@@ -306,7 +307,10 @@ select functions.
 
 ```scala
 case class ColumnsIWant(i: Int, l: Long)
+
+// generates """SELECT i, l FROM mykeyspace.mytable WHERE s='asdf' AND i=123"""
 val someColumns: Option[Row] = sSession.selectColumnsOne[ColumnsIWant, Query]("mytable", Query("asdf", 123))
+
 val aRowSomeColumns = someColumns.get
 aRowSomeColumns.isNull("s") // true
 aRowSomeColumns.getInt("i") // 123
@@ -327,12 +331,12 @@ a friendlier syntax
 ##### Characteristics
 
 * requires an import of `com.weather.scalacass.Scalacass._`
-* no column parameter is passed to these functions, since it is acting on the entire row, not on a single column
 * This functionality comes with no additional code cost thanks to the [Shapeless library](https://github.com/milessabin/shapeless)
 * For a complete mapping between Cassandra and Scala types, [see the type mappings section](#type-mapping)
 
 ```scala
 val aRow = selectOneRes.get // for demonstration purposes
+
 // Java driver way
 val s1: String = aRow.getString("s")
 
@@ -351,7 +355,7 @@ val s2_?: Option[String] = aRow.getAs[String]("s")
 val sWithDefault: String = aRow.getOrElse[String]("s", "defaultValue")
 ```
 
-and perhaps most helpfully, allows extraction of an entire Row directly into a case class
+and perhaps most helpfully, allows extraction of an entire Row directly into a case class. Note that no column parameter is passed to these functions, since it is acting on the entire row, not on a single column
 
 ```scala
 // given the table definition
@@ -361,6 +365,8 @@ val allValues: MyTable = aRow.as[MyTable]
 val allValues_?: Option[MyTable] = aRow.getAs[MyTable]
 val allValuesOrDefault: MyTable = aRow.getOrElse[MyTable](MyTable("default_s", 0, None))
 ```
+
+In case class extraction, the entire case class must be extracted correctly, or none of it will be. If some parameters do not need to be extracted, they can be made `Option`al fields inside the case class.
 
 ## Additional Functionality
 
@@ -416,6 +422,17 @@ val selectOneRes: Option[Row] = sSession.rawSelectOne(selectQuery, "asdf", Int.b
 val selectOneRes: Future[Option[Row]] = sSession.rawSelectOneAsync(selectQuery, "asdf", Int.box(123))
 ```
 
+and for batch statements,
+
+```scala
+import com.weather.scalacass._
+
+val deleteBatch = DeleteBatch("mytable", MyQuery("qwer", 1234))
+val rawBatch = RawBatch(insertQuery, "asdf", Int.box(123), Long.box(1234L))
+
+sSession.batch(Seq(deleteBatch, rawBatch)
+```
+
 ## Type Mapping
 
 ### Cassandra 3.0+ on Java 8
@@ -442,12 +459,14 @@ val selectOneRes: Future[Option[Row]] = sSession.rawSelectOneAsync(selectQuery, 
 | **time**       | **Time**                               |
 
 * Time is a type specific to this library so as not to conflict with `bigint` and `Long`. it is defined as
-  ```scala
-  final case class Time(millis: Long)
-  ```
+  
+```scala
+final case class Time(millis: Long)
+```
+  
 * There are implicit overrides for both the Joda library and Jdk8 Time library that take advantage of Cassandra's new 
   codecs. These codecs have to be registered with your `Cluster` instance, which is included as a helper function
-* when using tuples, you must make the `Cluster` instance implicit, due to the nature of tuples in Cassandra 3.0+.
+* when using tuples, you must make the `Cluster` instance implicit, due to tuples' dependency on the specific codecs registered with the cluster in Cassandra 3.0+.
 
 #### Joda Implicits
 
@@ -514,64 +533,9 @@ val r: Row = _ // some row from your cluster
 r.as[org.joda.time.Instant]("mytimestamp") // cassandra "timestamp"
 ```
 
-## Parsing Performance
-
-performance is pretty decent.
-
-Measurements taken by extracting a String/Case Class 10,000 times with [Thyme](https://github.com/Ichoran/thyme)  
-compare the implementation of `as`:
-
-```scala
-// with scala-cass
-row.as[String]("str")
-row.getAs[String]("str")
-// native
-if (row.isNull("str")) throw new IllegalArgumentException("") else row.getString("str"))
-if (row.getColumnDefinitions.contains("str") && !row.isNull("str")) Some(row.getString("str")) else None)
-```
-
-|           |   as   |  getAs |
-|:---------:|:------:|:------:|
-| ScalaCass | 6.92us | 6.71us |
-|   Native  | 6.88us | 7.80us |
-
-ScalaCass is 99.392% the speed of native for `as`, 106.209% the speed of native for `getAs`  
-
-compare the implementation of `as` for a case class:
-
-```scala
-case class Strings(str1: String, str2: String, str3: String, str4: Option[String])
-// with scala-cass
-row.as[Strings]
-row.getAs[Strings]
-// native as
-def get(name: String) = if (row.isNull("str")) throw new IllegalArgumentException("") else row.getString("str")
-Strings(get("str"), get("str2"), get("str3"), if (row.getColumnDefinitions.contains("str") && !row.isNull("str")) Some(row.getString("str"))
-// native getAs
-def ga(name: String) = if (row.getColumnDefinitions.contains(name) && !row.isNull(name)) Some(row.getString(name)) else None
-    def getAs = for {
-      s1 <- ga("str")
-      s2 <- ga("str2")
-      s3 <- ga("str3")
-      s4  = ga("str4")
-    } yield Strings(s1, s2, s3, s4)
-```
-
-|                             |   as   |  getAs |
-|:---------------------------:|:------:|:------:|
-|          ScalaCass          | 68.1us | 65.7us |
-| ScalaCass w/ cachedImplicit | 39.3us | 39.1us |
-|            Native           | 30.5us | 36.5us |
-
-ScalaCass alone is 44.844% the speed of native for `as`, 55.557% the speed of native for `getAs`
-
-ScalaCass w/ `cachedImplicit` is 77.664% the speed of native for `as`, 93.372% the speed of native for `getAs`
-
-* `cachedImplicit` is a feature of shapeless that caches the underlying representation of a case class so that it does not need to be recreated on every call.
-
 ## Custom Types
 
-If you have a Scala type outside those listed above, you can provide a custom encoder/decoder for it in 2 ways:
+If you want to use a Scala type outside those listed above, you can provide a custom encoder/decoder for it in 2 ways:
 
 ### Map Over an Existing Type
 
@@ -591,7 +555,6 @@ ss.insert("mytable", p) // writes a (string, timestamp)
 
 * **CassFormatDecoder** and **CassFormatEncoder** `apply` methods summon an existing implicit conversion, which is done above
   (`CassFormatDecoder[java.util.Date]`) to utilize the `map` function. It is equivalent to `implicitly[CassFormatDecoder[T]]`
-* for more about `ScalaSession`, [see below](#creating-a-scalasession)
 
 if your conversion has a chance to fail, you can also use `flatMap` that utilizes the `Either[Throwable, T]` type
 
@@ -603,7 +566,7 @@ implicit val uuidDecoder = CassFormatDecoder[String].flatMap(str: String => Try(
   case scala.util.Failure(exc) => Left(exc)
 })
 val r: Row = _ // some row
-r.as[java.util.UUID]("myvarchar") // reads from a varchar, throws IllegalArgumentException if "str" is not a UUID
+r.as[java.util.UUID]("myvarchar") // reads from a varchar, throws IllegalArgumentException if "myvarchar" is not a UUID
 
 implicit val uuidEncoder = CassFormatEncoder[String].map(uuid: java.util.UUID => uuid.toString) // this one can't fail, so no flatMap
 case class Item(uuid: java.util.UUID, name: String)
@@ -623,13 +586,14 @@ implicit val iDecoder = new CassFormatDecoder[org.joda.time.Instant] {
   val clazz = classOf[From] // just the Class of From. If you know a way to specify this inside the trait, let me know
   def f2t(f: From): Either[Throwable, T] = Right(new org.joda.time.Instant(f)) // failable conversion between From and T
   def extract(r: Row, name: String): From = r getTimestamp name // how to get an instance of From from Cassandra
+  def tupleExtract(tup: TupleValue, pos: Int): From = tup getTimestamp pos // how to get an instance of From from a Cassandra TupleValue
 }
 val r: Row = _ // some row
 r.as[org.joda.time.Instant]("mytimestamp") // reads from a timestamp
 
 implicit val iEncoder = new CassFormatEncoder[org.joda.time.Instant] {
   type To = java.util.Date // describes the type of the value needed for the Java driver
-  val cassType = "timestamp" // the Cassandra data type
+  val cassDataType = com.datastax.driver.core.DataType.timestamp // the Cassandra data type
   def encode(t: org.joda.time.Instant): Either[Throwable, To] = Right(new java.util.Date(i.getMillis)) // can't fail
 }
 case class Person(name: String, birthday: org.joda.time.Instant)
@@ -637,3 +601,84 @@ val p = Person("newborn-baby", org.joda.time.Instant.now)
 val ss: ScalaSession = _ // your session instance
 ss.insert("mytable", p) // writes a (string, timestamp)
 ```
+
+## Parsing Performance
+
+performance is pretty decent.
+
+Measurements taken by extracting a String 10,000 times with [Thyme](https://github.com/Ichoran/thyme)
+
+compare the implementations of `as`:
+
+```scala
+// with ScalaCass
+row.as[String]("str")
+
+// native
+if (row.isNull("str")) throw new IllegalArgumentException("") else row.getString("str"))
+```
+
+and `getAs`:
+
+```scala
+// ScalaCass
+row.getAs[String]("str")
+
+// Java driver
+if (row.getColumnDefinitions.contains("str") && !row.isNull("str")) Some(row.getString("str")) else None)
+```
+
+|           |   as   |  getAs |
+|:---------:|:------:|:------:|
+| ScalaCass | 6.92us | 6.71us |
+|   Native  | 6.88us | 7.80us |
+
+ScalaCass is 99.392% the speed of native for `as`, 106.209% the speed of native for `getAs`  
+
+Measurements take by extracting to a case class 10,000 times with [Thyme](https://github.com/Ichoran/thyme)
+
+given the case class:
+
+```scala
+case class Strings(str1: String, str2: String, str3: String, str4: Option[String])
+```
+
+compare the implementations of `as` for a case class:
+
+```scala
+// ScalaCass
+row.as[Strings]
+
+// Java driver
+def get(name: String) = if (row.isNull("str")) throw new IllegalArgumentException("") else row.getString("str")
+def getAs(name: String) = if (row.getColumnDefinitions.contains(name) && !row.isNull(name)) Some(row.getString(name)) else None
+
+Strings(get("str"), get("str2"), get("str3"), getAs("str4")
+```
+
+and `getAs`:
+
+```scala
+// ScalaCass
+row.getAs[Strings]
+
+// Java driver
+for {
+  s1 <- getAs("str")
+  s2 <- getAs("str2")
+  s3 <- getAs("str3")
+  s4  = getAs("str4")
+} yield Strings(s1, s2, s3, s4)
+```
+
+|                             |   as   |  getAs |
+|:---------------------------:|:------:|:------:|
+|          ScalaCass          | 68.1us | 65.7us |
+| ScalaCass w/ cachedImplicit | 39.3us | 39.1us |
+|            Native           | 30.5us | 36.5us |
+
+ScalaCass alone is 44.844% the speed of native for `as`, 55.557% the speed of native for `getAs`
+
+ScalaCass w/ `cachedImplicit` is 77.664% the speed of native for `as`, 93.372% the speed of native for `getAs`
+
+* `cachedImplicit` is a feature of shapeless that caches the underlying representation of a case class so that it does not need to be recreated on every call. [see more here](https://github.com/milessabin/shapeless/blob/master/core/src/main/scala/shapeless/package.scala#L118) (WARNING: source code)
