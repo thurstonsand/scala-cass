@@ -5,21 +5,21 @@ val javaVersion = SettingKey[String]("javaVersion", "the version of cassandra fo
 javaVersion := sys.props("java.specification.version")
 
 val cassV3 = "3"
-val cassV22 = "22"
+val cassV21 = "21"
 val cassVersion = SettingKey[String]("cassVersion", "the version of cassandra to use for compilation")
 cassVersion := Option(System.getProperty("cassVersion")).getOrElse(javaVersion.value match {
-  case "1.7" => cassV22
+  case "1.7" => cassV21
   case _     => cassV3
 })
-def wrongCassVersion = new RuntimeException("unknown cassVersion. use either \"" + cassV3 + "\" or \"" + cassV22 + "\"")
+def wrongCassVersion = new RuntimeException("unknown cassVersion. use either \"" + cassV3 + "\" or \"" + cassV21 + "\"")
 
 version := {
   val majorVersion = (cassVersion.value, javaVersion.value) match {
     case (`cassV3`, "1.8") => "4"
-    case (`cassV22`, "1.7") => "3"
-    case (cv, jv) => throw new RuntimeException("invalid cassandra/java version combination: " + cv + "/" + jv + ". use either cass \"" + cassV3 + "\" with java 8 or cass \"" + cassV22 + "\" with java 7")
+    case (`cassV21`, "1.7") => "3"
+    case (cv, jv) => throw new RuntimeException("invalid cassandra/java version combination: " + cv + "/" + jv + ". use either cass \"" + cassV3 + "\" with java 8 or cass \"" + cassV21 + "\" with java 7")
   }
-  s"0.$majorVersion.7"
+  s"0.$majorVersion.8"
 }
 
 scalaVersion := "2.11.8"
@@ -44,6 +44,9 @@ scalacOptions ++= Seq(
   case _ => Seq.empty[String]
 })
 
+scalacOptions in (Compile, console) ~= (_ filterNot (_ == "-Ywarn-unused-import"))
+scalacOptions in (Test, console) := (scalacOptions in (Compile, console)).value
+
 parallelExecution in Test := false
 
 resolvers ++= Seq(
@@ -53,8 +56,9 @@ resolvers ++= Seq(
 addCompilerPlugin("org.scalamacros" % "paradise" % "2.1.0" cross CrossVersion.full)
 
 libraryDependencies ++= Seq(
-  "com.google.code.findbugs" % "jsr305" % "3.0.1" % "compile-internal, test-internal",
-  "org.joda" % "joda-convert" % "1.8.1" % "compile-internal, test-internal",
+  "com.google.code.findbugs" % "jsr305" % "3.0.1" % "compile-internal, test-internal", // Intellij does not like "compile-internal, test-internal", use "provided" instead
+  "org.joda" % "joda-convert" % "1.8.1" % "compile-internal, test-internal", // Intellij does not like "compile-internal, test-internal", use "provided" instead
+  "org.slf4j" % "slf4j-api" % "1.7.21" % "compile-internal, test-internal", // Intellij does not like "compile-internal, test-internal", use "provided" instead
   "joda-time" % "joda-time" % "2.9.4",
   "com.chuusai" %% "shapeless" % "2.3.1",
   "com.google.guava" % "guava" % "19.0",
@@ -66,18 +70,18 @@ libraryDependencies ++= Seq(
     "com.datastax.cassandra" % "cassandra-driver-extras" % "3.1.0" excludeAll (ExclusionRule("com.datastax.cassandra", "cassandra-driver-core"), ExclusionRule("com.google.guava", "guava")),
     "org.cassandraunit" % "cassandra-unit" % "3.0.0.1" % "test"
   )
-  case `cassV22` =>  Seq(
+  case `cassV21` =>  Seq(
     "com.datastax.cassandra" % "cassandra-driver-core" % "2.1.10.2" classifier "shaded" excludeAll ExclusionRule("com.google.guava", "guava"),
     "org.cassandraunit" % "cassandra-unit" % "2.2.2.1" % "test"
   )
-  case _ => throw new RuntimeException("unknown cassVersion. use either \"" + cassV3 + "\" or \"" + cassV22 + "\"")
+  case _ => throw new RuntimeException("unknown cassVersion. use either \"" + cassV3 + "\" or \"" + cassV21 + "\"")
 })
 
 def addSourceFilesTo(conf: Configuration) =
   unmanagedSourceDirectories in conf <<= (unmanagedSourceDirectories in conf, sourceDirectory in conf, cassVersion) {
     (sds: Seq[java.io.File], sd: java.io.File, v: String) =>
       if (v == cassV3) sds ++ Seq(new java.io.File(sd, "scala_cass3"))
-      else if (v == cassV22) sds ++ Seq(new java.io.File(sd, "scala_cass22"))
+      else if (v == cassV21) sds ++ Seq(new java.io.File(sd, "scala_cass21"))
       else throw wrongCassVersion
   }
 addSourceFilesTo(Compile)
@@ -101,6 +105,7 @@ wartremoverWarnings in (Compile, compile) ++= Seq(
   Wart.Product, Wart.Return, Wart.Serializable,
   Wart.TryPartial, Wart.Var,
   Wart.Enumeration, Wart.FinalCaseClass, Wart.JavaConversions)
+wartremoverWarnings in (Compile, console) := Seq.empty
 
 publishMavenStyle := true
 pomIncludeRepository := (_ => false)

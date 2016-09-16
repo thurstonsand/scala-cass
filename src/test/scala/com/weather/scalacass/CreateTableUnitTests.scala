@@ -100,5 +100,4 @@ class CreateTableUnitTests extends CassandraUnitTester {
 
     f.ss.dropTable(f.tname)
   }
-
 }

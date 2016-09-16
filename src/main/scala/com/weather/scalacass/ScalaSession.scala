@@ -16,9 +16,15 @@ sealed trait Batch extends Product with Serializable
 final case class UpdateBatch[T, S](table: String, item: T, query: T)(implicit val tEncoder: CCCassFormatEncoder[T], val sEncoder: CCCassFormatEncoder[S]) extends Batch
 final case class DeleteBatch[T](table: String, item: T)(implicit val tEncoder: CCCassFormatEncoder[T]) extends Batch
 final case class InsertBatch[T](table: String, item: T)(implicit val tEncoder: CCCassFormatEncoder[T]) extends Batch
+final case class RawBatch(query: String, anyrefArgs: AnyRef*) extends Batch
 
 object ScalaSession {
-  import scala.language.implicitConversions
+  def apply(keyspace: String, keyspaceProperties: String = "")(implicit session: Session): ScalaSession = {
+    if (keyspaceProperties.nonEmpty)
+      session.execute(s"CREATE KEYSPACE IF NOT EXISTS $keyspace WITH $keyspaceProperties")
+    new ScalaSession(keyspace)
+  }
+
   private implicit def resultSetFutureToScalaFuture(f: ResultSetFuture): Future[ResultSet] = {
     val p = Promise[ResultSet]()
     Futures.addCallback(
@@ -29,11 +35,6 @@ object ScalaSession {
       }
     )
     p.future
-  }
-  def apply(keyspace: String, keyspaceProperties: String = "")(implicit session: Session): ScalaSession = {
-    if (keyspaceProperties.nonEmpty)
-      session.execute(s"CREATE KEYSPACE IF NOT EXISTS $keyspace WITH $keyspaceProperties")
-    new ScalaSession(keyspace)
   }
 
   private implicit def Fn02Callable[V](f: => V): Callable[V] = new Callable[V] {
@@ -106,15 +107,6 @@ class ScalaSession(val keyspace: String)(implicit val session: Session) {
   def insert[T: CCCassFormatEncoder](table: String, insertable: T): ResultSet = session.execute(prepareInsert(table, insertable))
   def insertAsync[T: CCCassFormatEncoder](table: String, insertable: T): Future[ResultSet] = session.executeAsync(prepareInsert(table, insertable))
 
-  private[this] def prepareInsertRaw(query: String, anyrefArgs: Seq[AnyRef]) = {
-    val prepared = queryCache.get(Set(query), session.prepare(query))
-    prepared.bind(anyrefArgs)
-  }
-  def insertRaw(query: String, anyrefArgs: AnyRef*): ResultSet =
-    session.execute(prepareInsertRaw(query, anyrefArgs))
-  def insertRawAsync(query: String, anyrefArgs: AnyRef*): Future[ResultSet] =
-    session.executeAsync(prepareInsertRaw(query, anyrefArgs))
-
   private[this] def prepareUpdate[T: CCCassFormatEncoder, S: CCCassFormatEncoder](table: String, updateable: T, query: S): BoundStatement = {
     val (updateStrArgs, updateAnyrefArgs) = clean(updateable)
     val (queryStrArgs, queryAnyrefArgs) = clean(query)
@@ -127,6 +119,8 @@ class ScalaSession(val keyspace: String)(implicit val session: Session) {
 
   def update[T: CCCassFormatEncoder, S: CCCassFormatEncoder](table: String, updateable: T, query: S): ResultSet =
     session.execute(prepareUpdate(table, updateable, query))
+  def updateAsync[T: CCCassFormatEncoder, S: CCCassFormatEncoder](table: String, updateable: T, query: S): Future[ResultSet] =
+    session.executeAsync(prepareUpdate(table, updateable, query))
 
   private[this] def prepareDelete[T: CCCassFormatEncoder](table: String, deletable: T): BoundStatement = {
     val (strArgs, anyrefArgs) = clean(deletable)
@@ -142,22 +136,14 @@ class ScalaSession(val keyspace: String)(implicit val session: Session) {
   def deleteAsync[T: CCCassFormatEncoder](table: String, deletable: T): Future[ResultSet] =
     session.executeAsync(prepareDelete(table, deletable))
 
-  private[this] def prepareRawDelete(query: String, anyrefArgs: Seq[AnyRef]) = {
-    val prepared = queryCache.get(Set(query), session.prepare(query))
-    prepared.bind(anyrefArgs)
-  }
-  def deleteRaw(query: String, anyrefArgs: AnyRef*): ResultSet =
-    session.execute(prepareRawDelete(query, anyrefArgs))
-  def deleteRawAsync(query: String, anyrefArgs: AnyRef*): Future[ResultSet] =
-    session.executeAsync(prepareRawDelete(query, anyrefArgs))
-
   @SuppressWarnings(Array("org.brianmckenna.wartremover.warts.Any"))
   def prepareBatch(batches: Seq[Batch], batchType: BatchStatement.Type): BatchStatement = {
     val batch = new BatchStatement(batchType)
     batches.foreach {
-      case d @ DeleteBatch(table, item)        => batch.add(prepareDelete(table, item)(d.tEncoder))
-      case u @ UpdateBatch(table, item, query) => batch.add(prepareUpdate(table, item, query)(u.tEncoder, u.sEncoder))
-      case i @ InsertBatch(table, item)        => batch.add(prepareInsert(table, item)(i.tEncoder))
+      case d @ DeleteBatch(table, item)         => batch.add(prepareDelete(table, item)(d.tEncoder))
+      case u @ UpdateBatch(table, item, query)  => batch.add(prepareUpdate(table, item, query)(u.tEncoder, u.sEncoder))
+      case i @ InsertBatch(table, item)         => batch.add(prepareInsert(table, item)(i.tEncoder))
+      case r @ RawBatch(query, anyrefArgs @ _*) => batch.add(prepareRawStatement(query, anyrefArgs))
     }
     batch
   }
@@ -194,16 +180,21 @@ class ScalaSession(val keyspace: String)(implicit val session: Session) {
   def selectColumnsOneAsync[Sub: CCCassFormatEncoder, Query: CCCassFormatEncoder](table: String, selectable: Query, allowFiltering: Boolean = false): Future[Option[Row]] =
     session.executeAsync(prepareSelect[Sub, Query](table, selectable, allowFiltering, 0)).map(rs => Option(rs.one()))
 
-  private[this] def prepareRawSelect(query: String, anyrefArgs: Seq[AnyRef]) = {
+  private[this] def prepareRawStatement(query: String, anyrefArgs: Seq[AnyRef]) = {
     val prepared = queryCache.get(Set(query), session.prepare(query))
     prepared.bind(anyrefArgs: _*)
   }
-  def selectRaw[T: CCCassFormatDecoder](query: String, anyrefArgs: AnyRef*): Iterator[Row] =
-    session.execute(prepareRawSelect(query, anyrefArgs)).iterator.asScala
-  def selectRawAsync[T: CCCassFormatDecoder](query: String, anyrefArgs: AnyRef*): Future[Iterator[Row]] =
-    session.executeAsync(prepareRawSelect(query, anyrefArgs)).map(_.iterator.asScala)
-  def selectOneRaw[T: CCCassFormatDecoder](query: String, anyrefArgs: AnyRef*): Option[Row] =
-    Option(session.execute(prepareRawSelect(query, anyrefArgs)).one())
-  def selectOneAsync[T: CCCassFormatDecoder](query: String, anyrefArgs: AnyRef*): Future[Option[Row]] =
-    session.executeAsync(prepareRawSelect(query, anyrefArgs)).map(rs => Option(rs.one()))
+
+  def rawStatement(query: String, anyrefArgs: AnyRef*): ResultSet =
+    session.execute(prepareRawStatement(query, anyrefArgs))
+  def rawStatementAsync(query: String, anyrefArgs: AnyRef*): Future[ResultSet] =
+    session.executeAsync(prepareRawStatement(query, anyrefArgs))
+  def rawSelect(query: String, anyrefArgs: AnyRef*): Iterator[Row] =
+    session.execute(prepareRawStatement(query, anyrefArgs)).iterator.asScala
+  def rawSelectAsync(query: String, anyrefArgs: AnyRef*): Future[Iterator[Row]] =
+    session.executeAsync(prepareRawStatement(query, anyrefArgs)).map(_.iterator.asScala)
+  def rawSelectOne(query: String, anyrefArgs: AnyRef*): Option[Row] =
+    Option(session.execute(prepareRawStatement(query, anyrefArgs)).one())
+  def rawSelectOneAsync(query: String, anyrefArgs: AnyRef*): Future[Option[Row]] =
+    session.executeAsync(prepareRawStatement(query, anyrefArgs)).map(rs => Option(rs.one()))
 }

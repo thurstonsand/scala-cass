@@ -4,10 +4,11 @@ import com.weather.scalacass.ScalaCassUnitTestsVersionSpecific.BadTypeException
 import org.scalatest.OptionValues
 import com.weather.scalacass.util.CassandraWithTableTester
 import ScalaCass._
+import com.datastax.driver.core.exceptions.InvalidTypeException
 
 abstract class ScalaCassUnitTests extends CassandraWithTableTester("testDB", "testTable", ScalaCassUnitTestsVersionSpecific.extraHeaders ::: List("str varchar", "str2 ascii", "b blob",
   "d decimal", "f float", "net inet", "tid timeuuid", "vi varint", "i int", "bi bigint", "bool boolean", "dub double",
-  "l list<varchar>", "m map<varchar, bigint>", "s set<double>", "id uuid", "sblob set<blob>"), List("str")) with OptionValues {
+  "l list<varchar>", "m map<varchar, bigint>", "s set<double>", "id uuid", "sblob set<blob>, tup tuple<int, varchar>"), List("str")) with OptionValues {
   def testType[GoodType: CassFormatDecoder, BadType: CassFormatDecoder](k: String, v: GoodType, default: GoodType)(implicit goodCF: CassFormatEncoder[GoodType]) = {
     val args = {
       val converted = goodCF.encode(v).getOrThrow.asInstanceOf[AnyRef]
@@ -40,7 +41,6 @@ abstract class ScalaCassUnitTests extends CassandraWithTableTester("testDB", "te
 
     case class TestCC(pkField: String, refField: GoodType)
     case class QueryCC(pkField: String)
-    implicit val s = client.session
     val ss = new ScalaSession(dbName)
     val tname = s"testdb${scala.util.Random.alphanumeric.take(12).mkString}"
     ss.createTable[TestCC](tname, 1, 0)(CCCassFormatEncoder[TestCC])
@@ -49,9 +49,9 @@ abstract class ScalaCassUnitTests extends CassandraWithTableTester("testDB", "te
     ss.insert(tname, t1)(CCCassFormatEncoder[TestCC])
     k match {
       case "b" =>
-        ss.selectOne(tname, q1).getAs[TestCC].map(_.refField.asInstanceOf[Array[Byte]]).value should contain theSameElementsInOrderAs t1.refField.asInstanceOf[Array[Byte]]
+        ss.selectOne(tname, ScalaSession.NoQuery()).getAs[TestCC].map(_.refField.asInstanceOf[Array[Byte]]).value should contain theSameElementsInOrderAs t1.refField.asInstanceOf[Array[Byte]]
       case "sblob" =>
-        ss.selectOne(tname, q1).getAs[TestCC].flatMap(_.refField.asInstanceOf[Set[Array[Byte]]].headOption).value should contain theSameElementsInOrderAs t1.refField.asInstanceOf[Set[Array[Byte]]].head
+        ss.selectOne(tname, ScalaSession.NoQuery()).getAs[TestCC].flatMap(_.refField.asInstanceOf[Set[Array[Byte]]].headOption).value should contain theSameElementsInOrderAs t1.refField.asInstanceOf[Set[Array[Byte]]].head
       case _ =>
         ss.selectOne(tname, q1).getAs[TestCC].value shouldBe t1
     }
@@ -81,6 +81,23 @@ class ScalaCassUnitTestsAll extends ScalaCassUnitTests with ScalaCassUnitTestsVe
   "varint" should "be extracted correctly" in testType[BigInt, Long]("vi", 3, 2)
   "float" should "be extracted correctly" in testType[Float, Double]("f", 123.4f, 987.6f)
   "set<blob>" should "be extracted correctly" in testType[Set[Array[Byte]], Set[Double]]("sblob", Set("asdf".getBytes), Set("fdsa".getBytes))
+  "tup<int, varchar>" should "be extracted correctly (wrong basic)" in testType[(Int, String), String]("tup", (4, "fdsa"), (5, "asas"))
+  "tup<int, varchar>" should "be extracted correctly (wrong 1st type)" in testType[(Int, String), (String, String)]("tup", (4, "fdsa"), (5, "qqwer"))
+  "tup<int, varchar>" should "be extracted correctly (wrong arity)" in {
+    val goodValue = (4, "fdsa")
+    val args = Seq(("tup", implicitly[CassFormatEncoder[(Int, String)]].encode(goodValue).getOrThrow.asInstanceOf[AnyRef]), ("str", "asdf"))
+    insert(args)
+    val res = getOne
+    res.as[(Int, String)]("tup") shouldBe goodValue
+    res.getAs[(Int, String)]("tup").value shouldBe goodValue
+    res.getOrElse("tup", (5, "qqwe")) shouldBe goodValue
+    res.getOrElse("nottup", (5, "qqwe")) shouldBe ((5, "qqwe"))
+
+    an[IllegalArgumentException] should be thrownBy res.as[(Int, String)]("nottup")
+    an[InvalidTypeException] should be thrownBy res.as[(Int, String, String)]("tup")
+    an[InvalidTypeException] should be thrownBy res.as[Tuple1[Int]]("tup")
+    a[BadTypeException] should be thrownBy res.as[(String, Int)]("tup")
+  }
   "counter" should "be extracted correctly" in {
     val pKey = "str"
     val k = "count"
@@ -102,7 +119,6 @@ class ScalaCassUnitTestsAll extends ScalaCassUnitTests with ScalaCassUnitTestsVe
     case class CounterCC(str: String, count: Long)
     case class QueryCC(str: String)
     val tname = "derivedtable"
-    implicit val s = client.session
     val ss = ScalaSession(dbName)
     ss.createTable[CounterCC](tname, 1, 0)
     val t1 = CounterCC("t1", 1)
