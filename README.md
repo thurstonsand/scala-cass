@@ -330,7 +330,7 @@ a friendlier syntax
 
 ##### Characteristics
 
-* requires an import of `com.weather.scalacass.Scalacass._`
+* requires an import of `com.weather.scalacass.syntax._`
 * This functionality comes with no additional code cost thanks to the [Shapeless library](https://github.com/milessabin/shapeless)
 * For a complete mapping between Cassandra and Scala types, [see the type mappings section](#type-mapping)
 
@@ -345,12 +345,15 @@ import com.weather.scalacass.ScalaCass._
 val s2: String = aRow.as[String]("s")
 ```
 
-This opens up a number of possibilities, including optional extractions that return `None` if the value is not found
+This opens up a number of possibilities, including optional extractions that return `None` if the value is not found and
+attempted extractions that return an `Either[Throwable, T]` to capture failure information
 
 ```scala
 val s1_?: Option[String] = aRow.as[Option[String]]("s")
 // alternate syntax
 val s2_?: Option[String] = aRow.getAs[String]("s")
+
+val sAttempt: Either[Throwable, String] = aRow.attemptAs[String]("s")
 
 val sWithDefault: String = aRow.getOrElse[String]("s", "defaultValue")
 ```
@@ -363,6 +366,7 @@ case class MyTable(s: String, i: Int, l: Option[Long])
 
 val allValues: MyTable = aRow.as[MyTable]
 val allValues_?: Option[MyTable] = aRow.getAs[MyTable]
+val allValuesAttempt: Either[Throwable, MyTable] = aRow.attemptAs[MyTable]
 val allValuesOrDefault: MyTable = aRow.getOrElse[MyTable](MyTable("default_s", 0, None))
 ```
 
@@ -430,7 +434,7 @@ import com.weather.scalacass._
 val deleteBatch = DeleteBatch("mytable", MyQuery("qwer", 1234))
 val rawBatch = RawBatch(insertQuery, "asdf", Int.box(123), Long.box(1234L))
 
-sSession.batch(Seq(deleteBatch, rawBatch)
+sSession.batch(Seq(deleteBatch, rawBatch))
 ```
 
 ## Type Mapping
@@ -465,8 +469,9 @@ final case class Time(millis: Long)
 ```
   
 * There are implicit overrides for both the Joda library and Jdk8 Time library that take advantage of Cassandra's new 
-  codecs. These codecs have to be registered with your `Cluster` instance, which is included as a helper function
-* when using tuples, you must make the `Cluster` instance implicit, due to tuples' dependency on the specific codecs registered with the cluster in Cassandra 3.0+.
+  codecs. These codecs have to be registered with your `Cluster` instance; there is a helper function that does this
+* when using tuples, you must make the `Cluster` instance implicit, due to tuples' dependency on the specific codecs 
+  registered with the cluster in Cassandra 3.0+.
 
 #### Joda Implicits
 
@@ -523,8 +528,8 @@ r.as[java.time.ZonedDateTime]("myzdt") // cassandra "tuple<timestamp,varchar>"
 | tuple          | Tuple*               |
 | **timestamp**  | **java.util.Date**   |
 
-* There is an implicit override for the Joda library. Unfortunately it still goes through `java.util.Date`,
-  so there might be performance issues in parallel execution
+* There is an implicit override for the Joda library. Unfortunately it transitively goes through `java.util.Date`,
+  so any performance issues related to `java.util.Date` apply
 
 ```scala
 import com.weather.scalacass.joda.Implicits._
@@ -541,6 +546,9 @@ If you want to use a Scala type outside those listed above, you can provide a cu
 
 This is the easier way to create a custom type since you only need to provide conversions to/from existing types
 
+* **CassFormatDecoder** and **CassFormatEncoder** object `apply` methods summon an existing conversion as a starting
+  point. (this is equivalent to using `implicitly[CassFormatDecoder[ExistingType]]`)
+  
 ```scala
 implicit val iDecoder = CassFormatDecoder[java.util.Date].map(d: java.util.Date => new org.joda.time.Instant(d))
 val r: Row = _ // some row
@@ -548,19 +556,13 @@ r.as[org.joda.time.Instant]("mytimestamp") // reads from a timestamp
 
 implicit val iEncoder = CassFormatEncoder[java.util.Date].map(i: org.joda.time.Instant => new java.util.Date(i.getMillis))
 case class Person(name: String, birthday: org.joda.time.Instant)
-val p = Person("newborn-baby", org.joda.time.Instant.now)
+val p = Person("newborn baby", org.joda.time.Instant.now)
 val ss: ScalaSession = _ // your session instance
 ss.insert("mytable", p) // writes a (string, timestamp)
 ```
-
-* **CassFormatDecoder** and **CassFormatEncoder** `apply` methods summon an existing implicit conversion, which is done above
-  (`CassFormatDecoder[java.util.Date]`) to utilize the `map` function. It is equivalent to `implicitly[CassFormatDecoder[T]]`
-
-if your conversion has a chance to fail, you can also use `flatMap` that utilizes the `Either[Throwable, T]` type
-
+if your conversion has a chance to fail, you can also use `flatMap` that utilizes the `Either[Throwable, T]` type. For
+instance, let's say you are storing a `java.util.UUID` as a varchar instead of the built-in uuid:
 ```scala
-// let's imagine you are storing java.util.UUID as a varchar instead of uuid in cassandra...
-
 implicit val uuidDecoder = CassFormatDecoder[String].flatMap(str: String => Try(java.util.UUID.fromString(str)) match {
   case scala.util.Success(uuid) => Right(uuid)
   case scala.util.Failure(exc) => Left(exc)
@@ -681,4 +683,6 @@ ScalaCass alone is 44.844% the speed of native for `as`, 55.557% the speed of na
 
 ScalaCass w/ `cachedImplicit` is 77.664% the speed of native for `as`, 93.372% the speed of native for `getAs`
 
-* `cachedImplicit` is a feature of shapeless that caches the underlying representation of a case class so that it does not need to be recreated on every call. [see more here](https://github.com/milessabin/shapeless/blob/master/core/src/main/scala/shapeless/package.scala#L118) (WARNING: source code)
+* `cachedImplicit` is a feature of shapeless that caches the underlying representation of the case class so that it does
+  not need to be recreated on every call. [see more here](https://github.com/milessabin/shapeless/blob/master/core/src/main/scala/shapeless/package.scala#L118) 
+  (WARNING: source code)

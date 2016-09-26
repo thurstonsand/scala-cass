@@ -5,13 +5,21 @@ import shapeless.labelled.{FieldType, field}
 import shapeless.{::, HList, HNil, LabelledGeneric, Lazy, Witness}
 
 trait CCCassFormatDecoder[T] { self =>
-  def decode(r: Row): Either[Throwable, T]
+  private[scalacass] def decode(r: Row): Either[Throwable, T]
   final def map[U](f: T => U): CCCassFormatDecoder[U] = new CCCassFormatDecoder[U] {
     def decode(r: Row): Either[Throwable, U] = self.decode(r).right.map(f)
   }
   final def flatMap[U](f: T => Either[Throwable, U]): CCCassFormatDecoder[U] = new CCCassFormatDecoder[U] {
     def decode(r: Row): Either[Throwable, U] = self.decode(r).right.flatMap(f)
   }
+
+  final def as(r: Row): T = decode(r) match {
+    case Right(v)  => v
+    case Left(exc) => throw exc
+  }
+  final def getAs(r: Row): Option[T] = decode(r).right.toOption
+  final def getOrElse(r: Row)(default: T): T = decode(r).right.getOrElse(default)
+  final def attemptAs(r: Row): Either[Throwable, T] = decode(r)
 }
 
 object CCCassFormatDecoder {

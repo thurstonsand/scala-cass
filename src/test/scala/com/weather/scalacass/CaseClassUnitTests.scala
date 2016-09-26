@@ -1,7 +1,7 @@
 package com.weather.scalacass
 
 import com.weather.scalacass.util.CassandraWithTableTester
-import ScalaCass._
+import syntax._
 import org.scalatest.OptionValues
 
 class CaseClassUnitTests extends CassandraWithTableTester("testDB", "testTable", List("str varchar", "str2 ascii", "b blob",

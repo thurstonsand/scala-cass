@@ -6,7 +6,6 @@ import com.datastax.driver.core._
 import com.google.common.cache.CacheBuilder
 import exceptions.QueryExecutionException
 import com.google.common.util.concurrent.{FutureCallback, Futures}
-import ScalaCass._
 
 import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -65,7 +64,10 @@ class ScalaSession(val keyspace: String)(implicit val session: Session) {
   private[this] val queryCache = CacheBuilder.newBuilder().maximumSize(1000).build[Set[String], PreparedStatement]()
 
   private[this] def clean[T: CCCassFormatEncoder](toClean: T): (List[String], List[AnyRef]) =
-    clean(implicitly[CCCassFormatEncoder[T]].encode(toClean).getOrThrow)
+    clean(implicitly[CCCassFormatEncoder[T]].encode(toClean) match {
+      case Right(res) => res
+      case Left(exc)  => throw exc
+    })
   @SuppressWarnings(Array("org.brianmckenna.wartremover.warts.Any", "org.brianmckenna.wartremover.warts.AsInstanceOf", "org.brianmckenna.wartremover.warts.IsInstanceOf"))
   private[this] def clean[T](toClean: List[(String, AnyRef)]): (List[String], List[AnyRef]) = toClean.filter(_._2 match {
     case None => false

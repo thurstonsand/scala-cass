@@ -10,19 +10,19 @@ import scala.util.{Try, Failure => TFailure, Success => TSuccess}
 trait CassFormatDecoder[T] { self =>
   import CassFormatDecoder.ValueNotDefinedException
 
-  type From <: AnyRef
-  def clazz: Class[From]
-  def f2t(f: From): Either[Throwable, T]
-  def extract(r: Row, name: String): From
-  def decode(r: Row, name: String): Either[Throwable, T] = Try[Either[Throwable, T]](
+  private[scalacass]type From <: AnyRef
+  private[scalacass] def clazz: Class[From]
+  private[scalacass] def f2t(f: From): Either[Throwable, T]
+  private[scalacass] def extract(r: Row, name: String): From
+  private[scalacass] def decode(r: Row, name: String): Either[Throwable, T] = Try[Either[Throwable, T]](
     if (r.isNull(name)) Left(new ValueNotDefinedException(s""""$name" was not defined in ${r.getColumnDefinitions.getTable(name)}"""))
     else f2t(extract(r, name))
   ) match {
       case TSuccess(v) => v
       case TFailure(e) => Left(e)
     }
-  def tupleExtract(tup: TupleValue, pos: Int): From
-  def tupleDecode(tup: TupleValue, pos: Int): Either[Throwable, T] = Try[Either[Throwable, T]](
+  private[scalacass] def tupleExtract(tup: TupleValue, pos: Int): From
+  private[scalacass] def tupleDecode(tup: TupleValue, pos: Int): Either[Throwable, T] = Try[Either[Throwable, T]](
     if (tup.isNull(pos)) Left(new ValueNotDefinedException(s"""position $pos was not defined in tuple $tup"""))
     else f2t(tupleExtract(tup, pos))
   ) match {
@@ -43,6 +43,14 @@ trait CassFormatDecoder[T] { self =>
     def extract(r: Row, name: String): From = self.extract(r, name)
     def tupleExtract(tup: TupleValue, pos: Int): From = self.tupleExtract(tup, pos)
   }
+
+  final def as(r: Row)(name: String): T = decode(r, name) match {
+    case Right(v)  => v
+    case Left(exc) => throw exc
+  }
+  final def getAs(r: Row)(name: String): Option[T] = decode(r, name).right.toOption
+  final def getOrElse(r: Row)(name: String, default: T): T = decode(r, name).right.getOrElse(default)
+  final def attemptAs(r: Row)(name: String): Either[Throwable, T] = decode(r, name)
 }
 
 // extended by CassFormatDecoderVersionSpecific

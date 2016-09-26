@@ -1,8 +1,8 @@
 package com.weather.scalacass
 
 import org.scalatest.Tag
-import ScalaCass._
 import com.weather.scalacass.util.CassandraUnitTester
+import syntax._
 
 object LongRunning extends Tag("LongRunning")
 
