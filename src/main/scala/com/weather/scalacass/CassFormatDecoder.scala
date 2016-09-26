@@ -73,13 +73,6 @@ object CassFormatDecoder extends CassFormatDecoderVersionSpecific {
   type Aux[T, From0] = CassFormatDecoder[T] { type From = From0 }
   def apply[T: CassFormatDecoder] = implicitly[CassFormatDecoder[T]]
 
-  //  private[scalacass] implicit class TryEither[T](val t: Try[T]) extends AnyVal {
-  //    def toEither: Either[Throwable, T] = t match {
-  //      case TSuccess(s) => Right(s)
-  //      case TFailure(f) => Left(f)
-  //    }
-  //  }
-
   class ValueNotDefinedException(m: String) extends QueryExecutionException(m)
 
   private[scalacass] def sameTypeCassFormatDecoder[T <: AnyRef](_clazz: Class[T], _extract: (Row, String) => T, _tupExtract: (TupleValue, Int) => T) = new CassFormatDecoder[T] {
