@@ -182,13 +182,13 @@ object CassFormatDecoder extends CassFormatDecoderVersionSpecific {
       def tupleExtract(tup: TupleValue, pos: Int) = tup getMap (pos, underlyingK.clazz, underlyingV.clazz)
     }
 
-  implicit val blobFormat = new CassFormatDecoder[Array[Byte]] {
+  implicit val blobFormat: CassFormatDecoder[Array[Byte]] = new CassFormatDecoder[Array[Byte]] {
     type From = java.nio.ByteBuffer
     val clazz = classOf[java.nio.ByteBuffer]
 
     def f2t(f: From) = Try(com.datastax.driver.core.utils.Bytes.getArray(f).toIndexedSeq.toArray).toEither
     def extract(r: Row, name: String): ByteBuffer = r getBytes name
-    override def decode(r: Row, name: String): Either[Throwable, Array[Byte]] =
+    override def decode(r: Row, name: String): Either[Throwable, Array[Byte]] = Try[Either[Throwable, Array[Byte]]](
       if (r.isNull(name)) Left(new ValueNotDefinedException(s""""$name" was not defined in ${r.getColumnDefinitions.getTable(name)}"""))
       else {
         val cassName = r.getColumnDefinitions.getType(name).getName
@@ -196,8 +196,12 @@ object CassFormatDecoder extends CassFormatDecoderVersionSpecific {
           Left(new InvalidTypeException(s"Column $name is a $cassName, is not a blob"))
         else f2t(extract(r, name))
       }
+    ) match {
+      case TSuccess(v) => v
+      case TFailure(e) => Left(e)
+    }
     def tupleExtract(tup: TupleValue, pos: Int): ByteBuffer = tup getBytes pos
-    override def tupleDecode(tup: TupleValue, pos: Int): Either[Throwable, Array[Byte]] =
+    override def tupleDecode(tup: TupleValue, pos: Int): Either[Throwable, Array[Byte]] = Try[Either[Throwable, Array[Byte]]](
       if (tup.isNull(pos)) Left(new ValueNotDefinedException(s"""position $pos was not defined in tuple $tup"""))
       else {
         val cassName = tup.getType.getComponentTypes.get(pos).getName
@@ -205,6 +209,10 @@ object CassFormatDecoder extends CassFormatDecoderVersionSpecific {
           Left(new InvalidTypeException(s"position $pos in tuple $tup is not a blob"))
         else f2t(tupleExtract(tup, pos))
       }
+    ) match {
+      case TSuccess(v) => v
+      case TFailure(e) => Left(e)
+    }
   }
 
   implicit def optionFormat[A](implicit underlying: CassFormatDecoder[A]): CassFormatDecoder[Option[A]] = new CassFormatDecoder[Option[A]] {

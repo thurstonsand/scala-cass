@@ -24,11 +24,14 @@ abstract class ScalaCassUnitTests extends CassandraWithTableTester("testDB", "te
 
         res.getOrElse(k, default).asInstanceOf[Iterable[Array[Byte]]].head should contain theSameElementsInOrderAs known
         res.getOrElse(s"not$k", default).asInstanceOf[Iterable[Array[Byte]]].head shouldBe default.asInstanceOf[Iterable[Array[Byte]]].head
+
+        res.attemptAs[GoodType](k).right.toOption.map(_.asInstanceOf[Iterable[Array[Byte]]].head).value should contain theSameElementsInOrderAs known
       case _ =>
         res.as[GoodType](k) shouldBe v
         res.getAs[GoodType](k).value shouldBe v
         res.getOrElse(k, default) shouldBe v
         res.getOrElse(s"not$k", default) shouldBe default
+        res.attemptAs[GoodType](k).right.toOption.value shouldBe v
     }
 
     an[IllegalArgumentException] should be thrownBy res.as[GoodType](s"not$k")
@@ -38,6 +41,10 @@ abstract class ScalaCassUnitTests extends CassandraWithTableTester("testDB", "te
     res.getAs[GoodType](s"not$k") shouldBe None
     res.getAs[BadType](k) shouldBe None
     res.getAs[BadType](s"not$k") shouldBe None
+
+    res.attemptAs[GoodType](s"not$k").left.toOption.value shouldBe an[IllegalArgumentException]
+    res.attemptAs[BadType](k).left.toOption.value shouldBe a[BadTypeException]
+    res.attemptAs[BadType](s"not$k").left.toOption.value shouldBe an[IllegalArgumentException]
 
     case class TestCC(pkField: String, refField: GoodType)
     case class QueryCC(pkField: String)
