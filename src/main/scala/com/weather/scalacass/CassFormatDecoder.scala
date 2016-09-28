@@ -44,7 +44,7 @@ trait CassFormatDecoder[T] { self =>
     case Left(exc) => throw exc
   }
   final def getAs(r: Row)(name: String): Option[T] = decode(r, name).right.toOption
-  final def getOrElse(r: Row)(name: String, default: T): T = decode(r, name).right.getOrElse(default)
+  final def getOrElse(r: Row)(name: String, default: => T): T = decode(r, name).right.getOrElse(default)
   final def attemptAs(r: Row)(name: String): Either[Throwable, T] = decode(r, name)
 }
 
