@@ -3,15 +3,15 @@ package com.weather.scalacass
 import com.weather.scalacass.ScalaCassUnitTestsVersionSpecific.BadTypeException
 import org.scalatest.OptionValues
 import com.weather.scalacass.util.CassandraWithTableTester
-import ScalaCass._
 import com.datastax.driver.core.exceptions.InvalidTypeException
+import syntax._
 
 abstract class ScalaCassUnitTests extends CassandraWithTableTester("testDB", "testTable", ScalaCassUnitTestsVersionSpecific.extraHeaders ::: List("str varchar", "str2 ascii", "b blob",
   "d decimal", "f float", "net inet", "tid timeuuid", "vi varint", "i int", "bi bigint", "bool boolean", "dub double",
   "l list<varchar>", "m map<varchar, bigint>", "s set<double>", "id uuid", "sblob set<blob>, tup tuple<int, varchar>"), List("str")) with OptionValues {
   def testType[GoodType: CassFormatDecoder, BadType: CassFormatDecoder](k: String, v: GoodType, default: GoodType)(implicit goodCF: CassFormatEncoder[GoodType]) = {
     val args = {
-      val converted = goodCF.encode(v).getOrThrow.asInstanceOf[AnyRef]
+      val converted = goodCF.encode(v).fold(throw _, identity).asInstanceOf[AnyRef]
       if (k == "str") Seq((k, converted)) else Seq((k, converted), ("str", "asdf"))
     }
     insert(args)
@@ -24,11 +24,14 @@ abstract class ScalaCassUnitTests extends CassandraWithTableTester("testDB", "te
 
         res.getOrElse(k, default).asInstanceOf[Iterable[Array[Byte]]].head should contain theSameElementsInOrderAs known
         res.getOrElse(s"not$k", default).asInstanceOf[Iterable[Array[Byte]]].head shouldBe default.asInstanceOf[Iterable[Array[Byte]]].head
+
+        res.attemptAs[GoodType](k).right.toOption.map(_.asInstanceOf[Iterable[Array[Byte]]].head).value should contain theSameElementsInOrderAs known
       case _ =>
         res.as[GoodType](k) shouldBe v
         res.getAs[GoodType](k).value shouldBe v
         res.getOrElse(k, default) shouldBe v
         res.getOrElse(s"not$k", default) shouldBe default
+        res.attemptAs[GoodType](k).right.toOption.value shouldBe v
     }
 
     an[IllegalArgumentException] should be thrownBy res.as[GoodType](s"not$k")
@@ -38,6 +41,10 @@ abstract class ScalaCassUnitTests extends CassandraWithTableTester("testDB", "te
     res.getAs[GoodType](s"not$k") shouldBe None
     res.getAs[BadType](k) shouldBe None
     res.getAs[BadType](s"not$k") shouldBe None
+
+    res.attemptAs[GoodType](s"not$k").left.toOption.value shouldBe an[IllegalArgumentException]
+    res.attemptAs[BadType](k).left.toOption.value shouldBe a[BadTypeException]
+    res.attemptAs[BadType](s"not$k").left.toOption.value shouldBe an[IllegalArgumentException]
 
     case class TestCC(pkField: String, refField: GoodType)
     case class QueryCC(pkField: String)
@@ -49,11 +56,11 @@ abstract class ScalaCassUnitTests extends CassandraWithTableTester("testDB", "te
     ss.insert(tname, t1)(CCCassFormatEncoder[TestCC])
     k match {
       case "b" =>
-        ss.selectOne(tname, ScalaSession.NoQuery()).getAs[TestCC].map(_.refField.asInstanceOf[Array[Byte]]).value should contain theSameElementsInOrderAs t1.refField.asInstanceOf[Array[Byte]]
+        ss.selectOne(tname, ScalaSession.NoQuery()).flatMap(_.getAs[TestCC]).map(_.refField.asInstanceOf[Array[Byte]]).value should contain theSameElementsInOrderAs t1.refField.asInstanceOf[Array[Byte]]
       case "sblob" =>
-        ss.selectOne(tname, ScalaSession.NoQuery()).getAs[TestCC].flatMap(_.refField.asInstanceOf[Set[Array[Byte]]].headOption).value should contain theSameElementsInOrderAs t1.refField.asInstanceOf[Set[Array[Byte]]].head
+        ss.selectOne(tname, ScalaSession.NoQuery()).flatMap(_.getAs[TestCC]).flatMap(_.refField.asInstanceOf[Set[Array[Byte]]].headOption).value should contain theSameElementsInOrderAs t1.refField.asInstanceOf[Set[Array[Byte]]].head
       case _ =>
-        ss.selectOne(tname, q1).getAs[TestCC].value shouldBe t1
+        ss.selectOne(tname, q1).flatMap(_.getAs[TestCC]).value shouldBe t1
     }
     ss.delete(tname, q1)
     ss.select(tname, q1).toList.map(_.as[TestCC]) shouldBe empty
@@ -85,7 +92,7 @@ class ScalaCassUnitTestsAll extends ScalaCassUnitTests with ScalaCassUnitTestsVe
   "tup<int, varchar>" should "be extracted correctly (wrong 1st type)" in testType[(Int, String), (String, String)]("tup", (4, "fdsa"), (5, "qqwer"))
   "tup<int, varchar>" should "be extracted correctly (wrong arity)" in {
     val goodValue = (4, "fdsa")
-    val args = Seq(("tup", implicitly[CassFormatEncoder[(Int, String)]].encode(goodValue).getOrThrow.asInstanceOf[AnyRef]), ("str", "asdf"))
+    val args = Seq(("tup", implicitly[CassFormatEncoder[(Int, String)]].encode(goodValue).fold(throw _, identity).asInstanceOf[AnyRef]), ("str", "asdf"))
     insert(args)
     val res = getOne
     res.as[(Int, String)]("tup") shouldBe goodValue

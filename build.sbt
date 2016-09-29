@@ -7,7 +7,7 @@ javaVersion := sys.props("java.specification.version")
 val cassV3 = "3"
 val cassV21 = "21"
 val cassVersion = SettingKey[String]("cassVersion", "the version of cassandra to use for compilation")
-cassVersion := Option(System.getProperty("cassVersion")).getOrElse(javaVersion.value match {
+cassVersion := sys.props.getOrElse("cassVersion", javaVersion.value match {
   case "1.7" => cassV21
   case _     => cassV3
 })
@@ -19,7 +19,7 @@ version := {
     case (`cassV21`, "1.7") => "3"
     case (cv, jv) => throw new RuntimeException("invalid cassandra/java version combination: " + cv + "/" + jv + ". use either cass \"" + cassV3 + "\" with java 8 or cass \"" + cassV21 + "\" with java 7")
   }
-  s"0.$majorVersion.8"
+  s"0.$majorVersion.9"
 }
 
 scalaVersion := "2.11.8"
@@ -41,8 +41,13 @@ scalacOptions ++= Seq(
   "-Xfuture"
 ) ++ (CrossVersion.partialVersion(scalaVersion.value) match {
   case Some((2, 11)) => Seq("-Ywarn-unused", "-Ywarn-unused-import")
-  case _ => Seq.empty[String]
+  case _             => Seq.empty
 })
+
+initialize <<= scalaVersion { sv => CrossVersion.partialVersion(sv) match {
+  case Some((2, 10)) => sys.props("scalac.patmat.analysisBudget") = "512"
+  case _             => sys.props remove "scalac.patmat.analysisBudget"
+}}
 
 scalacOptions in (Compile, console) ~= (_ filterNot (_ == "-Ywarn-unused-import"))
 scalacOptions in (Test, console) := (scalacOptions in (Compile, console)).value
