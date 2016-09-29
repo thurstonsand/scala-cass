@@ -45,7 +45,7 @@ scalacOptions ++= Seq(
 })
 
 initialize <<= scalaVersion { sv => CrossVersion.partialVersion(sv) match {
-  case Some((2, 10)) => sys.props("scalac.patmat.analysisBudget") = "512"
+  case Some((2, 10)) => sys.props("scalac.patmat.analysisBudget") = "off"
   case _             => sys.props remove "scalac.patmat.analysisBudget"
 }}
 

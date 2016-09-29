@@ -14,7 +14,7 @@ object syntax {
     def getOrElse[T](default: => T)(implicit ccd: CCCassFormatDecoder[T]): T = ccd.getOrElse(r)(default)
     def attemptAs[T](implicit ccd: CCCassFormatDecoder[T]): Either[Throwable, T] = ccd.attemptAs(r)
   }
-  
+
   implicit class RichIterator(val it: Iterator[Row]) extends AnyVal {
     def as[T](name: String)(implicit d: CassFormatDecoder[T]): Iterator[T] = it.map(r => d.as(r)(name))
     def getAs[T](name: String)(implicit d: CassFormatDecoder[T]): Iterator[Option[T]] = it.map(r => d.getAs(r)(name))
