@@ -18,7 +18,7 @@ trait CCCassFormatDecoder[T] { self =>
     case Left(exc) => throw exc
   }
   final def getAs(r: Row): Option[T] = decode(r).right.toOption
-  final def getOrElse(r: Row)(default: T): T = decode(r).right.getOrElse(default)
+  final def getOrElse(r: Row)(default: => T): T = decode(r).right.getOrElse(default)
   final def attemptAs(r: Row): Either[Throwable, T] = decode(r)
 }
 

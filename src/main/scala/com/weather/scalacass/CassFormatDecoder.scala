@@ -4,8 +4,9 @@ import java.nio.ByteBuffer
 
 import com.datastax.driver.core.{DataType, Row, TupleValue}
 import com.datastax.driver.core.exceptions.{InvalidTypeException, QueryExecutionException}
+import NotRecoverable.Try2Either
 
-import scala.util.{Try, Failure => TFailure, Success => TSuccess}
+import scala.util.Try
 
 trait CassFormatDecoder[T] { self =>
   import CassFormatDecoder.ValueNotDefinedException
@@ -17,18 +18,12 @@ trait CassFormatDecoder[T] { self =>
   private[scalacass] def decode(r: Row, name: String): Either[Throwable, T] = Try[Either[Throwable, T]](
     if (r.isNull(name)) Left(new ValueNotDefinedException(s""""$name" was not defined in ${r.getColumnDefinitions.getTable(name)}"""))
     else f2t(extract(r, name))
-  ) match {
-      case TSuccess(v) => v
-      case TFailure(e) => Left(e)
-    }
+  ).unwrap[T]
   private[scalacass] def tupleExtract(tup: TupleValue, pos: Int): From
   private[scalacass] def tupleDecode(tup: TupleValue, pos: Int): Either[Throwable, T] = Try[Either[Throwable, T]](
     if (tup.isNull(pos)) Left(new ValueNotDefinedException(s"""position $pos was not defined in tuple $tup"""))
     else f2t(tupleExtract(tup, pos))
-  ) match {
-      case TSuccess(v) => v
-      case TFailure(e) => Left(e)
-    }
+  ).unwrap[T]
   final def map[U](fn: T => U): CassFormatDecoder[U] = new CassFormatDecoder[U] {
     type From = self.From
     val clazz = self.clazz
@@ -49,7 +44,7 @@ trait CassFormatDecoder[T] { self =>
     case Left(exc) => throw exc
   }
   final def getAs(r: Row)(name: String): Option[T] = decode(r, name).right.toOption
-  final def getOrElse(r: Row)(name: String, default: T): T = decode(r, name).right.getOrElse(default)
+  final def getOrElse(r: Row)(name: String, default: => T): T = decode(r, name).right.getOrElse(default)
   final def attemptAs(r: Row)(name: String): Either[Throwable, T] = decode(r, name)
 }
 
@@ -77,13 +72,6 @@ trait LowPriorityCassFormatDecoder {
 object CassFormatDecoder extends CassFormatDecoderVersionSpecific {
   type Aux[T, From0] = CassFormatDecoder[T] { type From = From0 }
   def apply[T: CassFormatDecoder] = implicitly[CassFormatDecoder[T]]
-
-  private[scalacass] implicit class TryEither[T](val t: Try[T]) extends AnyVal {
-    def toEither: Either[Throwable, T] = t match {
-      case TSuccess(s) => Right(s)
-      case TFailure(f) => Left(f)
-    }
-  }
 
   class ValueNotDefinedException(m: String) extends QueryExecutionException(m)
 
@@ -196,10 +184,7 @@ object CassFormatDecoder extends CassFormatDecoderVersionSpecific {
           Left(new InvalidTypeException(s"Column $name is a $cassName, is not a blob"))
         else f2t(extract(r, name))
       }
-    ) match {
-      case TSuccess(v) => v
-      case TFailure(e) => Left(e)
-    }
+    ).unwrap[Array[Byte]]
     def tupleExtract(tup: TupleValue, pos: Int): ByteBuffer = tup getBytes pos
     override def tupleDecode(tup: TupleValue, pos: Int): Either[Throwable, Array[Byte]] = Try[Either[Throwable, Array[Byte]]](
       if (tup.isNull(pos)) Left(new ValueNotDefinedException(s"""position $pos was not defined in tuple $tup"""))
@@ -209,10 +194,7 @@ object CassFormatDecoder extends CassFormatDecoderVersionSpecific {
           Left(new InvalidTypeException(s"position $pos in tuple $tup is not a blob"))
         else f2t(tupleExtract(tup, pos))
       }
-    ) match {
-      case TSuccess(v) => v
-      case TFailure(e) => Left(e)
-    }
+    ).unwrap[Array[Byte]]
   }
 
   implicit def optionFormat[A](implicit underlying: CassFormatDecoder[A]): CassFormatDecoder[Option[A]] = new CassFormatDecoder[Option[A]] {
