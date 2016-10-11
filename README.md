@@ -318,9 +318,9 @@ aRowSomeColumns.getLong("l") // 1234L
 // see "Row Extraction" for a better way to extract values from the Row
 
 // other variants
-sSession.selectColumns[ColumnsIWant, Query]("mytable", Query("asdf", 123))
-sSession.selectColumnsAsync[ColumnsIWant, Query]("mytable", Query("asdf", 123))
-sSession.selectColumnsOneAsync[ColumnsIWant, Query]("mytable", Query("asdf", 123))
+sSession.selectColumns[ColumnsIWant]("mytable", Query("asdf", 123))
+sSession.selectColumnsAsync[ColumnsIWant]("mytable", Query("asdf", 123))
+sSession.selectColumnsOneAsync[ColumnsIWant]("mytable", Query("asdf", 123))
 ```
 
 #### Row Extraction
