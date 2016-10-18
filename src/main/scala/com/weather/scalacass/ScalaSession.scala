@@ -12,9 +12,9 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.{Future, Promise}
 
 sealed trait Batch extends Product with Serializable
-final case class UpdateBatch[T, S](table: String, updateable: T, query: S)(implicit val tEncoder: CCCassFormatEncoder[T], val sEncoder: CCCassFormatEncoder[S]) extends Batch
+final case class UpdateBatch[T, S](table: String, updateable: T, query: S, ttl: Option[Int] = None)(implicit val tEncoder: CCCassFormatEncoder[T], val sEncoder: CCCassFormatEncoder[S]) extends Batch
 final case class DeleteBatch[T](table: String, item: T)(implicit val tEncoder: CCCassFormatEncoder[T]) extends Batch
-final case class InsertBatch[T](table: String, item: T)(implicit val tEncoder: CCCassFormatEncoder[T]) extends Batch
+final case class InsertBatch[T](table: String, item: T, ttl: Option[Int] = None)(implicit val tEncoder: CCCassFormatEncoder[T]) extends Batch
 final case class RawBatch(query: String, anyrefArgs: AnyRef*) extends Batch
 
 object ScalaSession {
@@ -52,6 +52,11 @@ object ScalaSession {
   object NoQuery {
     @SuppressWarnings(Array("org.brianmckenna.wartremover.warts.AsInstanceOf"))
     implicit val ccCassEncoder: CCCassFormatEncoder[NoQuery] = shapeless.cachedImplicit
+  }
+  final case class NoUpdate()
+  object NoUpdate {
+    @SuppressWarnings(Array("org.brianmckenna.wartremover.warts.AsInstanceOf"))
+    implicit val ccCassEncoder: CCCassFormatEncoder[NoUpdate] = shapeless.cachedImplicit
   }
 }
 
@@ -96,43 +101,51 @@ class ScalaSession(val keyspace: String)(implicit val session: Session) {
   def truncateTable(table: String): ResultSet = session.execute(s"TRUNCATE TABLE $keyspace.$table")
   def dropTable(table: String): ResultSet = session.execute(s"DROP TABLE $keyspace.$table")
 
-  private[this] def prepareInsert[T: CCCassFormatEncoder](table: String, insertable: T): BoundStatement = {
+  private[this] def ttlStr(ttl: Option[Int]): String = ttl.fold("")(" USING TTL " + _)
+  private[this] def queryStr(strArgs: List[String]) = if (strArgs.isEmpty) "" else s" WHERE ${strArgs.map(_ + "=?").mkString(" AND ")}"
+
+  private[this] def prepareInsert[T: CCCassFormatEncoder](table: String, insertable: T, ttl: Option[Int]): BoundStatement = {
     val (strArgs, anyrefArgs) = clean(insertable)
+    val ttlAsString = ttlStr(ttl)
+    if (strArgs.isEmpty) throw new IllegalArgumentException("Cassandra: called INSERT, but no columns chosen for insert")
     val prepared = queryCache.get(
-      strArgs.toSet + table + "INSERT",
-      session.prepare(s"INSERT INTO $keyspace.$table ${strArgs.mkString("(", ",", ")")} VALUES ${List.fill(anyrefArgs.length)("?").mkString("(", ",", ")")}")
+      strArgs.toSet + ttlAsString + table + "INSERT", {
+        session.prepare(s"INSERT INTO $keyspace.$table ${strArgs.mkString("(", ",", ")")} VALUES ${List.fill(anyrefArgs.length)("?").mkString("(", ",", ")")}" + ttlAsString)
+      }
     )
     prepared.bind(anyrefArgs: _*)
   }
 
-  // includeColumns: specify the number of columns, as represented from left to right in the case class, to include in the WHERE clause for the delete
-  def insert[T: CCCassFormatEncoder](table: String, insertable: T): ResultSet = session.execute(prepareInsert(table, insertable))
-  def insertAsync[T: CCCassFormatEncoder](table: String, insertable: T): Future[ResultSet] = session.executeAsync(prepareInsert(table, insertable))
+  def insert[T: CCCassFormatEncoder](table: String, insertable: T, ttl: Option[Int] = None): ResultSet = session.execute(prepareInsert(table, insertable, ttl))
+  def insertAsync[T: CCCassFormatEncoder](table: String, insertable: T, ttl: Option[Int] = None): Future[ResultSet] = session.executeAsync(prepareInsert(table, insertable, ttl))
 
-  private[this] def prepareUpdate[T: CCCassFormatEncoder, S: CCCassFormatEncoder](table: String, updateable: T, query: S): BoundStatement = {
+  private[this] def prepareUpdate[T: CCCassFormatEncoder, S: CCCassFormatEncoder](table: String, updateable: T, query: S, ttl: Option[Int]): BoundStatement = {
     val (updateStrArgs, updateAnyrefArgs) = clean(updateable)
     val (queryStrArgs, queryAnyrefArgs) = clean(query)
+    val ttlAsString = ttlStr(ttl)
+    if (ttl.isEmpty && updateStrArgs.isEmpty) throw new IllegalArgumentException("Cassandra: called UPDATE, but no columns chosen for update, and no ttl provided")
     val prepared = queryCache.get(
-      updateStrArgs.toSet ++ queryStrArgs.toSet + table + "UPDATE",
-      session.prepare(s"UPDATE $keyspace.$table SET ${updateStrArgs.map(_ + "=?").mkString(",")} WHERE ${queryStrArgs.map(_ + "=?").mkString(" AND ")}")
+      updateStrArgs.toSet ++ queryStrArgs.toSet + ttlAsString + table + "UPDATE", {
+        val setStr = if (updateStrArgs.isEmpty) "" else s" SET ${updateStrArgs.map(_ + "=?").mkString(",")}"
+        session.prepare(s"UPDATE $keyspace.$table" + ttlAsString + setStr + queryStr(queryStrArgs))
+      }
     )
     prepared.bind(updateAnyrefArgs ++ queryAnyrefArgs: _*)
   }
 
-  def update[T: CCCassFormatEncoder, S: CCCassFormatEncoder](table: String, updateable: T, query: S): ResultSet =
-    session.execute(prepareUpdate(table, updateable, query))
-  def updateAsync[T: CCCassFormatEncoder, S: CCCassFormatEncoder](table: String, updateable: T, query: S): Future[ResultSet] =
-    session.executeAsync(prepareUpdate(table, updateable, query))
+  def update[T: CCCassFormatEncoder, S: CCCassFormatEncoder](table: String, updateable: T, query: S, ttl: Option[Int] = None): ResultSet =
+    session.execute(prepareUpdate(table, updateable, query, ttl))
+  def updateAsync[T: CCCassFormatEncoder, S: CCCassFormatEncoder](table: String, updateable: T, query: S, ttl: Option[Int] = None): Future[ResultSet] =
+    session.executeAsync(prepareUpdate(table, updateable, query, ttl))
 
   private[this] def prepareDelete[T: CCCassFormatEncoder](table: String, deletable: T): BoundStatement = {
     val (strArgs, anyrefArgs) = clean(deletable)
     val prepared = queryCache.get(
       strArgs.toSet + table + "DELETE",
-      session.prepare(s"DELETE FROM $keyspace.$table WHERE ${strArgs.map(_ + "=?").mkString(" AND ")}")
+      session.prepare(s"DELETE FROM $keyspace.$table" + queryStr(strArgs))
     )
     prepared.bind(anyrefArgs: _*)
   }
-  // includeColumns: specify the number of columns, as represented from left to right in the case class, to include in the WHERE clause for the delete
   def delete[T: CCCassFormatEncoder](table: String, deletable: T): ResultSet =
     session.execute(prepareDelete(table, deletable))
   def deleteAsync[T: CCCassFormatEncoder](table: String, deletable: T): Future[ResultSet] =
@@ -142,36 +155,35 @@ class ScalaSession(val keyspace: String)(implicit val session: Session) {
   def prepareBatch(batches: Seq[Batch], batchType: BatchStatement.Type): BatchStatement = {
     val batch = new BatchStatement(batchType)
     batches.foreach {
-      case d @ DeleteBatch(table, item)         => batch.add(prepareDelete(table, item)(d.tEncoder))
-      case u @ UpdateBatch(table, item, query)  => batch.add(prepareUpdate(table, item, query)(u.tEncoder, u.sEncoder))
-      case i @ InsertBatch(table, item)         => batch.add(prepareInsert(table, item)(i.tEncoder))
-      case r @ RawBatch(query, anyrefArgs @ _*) => batch.add(prepareRawStatement(query, anyrefArgs))
+      case d @ DeleteBatch(table, item)              => batch.add(prepareDelete(table, item)(d.tEncoder))
+      case u @ UpdateBatch(table, item, query, ttl)  => batch.add(prepareUpdate(table, item, query, ttl)(u.tEncoder, u.sEncoder))
+      case i @ InsertBatch(table, item, ttl)         => batch.add(prepareInsert(table, item, ttl)(i.tEncoder))
+      case r @ RawBatch(query, anyrefArgs @ _*)      => batch.add(prepareRawStatement(query, anyrefArgs))
     }
     batch
   }
   def batch(batches: Seq[Batch], batchType: BatchStatement.Type = BatchStatement.Type.LOGGED): ResultSet = session.execute(prepareBatch(batches, batchType))
   def batchAsync(batches: Seq[Batch], batchType: BatchStatement.Type = BatchStatement.Type.LOGGED): Future[ResultSet] = session.executeAsync(prepareBatch(batches, batchType))
 
-  private[this] def prepareSelect[Sub: CCCassFormatEncoder, Query: CCCassFormatEncoder](table: String, selectable: Query, allowFiltering: Boolean, limit: Long) = {
+  private[this] def prepareSelect[Sub: CCCassFormatEncoder, Query: CCCassFormatEncoder](table: String, selectable: Query, allowFiltering: Boolean, limit: Option[Long]) = {
     val sStrArgs = CCCassFormatEncoder[Sub].namesAndTypes.map(_._1)
     val (qStrArgs, qAnyRefArgs) = clean(selectable)
-    val prepared = queryCache.get(sStrArgs.toSet ++ qStrArgs.toSet + table + "SELECT", {
-      val whereClauseStr = if (qStrArgs.nonEmpty) s" WHERE ${qStrArgs.map(_ + "=?").mkString(" AND ")}" else ""
-      val limitStr = if (limit > 0) s" LIMIT $limit" else ""
+    val prepared = queryCache.get(sStrArgs.toSet ++ qStrArgs.toSet + allowFiltering.toString + limit.toString + table + "SELECT", {
+      val limitStr = limit.fold("")(" LIMIT " + _)
       val filteringStr = if (allowFiltering) s" ALLOW FILTERING" else ""
-      session.prepare(s"SELECT ${sStrArgs.mkString(", ")} FROM $keyspace.$table" + whereClauseStr + limitStr + filteringStr)
+      session.prepare(s"SELECT ${sStrArgs.mkString(", ")} FROM $keyspace.$table" + queryStr(qStrArgs) + limitStr + filteringStr)
     })
     prepared.bind(qAnyRefArgs: _*)
   }
 
-  def select[T: CCCassFormatEncoder](table: String, selectable: T, allowFiltering: Boolean = false, limit: Long = 0): Iterator[Row] =
+  def select[T: CCCassFormatEncoder](table: String, selectable: T, allowFiltering: Boolean = false, limit: Option[Long] = None): Iterator[Row] =
     session.execute(prepareSelect[Star, T](table, selectable, allowFiltering, limit)).iterator.asScala
-  def selectAsync[T: CCCassFormatEncoder](table: String, selectable: T, allowFiltering: Boolean = false, limit: Long = 0): Future[Iterator[Row]] =
+  def selectAsync[T: CCCassFormatEncoder](table: String, selectable: T, allowFiltering: Boolean = false, limit: Option[Long] = None): Future[Iterator[Row]] =
     session.executeAsync(prepareSelect[Star, T](table, selectable, allowFiltering, limit)).map(_.iterator.asScala)
   def selectOne[T: CCCassFormatEncoder](table: String, selectable: T, allowFiltering: Boolean = false): Option[Row] =
-    Option(session.execute(prepareSelect[Star, T](table, selectable, allowFiltering, 0)).one())
+    Option(session.execute(prepareSelect[Star, T](table, selectable, allowFiltering, Some(1))).one())
   def selectOneAsync[T: CCCassFormatEncoder](table: String, selectable: T, allowFiltering: Boolean = false): Future[Option[Row]] =
-    session.executeAsync(prepareSelect[Star, T](table, selectable, allowFiltering, 0)).map(rs => Option(rs.one()))
+    session.executeAsync(prepareSelect[Star, T](table, selectable, allowFiltering, Some(1))).map(rs => Option(rs.one()))
 
   @SuppressWarnings(Array("org.brianmckenna.wartremover.warts.AsInstanceOf"))
   def selectColumns[Sub] = sch.asInstanceOf[SelectColumnsHelper[Sub]]
@@ -183,37 +195,37 @@ class ScalaSession(val keyspace: String)(implicit val session: Session) {
   def selectColumnsOneAsync[Sub] = scoah.asInstanceOf[SelectColumnsOneAsyncHelper[Sub]]
 
   final class SelectColumnsHelper[Sub] {
-    def apply[Query: CCCassFormatEncoder](table: String, selectable: Query, allowFiltering: Boolean, limit: Long)(implicit se: CCCassFormatEncoder[Sub]): Iterator[Row] =
+    def apply[Query: CCCassFormatEncoder](table: String, selectable: Query, allowFiltering: Boolean, limit: Option[Long])(implicit se: CCCassFormatEncoder[Sub]): Iterator[Row] =
       session.execute(prepareSelect[Sub, Query](table, selectable, allowFiltering, limit)).iterator.asScala
-    def apply[Query: CCCassFormatEncoder](table: String, selectable: Query, limit: Long)(implicit se: CCCassFormatEncoder[Sub]): Iterator[Row] =
+    def apply[Query: CCCassFormatEncoder](table: String, selectable: Query, limit: Option[Long])(implicit se: CCCassFormatEncoder[Sub]): Iterator[Row] =
       apply(table, selectable, false, limit)
     def apply[Query: CCCassFormatEncoder](table: String, selectable: Query, allowFiltering: Boolean)(implicit se: CCCassFormatEncoder[Sub]): Iterator[Row] =
-      apply(table, selectable, allowFiltering, 0)
+      apply(table, selectable, allowFiltering, None)
     def apply[Query: CCCassFormatEncoder](table: String, selectable: Query)(implicit se: CCCassFormatEncoder[Sub]): Iterator[Row] =
-      apply(table, selectable, false, 0)
+      apply(table, selectable, false, None)
   }
 
   final class SelectColumnsAsyncHelper[Sub] {
-    def apply[Query: CCCassFormatEncoder](table: String, selectable: Query, allowFiltering: Boolean, limit: Long)(implicit se: CCCassFormatEncoder[Sub]): Future[Iterator[Row]] =
+    def apply[Query: CCCassFormatEncoder](table: String, selectable: Query, allowFiltering: Boolean, limit: Option[Long])(implicit se: CCCassFormatEncoder[Sub]): Future[Iterator[Row]] =
       session.executeAsync(prepareSelect[Sub, Query](table, selectable, allowFiltering, limit)).map(_.iterator.asScala)
-    def apply[Query: CCCassFormatEncoder](table: String, selectable: Query, limit: Long = 0)(implicit se: CCCassFormatEncoder[Sub]): Future[Iterator[Row]] =
+    def apply[Query: CCCassFormatEncoder](table: String, selectable: Query, limit: Option[Long])(implicit se: CCCassFormatEncoder[Sub]): Future[Iterator[Row]] =
       apply(table, selectable, false, limit)
     def apply[Query: CCCassFormatEncoder](table: String, selectable: Query, allowFiltering: Boolean)(implicit se: CCCassFormatEncoder[Sub]): Future[Iterator[Row]] =
-      apply(table, selectable, allowFiltering, 0)
+      apply(table, selectable, allowFiltering, None)
     def apply[Query: CCCassFormatEncoder](table: String, selectable: Query)(implicit se: CCCassFormatEncoder[Sub]): Future[Iterator[Row]] =
-      apply(table, selectable, false, 0)
+      apply(table, selectable, false, None)
   }
 
   final class SelectColumnsOneHelper[Sub] {
     def apply[Query: CCCassFormatEncoder](table: String, selectable: Query, allowFiltering: Boolean)(implicit se: CCCassFormatEncoder[Sub]): Option[Row] =
-      Option(session.execute(prepareSelect[Sub, Query](table, selectable, allowFiltering, 0)).one())
+      Option(session.execute(prepareSelect[Sub, Query](table, selectable, allowFiltering, Some(1))).one())
     def apply[Query: CCCassFormatEncoder](table: String, selectable: Query)(implicit se: CCCassFormatEncoder[Sub]): Option[Row] =
       apply(table, selectable, false)
   }
 
   final class SelectColumnsOneAsyncHelper[Sub] {
     def apply[Query: CCCassFormatEncoder](table: String, selectable: Query, allowFiltering: Boolean)(implicit se: CCCassFormatEncoder[Sub]): Future[Option[Row]] =
-      session.executeAsync(prepareSelect[Sub, Query](table, selectable, allowFiltering, 0)).map(rs => Option(rs.one()))
+      session.executeAsync(prepareSelect[Sub, Query](table, selectable, allowFiltering, Some(1))).map(rs => Option(rs.one()))
     def apply[Query: CCCassFormatEncoder](table: String, selectable: Query)(implicit se: CCCassFormatEncoder[Sub]): Future[Option[Row]] =
       apply(table, selectable, false)
   }

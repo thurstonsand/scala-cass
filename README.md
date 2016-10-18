@@ -225,6 +225,13 @@ val insertRes3: ResultSet = sSession.insert("mytable", InsertSome("asdf", 123))
 val insertRes4: Future[ResultSet] = sSession.insertAsync("mytable", MyTable("asdf", 123, None))
 ```
 
+if you need a TTL on the inserted data, that can be added to the insert statement
+
+```scala
+val insertResWithTTL: ResultSet = 
+  sSession.insert("mytable", MyTable("asdf", 123, Some(1234L)), ttl=Some(60)) // 1 minute ttl
+```
+
 ### Update
 
 Use case classes to model the data to update. For update, 2 case classes are used -- one to specify the query,
@@ -245,6 +252,23 @@ val updateRes2: Future[ResultSet] = sSession.updateAsync("mytable", Update(5678L
 // generates """UPDATE mykeyspace.mytable SET s='asdf', i=123 where l=5678""", which will throw an exception
 sSession.update("mytable", Query("asdf", 123), Update(5678L))
 ```
+
+if you need a TTL on the updated data, that can be added to the update statement
+
+```scala
+val updateResWithTTL: ResultSet =
+  sSession.update("mytable", Update(5678L), Query("asdf", 123), ttl=Some(60)) // 1 minute ttl
+```
+
+if you just want to update the TTL, pass `NoUpdate` to the update statement
+
+```scala
+val updateResWithOnlyTTL: ResultSet =
+  sSession.update("mytable", ScalaSession.NoUpdate(), Query("asdf", 123), ttl=Some(60))
+```
+
+be warned, however, if you pass `NoUpdate` and do not specify a ttl, the library will throw an 
+`IllegalArgumentException` because there is nothing to update.
 
 ### Delete
 
@@ -292,7 +316,7 @@ val selectWithFiltering: Iterator[Row] = sSession.select("mytable", RequiresFilt
 
 ```scala
 // generates """SELECT * FROM mykeyspace.mytable WHERE s='asdf' AND i=123 LIMIT 100"""
-val selectResWithLimit: Iterator[Row] = sSession.select("mytable", Query("asdf", 123), limit=100)
+val selectResWithLimit: Iterator[Row] = sSession.select("mytable", Query("asdf", 123), limit=Some(100))
 ```
 
 If you want to pull out the entire table with the select statement, this can be achieved by using the `NoQuery` type
