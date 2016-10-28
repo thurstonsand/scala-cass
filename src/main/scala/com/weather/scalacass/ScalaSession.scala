@@ -58,6 +58,34 @@ object ScalaSession {
     @SuppressWarnings(Array("org.brianmckenna.wartremover.warts.AsInstanceOf"))
     implicit val ccCassEncoder: CCCassFormatEncoder[NoUpdate] = shapeless.cachedImplicit
   }
+
+  sealed trait UpdateBehavior[F[_], A] {
+    def coll: F[A]
+    def withQuery(name: String): String
+  }
+  object UpdateBehavior {
+    final case class Add[F[_], A] private (coll: F[A]) extends UpdateBehavior[F, A] {
+      def withQuery(name: String) = s"$name=$name+?"
+    }
+    object Add {
+      def apply[A](coll: List[A]) = new Add(coll)
+      def apply[A](coll: Set[A]) = new Add(coll)
+    }
+    final case class Subtract[F[_], A] private (coll: F[A]) extends UpdateBehavior[F, A] {
+      def withQuery(name: String) = s"$name=$name-?"
+    }
+    object Subtract {
+      def apply[A](coll: List[A]) = new Subtract(coll)
+      def apply[A](coll: Set[A]) = new Subtract(coll)
+    }
+    final case class Replace[F[_], A] private (coll: F[A]) extends UpdateBehavior[F, A] {
+      def withQuery(name: String) = s"$name=?"
+    }
+    object Replace {
+      def apply[A](coll: List[A]) = new Replace(coll)
+      def apply[A](coll: Set[A]) = new Replace(coll)
+    }
+  }
 }
 
 class ScalaSession(val keyspace: String)(implicit val session: Session) {
@@ -68,25 +96,26 @@ class ScalaSession(val keyspace: String)(implicit val session: Session) {
   //  private[this] val queryCache = new LRUCache[Set[String], PreparedStatement](100)
   private[this] val queryCache = CacheBuilder.newBuilder().maximumSize(1000).build[Set[String], PreparedStatement]()
 
-  private[this] def clean[T: CCCassFormatEncoder](toClean: T): (List[String], List[AnyRef]) =
+  private[this] def clean[T: CCCassFormatEncoder](toClean: T): (List[String], List[String], List[AnyRef]) =
     clean(implicitly[CCCassFormatEncoder[T]].encode(toClean) match {
       case Right(res) => res
       case Left(exc)  => throw exc
     })
   @SuppressWarnings(Array("org.brianmckenna.wartremover.warts.Any", "org.brianmckenna.wartremover.warts.AsInstanceOf", "org.brianmckenna.wartremover.warts.IsInstanceOf"))
-  private[this] def clean[T](toClean: List[(String, AnyRef)]): (List[String], List[AnyRef]) = toClean.filter(_._2 match {
-    case None => false
-    case _    => true
-  }).map {
-    case (str, Some(anyref: AnyRef)) => (str, anyref)
-    case other                       => other
-  }.unzip
+  private[this] def clean[T](toClean: List[(String, String, AnyRef)]): (List[String], List[String], List[AnyRef]) =
+    toClean.filter(_._3 match {
+      case None => false
+      case _    => true
+    }).map {
+      case (str, withQuery, Some(anyref: AnyRef)) => (str, withQuery, anyref)
+      case other                                  => other
+    }.unzip3
 
   def close(): Unit = session.close()
 
   def dropKeyspace(): ResultSet = session.execute(s"DROP KEYSPACE $keyspace")
 
-  def createTable[T: CCCassFormatEncoder](name: String, numPartitionKeys: Int, numClusteringKeys: Int, tableProperties: String = ""): ResultSet = {
+  def createTable[T: CCCassFormatEncoder](name: String, numPartitionKeys: Int, numClusteringKeys: Int, tableProperties: String): ResultSet = {
     if (numPartitionKeys <= 0) throw new WrongPrimaryKeySizeException("must include at least one partition key")
     val allColumns = implicitly[CCCassFormatEncoder[T]].namesAndTypes
     if (numPartitionKeys + numClusteringKeys > allColumns.length) throw new WrongPrimaryKeySizeException(s"too many partition+clustering keys for table $name")
@@ -97,15 +126,19 @@ class ScalaSession(val keyspace: String)(implicit val session: Session) {
     val withClause = if (tableProperties.nonEmpty) s" WITH $tableProperties" else ""
     session.execute(s"CREATE TABLE $keyspace.$name (${allColumns.map(nt => s"${nt._1} ${nt._2}").mkString(", ")}, PRIMARY KEY $fullKey)" + withClause)
   }
+  def createTable[T: CCCassFormatEncoder](name: String, numPartitionKeys: Int, numClusteringKeys: Int): ResultSet =
+    createTable(name, numPartitionKeys, numClusteringKeys, "")
 
   def truncateTable(table: String): ResultSet = session.execute(s"TRUNCATE TABLE $keyspace.$table")
   def dropTable(table: String): ResultSet = session.execute(s"DROP TABLE $keyspace.$table")
 
   private[this] def ttlStr(ttl: Option[Int]): String = ttl.fold("")(" USING TTL " + _)
-  private[this] def queryStr(strArgs: List[String]) = if (strArgs.isEmpty) "" else s" WHERE ${strArgs.map(_ + "=?").mkString(" AND ")}"
+  private[this] def queryStr(fullStrArgs: List[String], op: String = "WHERE") =
+    if (fullStrArgs.isEmpty) ""
+    else s" $op ${fullStrArgs.mkString(if (op == "WHERE") " AND " else ", ")}"
 
   private[this] def prepareInsert[T: CCCassFormatEncoder](table: String, insertable: T, ttl: Option[Int]): BoundStatement = {
-    val (strArgs, anyrefArgs) = clean(insertable)
+    val (strArgs, _, anyrefArgs) = clean(insertable)
     val ttlAsString = ttlStr(ttl)
     if (strArgs.isEmpty) throw new IllegalArgumentException("Cassandra: called INSERT, but no columns chosen for insert")
     val prepared = queryCache.get(
@@ -120,15 +153,13 @@ class ScalaSession(val keyspace: String)(implicit val session: Session) {
   def insertAsync[T: CCCassFormatEncoder](table: String, insertable: T, ttl: Option[Int] = None): Future[ResultSet] = session.executeAsync(prepareInsert(table, insertable, ttl))
 
   private[this] def prepareUpdate[T: CCCassFormatEncoder, S: CCCassFormatEncoder](table: String, updateable: T, query: S, ttl: Option[Int]): BoundStatement = {
-    val (updateStrArgs, updateAnyrefArgs) = clean(updateable)
-    val (queryStrArgs, queryAnyrefArgs) = clean(query)
+    val (_, updateStrArgsWithQuery, updateAnyrefArgs) = clean(updateable)
+    val (_, queryStrArgsWithQuery, queryAnyrefArgs) = clean(query)
     val ttlAsString = ttlStr(ttl)
-    if (ttl.isEmpty && updateStrArgs.isEmpty) throw new IllegalArgumentException("Cassandra: called UPDATE, but no columns chosen for update, and no ttl provided")
+    if (ttl.isEmpty && updateStrArgsWithQuery.isEmpty) throw new IllegalArgumentException("Cassandra: called UPDATE, but no columns chosen for update, and no ttl provided")
     val prepared = queryCache.get(
-      updateStrArgs.toSet ++ queryStrArgs.toSet + ttlAsString + table + "UPDATE", {
-        val setStr = if (updateStrArgs.isEmpty) "" else s" SET ${updateStrArgs.map(_ + "=?").mkString(",")}"
-        session.prepare(s"UPDATE $keyspace.$table" + ttlAsString + setStr + queryStr(queryStrArgs))
-      }
+      updateStrArgsWithQuery.toSet ++ queryStrArgsWithQuery.toSet + ttlAsString + table + "UPDATE",
+      session.prepare(s"UPDATE $keyspace.$table" + ttlAsString + queryStr(updateStrArgsWithQuery, op = "SET") + queryStr(queryStrArgsWithQuery))
     )
     prepared.bind(updateAnyrefArgs ++ queryAnyrefArgs: _*)
   }
@@ -139,10 +170,10 @@ class ScalaSession(val keyspace: String)(implicit val session: Session) {
     session.executeAsync(prepareUpdate(table, updateable, query, ttl))
 
   private[this] def prepareDelete[T: CCCassFormatEncoder](table: String, deletable: T): BoundStatement = {
-    val (strArgs, anyrefArgs) = clean(deletable)
+    val (_, strArgsWithQuery, anyrefArgs) = clean(deletable)
     val prepared = queryCache.get(
-      strArgs.toSet + table + "DELETE",
-      session.prepare(s"DELETE FROM $keyspace.$table" + queryStr(strArgs))
+      strArgsWithQuery.toSet + table + "DELETE",
+      session.prepare(s"DELETE FROM $keyspace.$table" + queryStr(strArgsWithQuery))
     )
     prepared.bind(anyrefArgs: _*)
   }
@@ -155,10 +186,10 @@ class ScalaSession(val keyspace: String)(implicit val session: Session) {
   def prepareBatch(batches: Seq[Batch], batchType: BatchStatement.Type): BatchStatement = {
     val batch = new BatchStatement(batchType)
     batches.foreach {
-      case d @ DeleteBatch(table, item)              => batch.add(prepareDelete(table, item)(d.tEncoder))
-      case u @ UpdateBatch(table, item, query, ttl)  => batch.add(prepareUpdate(table, item, query, ttl)(u.tEncoder, u.sEncoder))
-      case i @ InsertBatch(table, item, ttl)         => batch.add(prepareInsert(table, item, ttl)(i.tEncoder))
-      case r @ RawBatch(query, anyrefArgs @ _*)      => batch.add(prepareRawStatement(query, anyrefArgs))
+      case d @ DeleteBatch(table, item)             => batch.add(prepareDelete(table, item)(d.tEncoder))
+      case u @ UpdateBatch(table, item, query, ttl) => batch.add(prepareUpdate(table, item, query, ttl)(u.tEncoder, u.sEncoder))
+      case i @ InsertBatch(table, item, ttl)        => batch.add(prepareInsert(table, item, ttl)(i.tEncoder))
+      case r @ RawBatch(query, anyrefArgs @ _*)     => batch.add(prepareRawStatement(query, anyrefArgs))
     }
     batch
   }
@@ -166,12 +197,12 @@ class ScalaSession(val keyspace: String)(implicit val session: Session) {
   def batchAsync(batches: Seq[Batch], batchType: BatchStatement.Type = BatchStatement.Type.LOGGED): Future[ResultSet] = session.executeAsync(prepareBatch(batches, batchType))
 
   private[this] def prepareSelect[Sub: CCCassFormatEncoder, Query: CCCassFormatEncoder](table: String, selectable: Query, allowFiltering: Boolean, limit: Option[Long]) = {
-    val sStrArgs = CCCassFormatEncoder[Sub].namesAndTypes.map(_._1)
-    val (qStrArgs, qAnyRefArgs) = clean(selectable)
-    val prepared = queryCache.get(sStrArgs.toSet ++ qStrArgs.toSet + allowFiltering.toString + limit.toString + table + "SELECT", {
+    val sStrArgs = CCCassFormatEncoder[Sub].names
+    val (_, qStrArgsWithQuery, qAnyRefArgs) = clean(selectable)
+    val prepared = queryCache.get(sStrArgs.toSet ++ qStrArgsWithQuery.toSet + allowFiltering.toString + limit.toString + table + "SELECT", {
       val limitStr = limit.fold("")(" LIMIT " + _)
       val filteringStr = if (allowFiltering) s" ALLOW FILTERING" else ""
-      session.prepare(s"SELECT ${sStrArgs.mkString(", ")} FROM $keyspace.$table" + queryStr(qStrArgs) + limitStr + filteringStr)
+      session.prepare(s"SELECT ${sStrArgs.mkString(", ")} FROM $keyspace.$table" + queryStr(qStrArgsWithQuery) + limitStr + filteringStr)
     })
     prepared.bind(qAnyRefArgs: _*)
   }
