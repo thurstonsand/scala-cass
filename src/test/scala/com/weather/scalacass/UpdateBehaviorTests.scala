@@ -23,7 +23,7 @@ class UpdateBehaviorTests extends CassandraWithTableTester(UpdateBehaviorTests.d
 
   "explicit replacement" should "act as before" in {
     case class Replacing(l: UpdateBehavior.Replace[List, String], s: UpdateBehavior.Replace[Set, Double])
-    val instance = Replacing(UpdateBehavior.Replace(List("fdsa")), UpdateBehavior.Replace(Set(2.0)))
+    val instance = Replacing(List("fdsa"), Set(2.0))
 
     insertOne()
     ss.update(table, instance, baseQuery)
@@ -49,7 +49,7 @@ class UpdateBehaviorTests extends CassandraWithTableTester(UpdateBehaviorTests.d
 
   "add" should "combine the two entries" in {
     case class Adding(l: UpdateBehavior.Add[List, String], s: UpdateBehavior.Add[Set, Double])
-    val instance = Adding(UpdateBehavior.Add(List("afaf")), UpdateBehavior.Add(Set(4.0)))
+    val instance = Adding(List("afaf"), Set(4.0))
 
     insertOne()
     ss.update(table, instance, baseQuery)
@@ -62,7 +62,7 @@ class UpdateBehaviorTests extends CassandraWithTableTester(UpdateBehaviorTests.d
 
   "subtract" should "subtract from the original entry" in {
     case class Subtracting(l: UpdateBehavior.Subtract[List, String], s: UpdateBehavior.Subtract[Set, Double])
-    val instance = Subtracting(UpdateBehavior.Subtract(List("another str")), UpdateBehavior.Subtract(Set(5.0)))
+    val instance = Subtracting(List("another str"), Set(5.0))
 
     val expandedBase = base.copy(l = instance.l.coll ::: base.l, s = instance.s.coll ++ base.s)
     insertOne(expandedBase)

@@ -70,6 +70,8 @@ object ScalaSession {
     object Add {
       def apply[A](coll: List[A]) = new Add(coll)
       def apply[A](coll: Set[A]) = new Add(coll)
+      implicit def liftList[A](l: List[A]): Add[List, A] = apply(l)
+      implicit def listSet[A](s: Set[A]): Add[Set, A] = apply(s)
     }
     final case class Subtract[F[_], A] private (coll: F[A]) extends UpdateBehavior[F, A] {
       def withQuery(name: String) = s"$name=$name-?"
@@ -77,6 +79,8 @@ object ScalaSession {
     object Subtract {
       def apply[A](coll: List[A]) = new Subtract(coll)
       def apply[A](coll: Set[A]) = new Subtract(coll)
+      implicit def liftList[A](l: List[A]): Subtract[List, A] = apply(l)
+      implicit def listSet[A](s: Set[A]): Subtract[Set, A] = apply(s)
     }
     final case class Replace[F[_], A] private (coll: F[A]) extends UpdateBehavior[F, A] {
       def withQuery(name: String) = s"$name=?"
@@ -84,6 +88,8 @@ object ScalaSession {
     object Replace {
       def apply[A](coll: List[A]) = new Replace(coll)
       def apply[A](coll: Set[A]) = new Replace(coll)
+      implicit def liftList[A](l: List[A]): Replace[List, A] = apply(l)
+      implicit def listSet[A](s: Set[A]): Replace[Set, A] = apply(s)
     }
   }
 }

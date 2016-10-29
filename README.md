@@ -249,7 +249,7 @@ val updateRes: ResultSet = sSession.update("mytable", Update(5678L), Query("asdf
 val updateRes2: Future[ResultSet] = sSession.updateAsync("mytable", Update(5678L), Query("asdf", 123))
 
 // NOTE:
-// generates """UPDATE mykeyspace.mytable SET s='asdf', i=123 where l=5678""", which will throw an exception
+// generates """UPDATE mykeyspace.mytable SET s='asdf', i=123 WHERE l=5678""", which will throw an exception
 sSession.update("mytable", Query("asdf", 123), Update(5678L))
 ```
 
@@ -269,6 +269,66 @@ val updateResWithOnlyTTL: ResultSet =
 
 be warned, however, if you pass `NoUpdate` and do not specify a ttl, the library will throw an 
 `IllegalArgumentException` because there is nothing to update.
+
+Finally, if you need an additive/subtractive update on a cassandra collection, that can be accomplished with the 
+`UpdateBehavior` classes found in `com.weather.scalacass.ScalaSession.UpdateBehavior`.
+
+**NOTE**: only works for `list` and `set`
+
+For example, if you have a table with `s varchar, i int, sSet set<varchar>`, you can use additive behavior via
+
+```scala
+case class MyTableWithSet(s: String, sSet: Set[String])
+
+import com.weather.scalacass.ScalaSession.UpdateBehavior
+
+case class UpdateWithAdditive(sSet: UpdateBehavior.Add[Set, String])
+
+// generates """UPDATE mykeyspace.mytable SET sSet=sSet+{'firstitem'} WHERE s='asdf' AND i=1234"""
+val updateResFirst: ResultSet =
+  sSession.update("mytable", UpdateWithAdditive(Set("firstitem")), Query("asdf", 1234)) // adds 'firstitem' to empty sSet
+
+// generates """UPDATE mykeyspace.mytable SET sSet=sSet+{'seconditem'} WHERE s='asdf' AND i=1234"""
+val updateResSecond: ResultSet =
+  sSession.update("mytable", UpdateWithAdditive(Set("seconditem")), Query("asdf", 1234)) // adds 'seconditem' to sSet with 'firstItem' element
+```
+
+and the row where `s='asdf' AND i=1234` now has `sSet={'firstitem', 'seconditem'}`. You have access to the 
+aforementioned `UpdateBehavior.Add` as well as `UpdateBehavior.Subtract` and `UpdateBehavior.Replace`. Subtract works as
+you expect:
+
+```scala
+case class UpdateWithSubtractive(sSet: UpdateBehavior.Subtract[Set, String])
+
+val updateResAdd: ResultSet =
+  sSession.update("mytable", UpdateWithAdditive(Set("firstitem")), Query("asdf", 1234)) // adds 'firstitem' to the set
+
+// generates """UPDATE mykeyspace.mytable SET sSet=sSet-{'firstitem'} WHERE s='asdf' AND i=1234
+val updateResSubtract: ResultSet =
+  sSession.update("mytable", UpdateWithSubtractive(Set("firstitem")), Query("asdf", 1234)) // removes 'firstitem' from the set
+```
+
+finally, `UpdateBehavior.Replace` is the "default" behavior:
+
+```scala
+case class UpdateWithReplace(sSet: UpdateBehavior.Replace[Set, String])
+
+// generates """UPDATE mykeyspace.mytable SET sSet={'firstitem'} WHERE s='asdf' AND i=1234"""
+val updateResFirst: ResultSet =
+  sSession.update("mytable", UpdateWithReplace(Set("firstitem")), Query("asdf", 1234)) // sets sSet to 'firstitem'
+
+// generates """UPDATE mykeyspace.mytable SET sSet={'seconditem'} WHERE s='asdf' AND i=1234"""
+val updateResSecond: ResultSet =
+  sSession.update("mytable", UpdateWithReplace(Set("seconditem")), Query("asdf", 1234)) // sets sSet to 'firstitem'
+```
+
+as you may guess, if you don't use one of the `UpdateBehavior`s, it defaults to `UpdateBehavior.Replace`
+
+```scala
+case class UpdateWithoutUpdateBehavior(sSet: Set[String])
+ // equivalent to
+case class UpdateWithReplace(sSet: UpdateBehavior.Replace[Set, String])
+```
 
 ### Delete
 
