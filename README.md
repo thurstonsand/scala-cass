@@ -27,13 +27,13 @@ Add the appropriate version of the library
 ##### Cassandra 3.0+ with Java 8
 
 ```scala
-libraryDependencies += "com.github.thurstonsand" %% "scalacass" % "0.6.10"
+libraryDependencies += "com.github.thurstonsand" %% "scalacass" % "0.6.11"
 ```
 
 ##### Cassandra 2.1 with Java 7
 
 ```scala
-libraryDependencies += "com.github.thurstonsand" %% "scalacass" % "0.5.10"
+libraryDependencies += "com.github.thurstonsand" %% "scalacass" % "0.5.11"
 ```
 
 #### Maven
@@ -56,7 +56,7 @@ Pick a version
 
 ```xml
 <properties>
-    <scalaCass.version>0.5.10</scalaCassVersion>
+    <scalaCass.version>0.5.11</scalaCassVersion>
 </properties>
 ```
 
@@ -64,7 +64,7 @@ Pick a version
 
 ```xml
 <properties>
-    <scalaCass.version>0.6.10</scalaCassVersion>
+    <scalaCass.version>0.6.11</scalaCassVersion>
 </properties>
 ```
 
