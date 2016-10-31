@@ -102,20 +102,18 @@ class ScalaSession(val keyspace: String)(implicit val session: Session) {
   //  private[this] val queryCache = new LRUCache[Set[String], PreparedStatement](100)
   private[this] val queryCache = CacheBuilder.newBuilder().maximumSize(1000).build[Set[String], PreparedStatement]()
 
-  private[this] def clean[T: CCCassFormatEncoder](toClean: T): (List[String], List[String], List[AnyRef]) =
-    clean(implicitly[CCCassFormatEncoder[T]].encode(toClean) match {
-      case Right(res) => res
-      case Left(exc)  => throw exc
+  private[this] def encode(encoded: Either[Throwable, List[(String, AnyRef)]]) = {
+    encoded.fold(throw _, _ flatMap {
+      case (str, Some(anyref: AnyRef)) => List((str, anyref))
+      case (_, None)                   => Nil
+      case other                       => List(other)
     })
-  @SuppressWarnings(Array("org.brianmckenna.wartremover.warts.Any", "org.brianmckenna.wartremover.warts.AsInstanceOf", "org.brianmckenna.wartremover.warts.IsInstanceOf"))
-  private[this] def clean[T](toClean: List[(String, String, AnyRef)]): (List[String], List[String], List[AnyRef]) =
-    toClean.filter(_._3 match {
-      case None => false
-      case _    => true
-    }).map {
-      case (str, withQuery, Some(anyref: AnyRef)) => (str, withQuery, anyref)
-      case other                                  => other
-    }.unzip3
+  }.unzip
+  private[this] def namedEncode[T](toEncode: T)(implicit encoder: CCCassFormatEncoder[T]): (List[String], List[AnyRef]) =
+    encode(encoder.encodeWithName(toEncode))
+
+  private[this] def queryEncode[T](toEncode: T)(implicit encoder: CCCassFormatEncoder[T]): (List[String], List[AnyRef]) =
+    encode(encoder.encodeWithQuery(toEncode))
 
   def close(): Unit = session.close()
 
@@ -144,7 +142,8 @@ class ScalaSession(val keyspace: String)(implicit val session: Session) {
     else s" $op ${fullStrArgs.mkString(if (op == "WHERE") " AND " else ", ")}"
 
   private[this] def prepareInsert[T: CCCassFormatEncoder](table: String, insertable: T, ttl: Option[Int]): BoundStatement = {
-    val (strArgs, _, anyrefArgs) = clean(insertable)
+    val (strArgs, anyrefArgs) = namedEncode(insertable)
+//    val (strArgs, _, anyrefArgs) = clean(insertable)
     val ttlAsString = ttlStr(ttl)
     if (strArgs.isEmpty) throw new IllegalArgumentException("Cassandra: called INSERT, but no columns chosen for insert")
     val prepared = queryCache.get(
@@ -159,13 +158,13 @@ class ScalaSession(val keyspace: String)(implicit val session: Session) {
   def insertAsync[T: CCCassFormatEncoder](table: String, insertable: T, ttl: Option[Int] = None): Future[ResultSet] = session.executeAsync(prepareInsert(table, insertable, ttl))
 
   private[this] def prepareUpdate[T: CCCassFormatEncoder, S: CCCassFormatEncoder](table: String, updateable: T, query: S, ttl: Option[Int]): BoundStatement = {
-    val (_, updateStrArgsWithQuery, updateAnyrefArgs) = clean(updateable)
-    val (_, queryStrArgsWithQuery, queryAnyrefArgs) = clean(query)
+    val (updateStrArgs, updateAnyrefArgs) = queryEncode(updateable)
+    val (queryStrArgs, queryAnyrefArgs) = queryEncode(query)
     val ttlAsString = ttlStr(ttl)
-    if (ttl.isEmpty && updateStrArgsWithQuery.isEmpty) throw new IllegalArgumentException("Cassandra: called UPDATE, but no columns chosen for update, and no ttl provided")
+    if (ttl.isEmpty && updateStrArgs.isEmpty) throw new IllegalArgumentException("Cassandra: called UPDATE, but no columns chosen for update, and no ttl provided")
     val prepared = queryCache.get(
-      updateStrArgsWithQuery.toSet ++ queryStrArgsWithQuery.toSet + ttlAsString + table + "UPDATE",
-      session.prepare(s"UPDATE $keyspace.$table" + ttlAsString + queryStr(updateStrArgsWithQuery, op = "SET") + queryStr(queryStrArgsWithQuery))
+      updateStrArgs.toSet ++ queryStrArgs.toSet + ttlAsString + table + "UPDATE",
+      session.prepare(s"UPDATE $keyspace.$table" + ttlAsString + queryStr(updateStrArgs, op = "SET") + queryStr(queryStrArgs))
     )
     prepared.bind(updateAnyrefArgs ++ queryAnyrefArgs: _*)
   }
@@ -176,12 +175,12 @@ class ScalaSession(val keyspace: String)(implicit val session: Session) {
     session.executeAsync(prepareUpdate(table, updateable, query, ttl))
 
   private[this] def prepareDelete[T: CCCassFormatEncoder](table: String, deletable: T): BoundStatement = {
-    val (_, strArgsWithQuery, anyrefArgs) = clean(deletable)
+    val (queryStrArgs, queryAnyrefArgs) = queryEncode(deletable)
     val prepared = queryCache.get(
-      strArgsWithQuery.toSet + table + "DELETE",
-      session.prepare(s"DELETE FROM $keyspace.$table" + queryStr(strArgsWithQuery))
+      queryStrArgs.toSet + table + "DELETE",
+      session.prepare(s"DELETE FROM $keyspace.$table" + queryStr(queryStrArgs))
     )
-    prepared.bind(anyrefArgs: _*)
+    prepared.bind(queryAnyrefArgs: _*)
   }
   def delete[T: CCCassFormatEncoder](table: String, deletable: T): ResultSet =
     session.execute(prepareDelete(table, deletable))
@@ -204,13 +203,13 @@ class ScalaSession(val keyspace: String)(implicit val session: Session) {
 
   private[this] def prepareSelect[Sub: CCCassFormatEncoder, Query: CCCassFormatEncoder](table: String, selectable: Query, allowFiltering: Boolean, limit: Option[Long]) = {
     val sStrArgs = CCCassFormatEncoder[Sub].names
-    val (_, qStrArgsWithQuery, qAnyRefArgs) = clean(selectable)
-    val prepared = queryCache.get(sStrArgs.toSet ++ qStrArgsWithQuery.toSet + allowFiltering.toString + limit.toString + table + "SELECT", {
+    val (queryStrArgs, queryAnyrefArgs) = queryEncode(selectable)
+    val prepared = queryCache.get(sStrArgs.toSet ++ queryStrArgs.toSet + allowFiltering.toString + limit.toString + table + "SELECT", {
       val limitStr = limit.fold("")(" LIMIT " + _)
       val filteringStr = if (allowFiltering) s" ALLOW FILTERING" else ""
-      session.prepare(s"SELECT ${sStrArgs.mkString(", ")} FROM $keyspace.$table" + queryStr(qStrArgsWithQuery) + limitStr + filteringStr)
+      session.prepare(s"SELECT ${sStrArgs.mkString(", ")} FROM $keyspace.$table" + queryStr(queryStrArgs) + limitStr + filteringStr)
     })
-    prepared.bind(qAnyRefArgs: _*)
+    prepared.bind(queryAnyrefArgs: _*)
   }
 
   def select[T: CCCassFormatEncoder](table: String, selectable: T, allowFiltering: Boolean = false, limit: Option[Long] = None): Iterator[Row] =
