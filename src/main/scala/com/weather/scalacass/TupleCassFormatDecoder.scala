@@ -2,14 +2,14 @@ package com.weather.scalacass
 
 import com.datastax.driver.core.TupleValue
 import com.datastax.driver.core.exceptions.InvalidTypeException
-import shapeless.{::, Generic, HList, HNil}
+import shapeless.{::, Generic, HList, HNil, Lazy}
 
 trait TupleCassFormatDecoder[T] {
   def decode(tup: TupleValue, n: Int): Either[Throwable, T]
 }
 
 object TupleCassFormatDecoder {
-  def apply[T: TupleCassFormatDecoder] = implicitly[TupleCassFormatDecoder[T]]
+  def apply[T](implicit decoder: Lazy[TupleCassFormatDecoder[T]]) = decoder.value
 
   implicit val hNilDecoder = new TupleCassFormatDecoder[HNil] {
     def decode(tup: TupleValue, n: Int) = {

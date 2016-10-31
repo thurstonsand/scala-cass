@@ -5,6 +5,7 @@ import java.nio.ByteBuffer
 import com.datastax.driver.core.{DataType, Row, TupleValue}
 import com.datastax.driver.core.exceptions.{InvalidTypeException, QueryExecutionException}
 import NotRecoverable.Try2Either
+import shapeless.Lazy
 
 import scala.util.Try
 
@@ -71,7 +72,7 @@ trait LowPriorityCassFormatDecoder {
 
 object CassFormatDecoder extends CassFormatDecoderVersionSpecific {
   type Aux[T, From0] = CassFormatDecoder[T] { type From = From0 }
-  def apply[T: CassFormatDecoder] = implicitly[CassFormatDecoder[T]]
+  def apply[T](implicit decoder: Lazy[CassFormatDecoder[T]]) = decoder.value
 
   class ValueNotDefinedException(m: String) extends QueryExecutionException(m)
 
