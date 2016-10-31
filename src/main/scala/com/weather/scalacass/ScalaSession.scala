@@ -142,16 +142,15 @@ class ScalaSession(val keyspace: String)(implicit val session: Session) {
     else s" $op ${fullStrArgs.mkString(if (op == "WHERE") " AND " else ", ")}"
 
   private[this] def prepareInsert[T: CCCassFormatEncoder](table: String, insertable: T, ttl: Option[Int]): BoundStatement = {
-    val (strArgs, anyrefArgs) = namedEncode(insertable)
-//    val (strArgs, _, anyrefArgs) = clean(insertable)
+    val (queryStrArgs, queryAnyrefArgs) = namedEncode(insertable)
     val ttlAsString = ttlStr(ttl)
-    if (strArgs.isEmpty) throw new IllegalArgumentException("Cassandra: called INSERT, but no columns chosen for insert")
+    if (queryStrArgs.isEmpty) throw new IllegalArgumentException("Cassandra: called INSERT, but no columns chosen for insert")
     val prepared = queryCache.get(
-      strArgs.toSet + ttlAsString + table + "INSERT", {
-        session.prepare(s"INSERT INTO $keyspace.$table ${strArgs.mkString("(", ",", ")")} VALUES ${List.fill(anyrefArgs.length)("?").mkString("(", ",", ")")}" + ttlAsString)
+      queryStrArgs.toSet + ttlAsString + table + "INSERT", {
+        session.prepare(s"INSERT INTO $keyspace.$table ${queryStrArgs.mkString("(", ",", ")")} VALUES ${List.fill(queryAnyrefArgs.length)("?").mkString("(", ",", ")")}" + ttlAsString)
       }
     )
-    prepared.bind(anyrefArgs: _*)
+    prepared.bind(queryAnyrefArgs: _*)
   }
 
   def insert[T: CCCassFormatEncoder](table: String, insertable: T, ttl: Option[Int] = None): ResultSet = session.execute(prepareInsert(table, insertable, ttl))
