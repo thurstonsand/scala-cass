@@ -11,6 +11,11 @@ before_script: sh .travis_script.sh
 
 sudo: required
 
+notifications:
+  webhooks:
+    urls:
+      - https://webhooks.gitter.im/e/b37d78d8e7cb1d34adb3
+
 #services:
 #  - docker
 
