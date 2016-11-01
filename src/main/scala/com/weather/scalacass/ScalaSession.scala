@@ -102,6 +102,7 @@ class ScalaSession(val keyspace: String)(implicit val session: Session) {
   //  private[this] val queryCache = new LRUCache[Set[String], PreparedStatement](100)
   private[this] val queryCache = CacheBuilder.newBuilder().maximumSize(1000).build[Set[String], PreparedStatement]()
 
+  @SuppressWarnings(Array("org.brianmckenna.wartremover.warts.AsInstanceOf", "org.brianmckenna.wartremover.warts.IsInstanceOf", "org.brianmckenna.wartremover.warts.Any"))
   private[this] def encode(encoded: Either[Throwable, List[(String, AnyRef)]]) = {
     encoded.fold(throw _, _ flatMap {
       case (str, Some(anyref: AnyRef)) => List((str, anyref))
