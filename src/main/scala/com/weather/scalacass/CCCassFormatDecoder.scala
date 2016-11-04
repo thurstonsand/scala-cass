@@ -23,7 +23,7 @@ trait CCCassFormatDecoder[T] { self =>
 }
 
 object CCCassFormatDecoder {
-  def apply[T: CCCassFormatDecoder] = implicitly[CCCassFormatDecoder[T]]
+  def apply[T](implicit decoder: Lazy[CCCassFormatDecoder[T]]) = decoder.value
 
   implicit val hNilDecoder = new CCCassFormatDecoder[HNil] {
     def decode(r: Row) = Right(HNil)

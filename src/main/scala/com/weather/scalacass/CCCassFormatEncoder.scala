@@ -25,7 +25,7 @@ trait CCCassFormatEncoder[F] { self =>
 }
 
 object CCCassFormatEncoder {
-  def apply[T: CCCassFormatEncoder] = implicitly[CCCassFormatEncoder[T]]
+  def apply[T](implicit encoder: Lazy[CCCassFormatEncoder[T]]) = encoder.value
 
   implicit val hNilEncoder = new CCCassFormatEncoder[HNil] {
     def encodeWithName(f: HNil) = Right(Nil)
