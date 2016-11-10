@@ -2,7 +2,6 @@ package com.weather.scalacass
 
 import com.datastax.driver.core.DataType
 import ScalaSession.UpdateBehavior
-import shapeless.Lazy
 
 trait CassFormatEncoder[F] { self =>
   type To <: AnyRef
@@ -26,7 +25,7 @@ trait CassFormatEncoder[F] { self =>
 
 object CassFormatEncoder extends CassFormatEncoderVersionSpecific {
   type Aux[F, To0] = CassFormatEncoder[F] { type To = To0 }
-  def apply[T](implicit encoder: Lazy[CassFormatEncoder[T]]) = encoder.value
+  def apply[T](implicit encoder: CassFormatEncoder[T]) = encoder
 
   private[scalacass] def sameTypeCassFormatEncoder[F <: AnyRef](_cassDataType: DataType): CassFormatEncoder[F] = new CassFormatEncoder[F] {
     type To = F
