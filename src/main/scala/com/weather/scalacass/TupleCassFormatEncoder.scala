@@ -3,15 +3,9 @@ package com.weather.scalacass
 import com.datastax.driver.core.DataType
 import shapeless.{::, Generic, HList, HNil, Lazy}
 
-trait TupleCassFormatEncoder[T] {
-  def encode(tup: T): Either[Throwable, List[AnyRef]]
-  def types: List[String]
-  def dataTypes: List[DataType]
-}
+abstract class DerivedTupleCassFormatEncoder[T] extends TupleCassFormatEncoder[T]
 
-object TupleCassFormatEncoder {
-  def apply[T](implicit encoder: Lazy[TupleCassFormatEncoder[T]]) = encoder.value
-
+object DerivedTupleCassFormatEncoder {
   implicit val hNilEncoder: TupleCassFormatEncoder[HNil] = new TupleCassFormatEncoder[HNil] {
     def encode(tup: HNil) = Right(Nil)
     def types = Nil
@@ -34,4 +28,15 @@ object TupleCassFormatEncoder {
       def types = hListEncoder.types
       def dataTypes = hListEncoder.dataTypes
     }
+}
+
+trait TupleCassFormatEncoder[T] {
+  def encode(tup: T): Either[Throwable, List[AnyRef]]
+  def types: List[String]
+  def dataTypes: List[DataType]
+}
+
+object TupleCassFormatEncoder {
+  implicit def derive[T](implicit derived: Lazy[DerivedTupleCassFormatEncoder[T]]): TupleCassFormatEncoder[T] = derived.value
+  def apply[T](implicit encoder: TupleCassFormatEncoder[T]) = encoder
 }

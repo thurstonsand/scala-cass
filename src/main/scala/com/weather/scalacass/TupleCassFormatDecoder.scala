@@ -4,13 +4,9 @@ import com.datastax.driver.core.TupleValue
 import com.datastax.driver.core.exceptions.InvalidTypeException
 import shapeless.{::, Generic, HList, HNil, Lazy}
 
-trait TupleCassFormatDecoder[T] {
-  def decode(tup: TupleValue, n: Int): Either[Throwable, T]
-}
+abstract class DerivedTupleCassFormatDecoder[T] extends TupleCassFormatDecoder[T]
 
-object TupleCassFormatDecoder {
-  def apply[T](implicit decoder: Lazy[TupleCassFormatDecoder[T]]) = decoder.value
-
+object DerivedTupleCassFormatDecoder {
   implicit val hNilDecoder = new TupleCassFormatDecoder[HNil] {
     def decode(tup: TupleValue, n: Int) = {
       val arity = tup.getType.getComponentTypes.size
@@ -34,4 +30,13 @@ object TupleCassFormatDecoder {
         hListDecoder.decode(tup, n).right.map(gen.from)
       }
     }
+}
+
+trait TupleCassFormatDecoder[T] {
+  def decode(tup: TupleValue, n: Int): Either[Throwable, T]
+}
+
+object TupleCassFormatDecoder {
+  implicit def derive[T](implicit derived: Lazy[DerivedTupleCassFormatDecoder[T]]): TupleCassFormatDecoder[T] = derived.value
+  def apply[T](implicit decoder: TupleCassFormatDecoder[T]) = decoder
 }

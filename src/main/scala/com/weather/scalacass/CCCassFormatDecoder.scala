@@ -4,6 +4,27 @@ import com.datastax.driver.core.Row
 import shapeless.labelled.{FieldType, field}
 import shapeless.{::, HList, HNil, LabelledGeneric, Lazy, Witness}
 
+abstract class DerivedCCCassFormatDecoder[T] extends CCCassFormatDecoder[T]
+
+object DerivedCCCassFormatDecoder {
+  implicit val hNilDecoder = new CCCassFormatDecoder[HNil] {
+    def decode(r: Row) = Right(HNil)
+  }
+
+  implicit def hConsDecoder[K <: Symbol, H, T <: HList](implicit w: Witness.Aux[K], tdH: Lazy[CassFormatDecoder[H]], tdT: Lazy[CCCassFormatDecoder[T]]) =
+    new CCCassFormatDecoder[FieldType[K, H] :: T] {
+      def decode(r: Row) = for {
+        h <- tdH.value.decode(r, w.value.name.toString).right
+        t <- tdT.value.decode(r).right
+      } yield field[K](h) :: t
+    }
+
+  implicit def ccConverter[T, Repr](implicit gen: LabelledGeneric.Aux[T, Repr], hListDecoder: Lazy[CCCassFormatDecoder[Repr]]): CCCassFormatDecoder[T] =
+    new CCCassFormatDecoder[T] {
+      def decode(r: Row): Either[Throwable, T] = hListDecoder.value.decode(r).right.map(gen.from)
+    }
+}
+
 trait CCCassFormatDecoder[T] { self =>
   private[scalacass] def decode(r: Row): Either[Throwable, T]
   final def map[U](f: T => U): CCCassFormatDecoder[U] = new CCCassFormatDecoder[U] {
@@ -23,22 +44,6 @@ trait CCCassFormatDecoder[T] { self =>
 }
 
 object CCCassFormatDecoder {
-  def apply[T](implicit decoder: Lazy[CCCassFormatDecoder[T]]) = decoder.value
-
-  implicit val hNilDecoder = new CCCassFormatDecoder[HNil] {
-    def decode(r: Row) = Right(HNil)
-  }
-
-  implicit def hConsDecoder[K <: Symbol, H, T <: HList](implicit w: Witness.Aux[K], tdH: Lazy[CassFormatDecoder[H]], tdT: Lazy[CCCassFormatDecoder[T]]) =
-    new CCCassFormatDecoder[FieldType[K, H] :: T] {
-      def decode(r: Row) = for {
-        h <- tdH.value.decode(r, w.value.name.toString).right
-        t <- tdT.value.decode(r).right
-      } yield field[K](h) :: t
-    }
-
-  implicit def ccConverter[T, Repr](implicit gen: LabelledGeneric.Aux[T, Repr], hListDecoder: Lazy[CCCassFormatDecoder[Repr]]): CCCassFormatDecoder[T] =
-    new CCCassFormatDecoder[T] {
-      def decode(r: Row): Either[Throwable, T] = hListDecoder.value.decode(r).right.map(gen.from)
-    }
+  implicit def derive[T](implicit derived: Lazy[DerivedCCCassFormatDecoder[T]]): CCCassFormatDecoder[T] = derived.value
+  def apply[T](implicit decoder: CCCassFormatDecoder[T]) = decoder
 }

@@ -46,17 +46,17 @@ object ScalaSession {
   final case class Star(`*`: Nothing)
   object Star {
     @SuppressWarnings(Array("org.brianmckenna.wartremover.warts.AsInstanceOf"))
-    implicit val ccCassEncoder: CCCassFormatEncoder[Star] = shapeless.cachedImplicit
+    implicit val ccCassEncoder: CCCassFormatEncoder[Star] = CCCassFormatEncoder.derive[Star]
   }
   final case class NoQuery()
   object NoQuery {
     @SuppressWarnings(Array("org.brianmckenna.wartremover.warts.AsInstanceOf"))
-    implicit val ccCassEncoder: CCCassFormatEncoder[NoQuery] = shapeless.cachedImplicit
+    implicit val ccCassEncoder: CCCassFormatEncoder[NoQuery] = CCCassFormatEncoder.derive[NoQuery]
   }
   final case class NoUpdate()
   object NoUpdate {
     @SuppressWarnings(Array("org.brianmckenna.wartremover.warts.AsInstanceOf"))
-    implicit val ccCassEncoder: CCCassFormatEncoder[NoUpdate] = shapeless.cachedImplicit
+    implicit val ccCassEncoder: CCCassFormatEncoder[NoUpdate] = CCCassFormatEncoder.derive[NoUpdate]
   }
 
   sealed trait UpdateBehavior[F[_], A] {

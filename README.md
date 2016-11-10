@@ -97,6 +97,7 @@ Include the repo
 * [Custom types](#custom-types)
   * [Map over existing type](#map-over-an-existing-type)
   * [Create new type](#create-a-new-type-from-scratch)
+* [Caching implicits](#caching-implicits)
 * [Parsing performance](#parsing-performance)
 
 ## Components
@@ -687,6 +688,54 @@ val p = Person("newborn-baby", org.joda.time.Instant.now)
 val ss: ScalaSession = _ // your session instance
 ss.insert("mytable", p) // writes a (string, timestamp)
 ```
+
+## Caching Implicits
+
+TL;DR: use `CCCassFormatEncoder.derive[MyType]` and `CCCassFormatDecoder.derive[MyType]` in your case class companion 
+object
+
+When using the methods on ScalaSession, as well as the expanded `.as`/`.getAs`/`.getOrElse` syntax on Row, these require
+a case class which maps to the cassandra row or query in question. From this case class, an implicit typeclass is derived
+which has the necessary functionality. This can be done ad-hoc, meaning at every call site, but for various reasons 
+(compile-time performance, custom decoder/encoder, etc), it can be advantageous to cache this typeclass, often in the
+companion object of the case class. You can derive this typeclass for the Scala-Cass encoder and decoder, called 
+`CCCassFormatEncoder` and `CCCassFormatDecoder`. For example:
+
+```scala
+import com.weather.scalacass.{CCCassFormatEncoder, CCCassFormatDecoder}
+
+case class MyTable(s: String, i: Int, l: Option[Long])
+object MyTable {
+  implicit val encoder: CCCassFormatEncoder[MyTable] = CCCassFormatEncoder.derive
+  implicit val decoder: CCCassFormatDecoder[MyTable] = CCCassFormatDecoder.derive
+}
+```
+
+This is particularly helpful when defining a custom `CassFormatEncoder`/`CassFormatDecoder` because deriving the case 
+class encoder and decoder in the companion object automatically brings it in scope for the rest of the library, meaning
+ you only need to import/define the custom encoder/decoder once, instead of at every call site. As an example,
+ 
+ ```scala
+ class CustomType(val myField: String)
+ implicit val customEncoder: CassFormatEncoder[CustomType] = 
+   CassFormatEncoder[String].map[CustomType](ct => ct.myField)
+ implicit val customeDecoder: CassFormatDecoder[CustomType] =
+   CassFormatDecoder[String].map[CustomType](str => new CustomType(str))
+ case class MyTableWithCustom(ct: CustomType, i: Int, l: Option[Long])
+ ```
+
+as is, at every call site (`.insert`, `.update`, `.getAs`, etc) the `customEncoder` and `customDecoder` must be in 
+scope, but with the inclusion of
+
+```scala
+object MyTableWithCustom {
+  implicit val encoder: CCCassFormatEncoder[MyTableWithCustom] = CCCassFormatEncoder.derive
+  implicit val decoder: CCCassFormatDecoder[MyTableWithCustom] = CCCassFormatDecoder.derive
+}
+```
+
+the `customEncoder` and `customDecoder` only need to be in scope for the companion object, and will be accessible 
+everywhere else automatically.
 
 ## Parsing Performance
 
