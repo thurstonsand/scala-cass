@@ -6,14 +6,14 @@ import shapeless.{::, Generic, HList, HNil, Lazy}
 abstract class DerivedTupleCassFormatEncoder[T] extends TupleCassFormatEncoder[T]
 
 object DerivedTupleCassFormatEncoder {
-  implicit val hNilEncoder: TupleCassFormatEncoder[HNil] = new TupleCassFormatEncoder[HNil] {
+  implicit val hNilEncoder: DerivedTupleCassFormatEncoder[HNil] = new DerivedTupleCassFormatEncoder[HNil] {
     def encode(tup: HNil) = Right(Nil)
     def types = Nil
     def dataTypes = Nil
   }
 
-  implicit def hConsEncoder[H, T <: HList](implicit tdH: CassFormatEncoder[H], tdT: TupleCassFormatEncoder[T]): TupleCassFormatEncoder[H :: T] =
-    new TupleCassFormatEncoder[H :: T] {
+  implicit def hConsEncoder[H, T <: HList](implicit tdH: CassFormatEncoder[H], tdT: DerivedTupleCassFormatEncoder[T]): DerivedTupleCassFormatEncoder[H :: T] =
+    new DerivedTupleCassFormatEncoder[H :: T] {
       def encode(tup: H :: T): Either[Throwable, List[AnyRef]] = for {
         h <- tdH.encode(tup.head).right
         t <- tdT.encode(tup.tail).right
@@ -22,8 +22,8 @@ object DerivedTupleCassFormatEncoder {
       def dataTypes = tdH.cassDataType :: tdT.dataTypes
     }
 
-  implicit def tupleEncoder[T <: Product, Repr <: HList](implicit gen: Generic.Aux[T, Repr], hListEncoder: TupleCassFormatEncoder[Repr]): TupleCassFormatEncoder[T] =
-    new TupleCassFormatEncoder[T] {
+  implicit def tupleEncoder[T <: Product, Repr <: HList](implicit gen: Generic.Aux[T, Repr], hListEncoder: DerivedTupleCassFormatEncoder[Repr]): DerivedTupleCassFormatEncoder[T] =
+    new DerivedTupleCassFormatEncoder[T] {
       def encode(tup: T): Either[Throwable, List[AnyRef]] = hListEncoder.encode(gen.to(tup))
       def types = hListEncoder.types
       def dataTypes = hListEncoder.dataTypes
