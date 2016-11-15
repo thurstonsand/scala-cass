@@ -4,6 +4,7 @@ import java.util.concurrent.Callable
 
 import com.datastax.driver.core._
 import com.google.common.cache.CacheBuilder
+import com.weather.scalacass.scsession.{SCDeleteStatement, SCInsertStatement, SCSelectStatement, SCUpdateStatement}
 import exceptions.QueryExecutionException
 import com.google.common.util.concurrent.{FutureCallback, Futures}
 
@@ -24,7 +25,7 @@ object ScalaSession {
     new ScalaSession(keyspace)
   }
 
-  private implicit def resultSetFutureToScalaFuture(f: ResultSetFuture): Future[ResultSet] = {
+  private[scalacass] implicit def resultSetFutureToScalaFuture(f: ResultSetFuture): Future[ResultSet] = {
     val p = Promise[ResultSet]()
     Futures.addCallback(
       f,
@@ -142,6 +143,8 @@ class ScalaSession(val keyspace: String)(implicit val session: Session) {
     if (fullStrArgs.isEmpty) ""
     else s" $op ${fullStrArgs.mkString(if (op == "WHERE") " AND " else ", ")}"
 
+  def getFromCacheOrElse(key: String, statement: => PreparedStatement) = queryCache.get(Set(key), statement)
+
   private[this] def prepareInsert[T: CCCassFormatEncoder](table: String, insertable: T, ttl: Option[Int]): BoundStatement = {
     val (queryStrArgs, queryAnyrefArgs) = namedEncode(insertable)
     val ttlAsString = ttlStr(ttl)
@@ -154,8 +157,7 @@ class ScalaSession(val keyspace: String)(implicit val session: Session) {
     prepared.bind(queryAnyrefArgs: _*)
   }
 
-  def insert[T: CCCassFormatEncoder](table: String, insertable: T, ttl: Option[Int] = None): ResultSet = session.execute(prepareInsert(table, insertable, ttl))
-  def insertAsync[T: CCCassFormatEncoder](table: String, insertable: T, ttl: Option[Int] = None): Future[ResultSet] = session.executeAsync(prepareInsert(table, insertable, ttl))
+  def insert[I: CCCassFormatEncoder](table: String, insertable: I): SCInsertStatement = SCInsertStatement(keyspace, table, insertable, this)
 
   private[this] def prepareUpdate[T: CCCassFormatEncoder, S: CCCassFormatEncoder](table: String, updateable: T, query: S, ttl: Option[Int]): BoundStatement = {
     val (updateStrArgs, updateAnyrefArgs) = queryEncode(updateable)
@@ -169,10 +171,8 @@ class ScalaSession(val keyspace: String)(implicit val session: Session) {
     prepared.bind(updateAnyrefArgs ++ queryAnyrefArgs: _*)
   }
 
-  def update[T: CCCassFormatEncoder, S: CCCassFormatEncoder](table: String, updateable: T, query: S, ttl: Option[Int] = None): ResultSet =
-    session.execute(prepareUpdate(table, updateable, query, ttl))
-  def updateAsync[T: CCCassFormatEncoder, S: CCCassFormatEncoder](table: String, updateable: T, query: S, ttl: Option[Int] = None): Future[ResultSet] =
-    session.executeAsync(prepareUpdate(table, updateable, query, ttl))
+  def update[U: CCCassFormatEncoder, Q: CCCassFormatEncoder](table: String, updateable: U, query: Q): SCUpdateStatement =
+    SCUpdateStatement(keyspace, table, updateable, query, this)
 
   private[this] def prepareDelete[T: CCCassFormatEncoder](table: String, deletable: T): BoundStatement = {
     val (queryStrArgs, queryAnyrefArgs) = queryEncode(deletable)
@@ -182,10 +182,14 @@ class ScalaSession(val keyspace: String)(implicit val session: Session) {
     )
     prepared.bind(queryAnyrefArgs: _*)
   }
-  def delete[T: CCCassFormatEncoder](table: String, deletable: T): ResultSet =
-    session.execute(prepareDelete(table, deletable))
-  def deleteAsync[T: CCCassFormatEncoder](table: String, deletable: T): Future[ResultSet] =
-    session.executeAsync(prepareDelete(table, deletable))
+  def delete[D] = dh.asInstanceOf[DeleteHelper[D]]
+  def deleteStar = dh.asInstanceOf[DeleteHelper[Star]]
+  private[this] val dh = new DeleteHelper[Nothing]
+
+  final class DeleteHelper[D] {
+    def apply[Q: CCCassFormatEncoder](table: String, where: Q)(implicit dEncoder: CCCassFormatEncoder[D]): SCDeleteStatement =
+      SCDeleteStatement[D, Q](keyspace, table, where, ScalaSession.this)
+  }
 
   @SuppressWarnings(Array("org.brianmckenna.wartremover.warts.Any"))
   def prepareBatch(batches: Seq[Batch], batchType: BatchStatement.Type): BatchStatement = {
@@ -212,10 +216,14 @@ class ScalaSession(val keyspace: String)(implicit val session: Session) {
     prepared.bind(queryAnyrefArgs: _*)
   }
 
-  def select[T: CCCassFormatEncoder](table: String, selectable: T, allowFiltering: Boolean = false, limit: Option[Long] = None): Iterator[Row] =
-    session.execute(prepareSelect[Star, T](table, selectable, allowFiltering, limit)).iterator.asScala
-  def selectAsync[T: CCCassFormatEncoder](table: String, selectable: T, allowFiltering: Boolean = false, limit: Option[Long] = None): Future[Iterator[Row]] =
-    session.executeAsync(prepareSelect[Star, T](table, selectable, allowFiltering, limit)).map(_.iterator.asScala)
+  def select[S] = sh.asInstanceOf[SelectHelper[S]]
+  def selectStar = sh.asInstanceOf[SelectHelper[Star]]
+  private[this] val sh = new SelectHelper[Nothing]
+
+  final class SelectHelper[S] {
+    def apply[Q: CCCassFormatEncoder](table: String, where: Q)(implicit sEncoder: CCCassFormatEncoder[S]): SCSelectStatement =
+      SCSelectStatement[S, Q](keyspace, table, where, ScalaSession.this)
+  }
   def selectOne[T: CCCassFormatEncoder](table: String, selectable: T, allowFiltering: Boolean = false): Option[Row] =
     Option(session.execute(prepareSelect[Star, T](table, selectable, allowFiltering, Some(1))).one())
   def selectOneAsync[T: CCCassFormatEncoder](table: String, selectable: T, allowFiltering: Boolean = false): Future[Option[Row]] =
