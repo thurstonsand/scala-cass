@@ -16,9 +16,10 @@ trait ActionUnitTests extends CassandraUnitTester {
 
   override def beforeAll(): Unit = {
     super.beforeAll()
-    _ss = ScalaSession(keyspace, "replication = {'class': 'SimpleStrategy', 'replication_factor': 1}")
+    _ss = ScalaSession(keyspace)
+    _ss.createKeyspace("replication = {'class': 'SimpleStrategy', 'replication_factor': 1}")
     _table = "mytable" // s"mytable_${java.util.UUID.randomUUID.toString.take(5)}"
-    ss.createTable[Table](table, 1, 0)
+    ss.createTable[Table](table, 1, 0).execute
     ()
   }
   override def beforeEach(): Unit = {
@@ -26,5 +27,4 @@ trait ActionUnitTests extends CassandraUnitTester {
     ss.truncateTable(table)
     ()
   }
-  override def afterEach(): Unit = {}
 }

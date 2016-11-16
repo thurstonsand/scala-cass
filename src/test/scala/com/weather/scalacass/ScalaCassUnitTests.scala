@@ -50,19 +50,19 @@ abstract class ScalaCassUnitTests extends CassandraWithTableTester("testDB", "te
     case class QueryCC(pkField: String)
     val ss = new ScalaSession(dbName)
     val tname = s"testdb${scala.util.Random.alphanumeric.take(12).mkString}"
-    ss.createTable[TestCC](tname, 1, 0)(CCCassFormatEncoder[TestCC])
+    ss.createTable[TestCC](tname, 1, 0)(CCCassFormatEncoder[TestCC]).execute
     val t1 = TestCC("t1", v)
     val q1 = QueryCC(t1.pkField)
-    ss.insert(tname, t1)(CCCassFormatEncoder[TestCC])
+    ss.insert(tname, t1)(CCCassFormatEncoder[TestCC]).execute
     k match {
       case "b" =>
-        ss.selectOne(tname, ScalaSession.NoQuery()).flatMap(_.getAs[TestCC]).map(_.refField.asInstanceOf[Array[Byte]]).value should contain theSameElementsInOrderAs t1.refField.asInstanceOf[Array[Byte]]
+        ss.selectOneStar(tname, ScalaSession.NoQuery()).execute.right.toOption.flatten.flatMap(_.getAs[TestCC]).map(_.refField.asInstanceOf[Array[Byte]]).value should contain theSameElementsInOrderAs t1.refField.asInstanceOf[Array[Byte]]
       case "sblob" =>
-        ss.selectOne(tname, ScalaSession.NoQuery()).flatMap(_.getAs[TestCC]).flatMap(_.refField.asInstanceOf[Set[Array[Byte]]].headOption).value should contain theSameElementsInOrderAs t1.refField.asInstanceOf[Set[Array[Byte]]].head
+        ss.selectOneStar(tname, ScalaSession.NoQuery()).execute.right.toOption.flatten.flatMap(_.getAs[TestCC]).flatMap(_.refField.asInstanceOf[Set[Array[Byte]]].headOption).value should contain theSameElementsInOrderAs t1.refField.asInstanceOf[Set[Array[Byte]]].head
       case _ =>
-        ss.selectOne(tname, q1).flatMap(_.getAs[TestCC]).value shouldBe t1
+        ss.selectOneStar(tname, q1).execute.right.toOption.flatten.flatMap(_.getAs[TestCC]).value shouldBe t1
     }
-    ss.delete[ScalaSession.NoQuery](tname, q1)
+    ss.delete[ScalaSession.NoQuery](tname, q1).execute
     ss.select[ScalaSession.Star](tname, q1).execute.right.toOption.value.toList.map(_.as[TestCC]) shouldBe empty
     ss.dropTable(tname)
   }
@@ -127,12 +127,12 @@ class ScalaCassUnitTestsAll extends ScalaCassUnitTests with ScalaCassUnitTestsVe
     case class QueryCC(str: String)
     val tname = "derivedtable"
     val ss = ScalaSession(dbName)
-    ss.createTable[CounterCC](tname, 1, 0)
+    ss.createTable[CounterCC](tname, 1, 0).execute
     val t1 = CounterCC("t1", 1)
     val q1 = QueryCC(t1.str)
-    ss.insert(tname, t1)
-    ss.selectOne(tname, q1).value.as[CounterCC] shouldBe t1
-    ss.delete[ScalaSession.NoQuery](tname, q1)
+    ss.insert(tname, t1).execute
+    ss.selectOneStar(tname, q1).execute.right.toOption.flatten.value.as[CounterCC] shouldBe t1
+    ss.delete[ScalaSession.NoQuery](tname, q1).execute
     ss.select[ScalaSession.Star](tname, q1).execute.right.toOption.value.toList shouldBe empty
   }
 }

@@ -9,10 +9,12 @@ abstract class CassandraUnitTester extends CassandraTester {
     _client = Some(CassandraClient(List("localhost"), Some(EmbeddedCassandraServerHelper.getNativeTransportPort)))
   }
 
-  def beforeEach(): Unit = {}
-  def afterEach(): Unit = {
+  override def afterAll() = {
     EmbeddedCassandraServerHelper.cleanEmbeddedCassandra()
   }
+
+  def beforeEach(): Unit = {}
+  def afterEach(): Unit = {}
 
   before {
     beforeEach()

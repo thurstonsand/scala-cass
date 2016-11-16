@@ -101,11 +101,13 @@ object QueryBuildingBlock {
     protected def infix: String
     protected def suffix: String
     protected def strList: Result[List[String]]
+    protected def skipIfEmpty: Boolean
 
-    def strRepr: Result[String] = strList.map(_.mkString(prefix, infix, suffix))
+    def strRepr: Result[String] = strList.map(strs => if (skipIfEmpty && strs.isEmpty) "" else strs.mkString(prefix, infix, suffix))
   }
 
-  abstract class CCBlockWithNamedValue[T: CCCassFormatEncoder](protected val prefix: String, protected val infix: String, protected val suffix: String) extends CCBlock { this: QueryBuildingBlock =>
+
+  abstract class CCBlockWithNamedValue[T: CCCassFormatEncoder](protected val skipIfEmpty: Boolean, protected val prefix: String, protected val infix: String, protected val suffix: String) extends CCBlock { this: QueryBuildingBlock =>
     protected def cc: T
     protected lazy val namedEncoded = namedEncode(cc)
     protected lazy val strList = namedEncoded.map(_._1)
@@ -113,7 +115,7 @@ object QueryBuildingBlock {
     def valueRepr = namedEncoded.map(_._2)
   }
 
-  abstract class CCBlockWithQueryValue[T: CCCassFormatEncoder](protected val prefix: String, protected val infix: String, protected val suffix: String) extends CCBlock { this: QueryBuildingBlock =>
+  abstract class CCBlockWithQueryValue[T: CCCassFormatEncoder](protected val skipIfEmpty: Boolean, protected val prefix: String, protected val infix: String, protected val suffix: String) extends CCBlock { this: QueryBuildingBlock =>
     protected def cc: T
     protected lazy val queryEncoded = queryEncode(cc)
     protected lazy val strList = queryEncoded.map(_._1)
@@ -121,7 +123,7 @@ object QueryBuildingBlock {
     def valueRepr = queryEncoded.map(_._2)
   }
 
-  abstract class CCBlockWithNoValue[T](protected val preambleInfix: String)(implicit encoder: CCCassFormatEncoder[T]) extends CCBlock { this: QueryBuildingBlock =>
+  abstract class CCBlockWithNoValue[T](protected val skipIfEmpty: Boolean, protected val preambleInfix: String)(implicit encoder: CCCassFormatEncoder[T]) extends CCBlock { this: QueryBuildingBlock =>
     protected def preamble: Preamble
     protected lazy val strList = Right(encoder.names)
 
@@ -132,16 +134,16 @@ object QueryBuildingBlock {
     def valueRepr = Right(Nil)
   }
 
-  case class CCBlockInsert[T: CCCassFormatEncoder](protected val cc: T) extends CCBlockWithNamedValue(" (", ", ", ")") with QueryBuildingBlock {
+  case class CCBlockInsert[T: CCCassFormatEncoder](protected val cc: T) extends CCBlockWithNamedValue(true, " (", ", ", ")") with QueryBuildingBlock {
     override def strRepr: Result[String] = strList.map { ns =>
       if (ns.isEmpty) ""
       else s"${ns.mkString(prefix, infix, suffix)} VALUES ${List.fill(ns.length)("?").mkString(prefix, infix, suffix)}"
     }
   }
-  case class CCBlockDelete[T](protected val preamble: Preamble)(implicit encoder: CCCassFormatEncoder[T]) extends CCBlockWithNoValue[T]("FROM") with QueryBuildingBlock
-  case class CCBlockSelect[T](preamble: Preamble)(implicit encoder: CCCassFormatEncoder[T]) extends CCBlockWithNoValue[T]("FROM") with QueryBuildingBlock
-  case class CCBlockUpdate[T: CCCassFormatEncoder](protected val cc: T) extends CCBlockWithQueryValue(" SET ", ", ", "") with QueryBuildingBlock
-  case class CCBlockWhere[T: CCCassFormatEncoder](protected val cc: T) extends CCBlockWithQueryValue(" WHERE ", " AND ", "") with QueryBuildingBlock
+  case class CCBlockDelete[T](protected val preamble: Preamble)(implicit encoder: CCCassFormatEncoder[T]) extends CCBlockWithNoValue[T](false, "FROM") with QueryBuildingBlock
+  case class CCBlockSelect[T](preamble: Preamble)(implicit encoder: CCCassFormatEncoder[T]) extends CCBlockWithNoValue[T](false, "FROM") with QueryBuildingBlock
+  case class CCBlockUpdate[T: CCCassFormatEncoder](protected val cc: T) extends CCBlockWithQueryValue(true, " SET ", ", ", "") with QueryBuildingBlock
+  case class CCBlockWhere[T: CCCassFormatEncoder](protected val cc: T) extends CCBlockWithQueryValue(true, " WHERE ", " AND ", "") with QueryBuildingBlock
 
   sealed trait If extends QueryBuildingBlock
 
@@ -158,7 +160,7 @@ object QueryBuildingBlock {
       val valueRepr = Right(Nil)
     }
 
-    case class IfStatement[A: CCCassFormatEncoder](cc: A) extends CCBlockWithQueryValue(" IF ", " AND ", "") with If
+    case class IfStatement[A: CCCassFormatEncoder](cc: A) extends CCBlockWithQueryValue(false, " IF ", " AND ", "") with If
   }
 
   sealed trait Limit extends QueryBuildingBlock
@@ -178,6 +180,40 @@ object QueryBuildingBlock {
     case object AllowFiltering extends Filtering {
       val strRepr: Result[String] = Right(" ALLOW FILTERING")
       val valueRepr: Result[List[AnyRef]] = Right(Nil)
+    }
+  }
+
+  case class Raw(private val _strRepr: String, private val anyrefArgs: List[AnyRef]) extends QueryBuildingBlock {
+    def strRepr = Right(_strRepr)
+    def valueRepr = Right(anyrefArgs)
+  }
+
+  case class CreateTable[T](keyspace: String, name: String, numPartitionKeys: Int, numClusteringKeys: Int)(implicit encoder: CCCassFormatEncoder[T]) extends QueryBuildingBlock {
+    private[this] def wrongPKSize(m: String) = {
+      val failed = Left(new WrongPrimaryKeySizeException(m))
+      (failed, failed)
+    }
+
+    lazy val allColumns = encoder.namesAndTypes
+
+    lazy val (strRepr: Result[String], valueRepr: Result[List[AnyRef]]) =
+      if (numPartitionKeys <= 0) wrongPKSize("must include at least one partition key")
+      else if (numPartitionKeys + numClusteringKeys > allColumns.length) wrongPKSize(s"too many partition+clustering keys for table $name")
+      else {
+        val (partitionKeys, rest) = allColumns.splitAt(numPartitionKeys)
+        val clusteringKeys = rest.take(numClusteringKeys)
+        val pk = s"${partitionKeys.map(_._1).mkString("(", ", ", ")")}"
+        val fullKey = if (numClusteringKeys > 0) s"($pk, ${clusteringKeys.map(_._1).mkString(", ")})" else s"($pk)"
+        (Right(s"CREATE TABLE $keyspace.$name (${allColumns.map(nt => s"${nt._1} ${nt._2}").mkString(", ")}, PRIMARY KEY $fullKey)"), Right(Nil))
+      }
+  }
+
+  sealed trait TableProperties extends QueryBuildingBlock
+  object TableProperties {
+    case object NoProperties extends NoQuery with TableProperties
+    case class With(properties: String) extends TableProperties {
+      def strRepr = Right(s" WITH $properties")
+      def valueRepr = Right(Nil)
     }
   }
 
