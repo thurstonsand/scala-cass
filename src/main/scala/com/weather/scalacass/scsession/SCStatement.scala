@@ -18,6 +18,9 @@ object SCStatement {
     }
     def getOrElse[BB >: B](or: => BB): BB = e.right.getOrElse(or)
   }
+  type SCResultSetStatement = SCStatement[ResultSet]
+  type SCIteratorStatement = SCStatement[Iterator[Row]]
+  type SCOptionStatement = SCStatement[Option[Row]]
 }
 trait SCStatement[Response] {
   import SCStatement.RightBiasedEither
@@ -174,7 +177,13 @@ object SCCreateTableStatement {
     new SCCreateTableStatement(CreateTable(keyspace, name, numPartitionKeys, numClusteringKeys))(sSession)
 }
 
-case class SCBatchStatement(private val statements: Seq[SCBatchStatement.Batchable], private val batchType: BatchStatement.Type = BatchStatement.Type.LOGGED)(implicit protected val sSession: ScalaSession) extends SCStatement[ResultSet] {
+case class SCBatchStatement(
+    private val statements: Seq[SCBatchStatement.Batchable],
+    private val batchType: BatchStatement.Type = BatchStatement.Type.LOGGED
+)(
+    implicit
+    protected val sSession: ScalaSession
+) extends SCStatement[ResultSet] {
   import SCStatement.RightBiasedEither
   import ScalaSession.resultSetFutureToScalaFuture
 

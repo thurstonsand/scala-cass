@@ -10,12 +10,6 @@ import com.weather.scalacass.scsession.SCBatchStatement.Batchable
 
 import scala.concurrent.{Future, Promise}
 
-sealed trait Batch extends Product with Serializable
-final case class UpdateBatch[T, S](table: String, updateable: T, query: S, ttl: Option[Int] = None)(implicit val tEncoder: CCCassFormatEncoder[T], val sEncoder: CCCassFormatEncoder[S]) extends Batch
-final case class DeleteBatch[T](table: String, item: T)(implicit val tEncoder: CCCassFormatEncoder[T]) extends Batch
-final case class InsertBatch[T](table: String, item: T, ttl: Option[Int] = None)(implicit val tEncoder: CCCassFormatEncoder[T]) extends Batch
-final case class RawBatch(query: String, anyrefArgs: AnyRef*) extends Batch
-
 object ScalaSession {
   private[scalacass] implicit def resultSetFutureToScalaFuture(f: ResultSetFuture): Future[ResultSet] = {
     val p = Promise[ResultSet]()
@@ -120,6 +114,7 @@ case class ScalaSession(keyspace: String)(implicit val session: Session) {
   }
 
   def batch(batches: Seq[Batchable]): SCBatchStatement = SCBatchStatement(batches, this)
+  def batchOf(batches: Batchable*): SCBatchStatement = SCBatchStatement(batches, this)
 
   def select[S] = sh.asInstanceOf[SelectHelper[S]]
   def selectStar = sh.asInstanceOf[SelectHelper[Star]]

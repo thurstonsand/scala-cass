@@ -202,10 +202,15 @@ object CassFormatDecoder extends CassFormatDecoderVersionSpecific {
     val clazz = underlying.clazz
     def f2t(f: From): Either[Throwable, Option[A]] = underlying.f2t(f).right.map(Option(_))
     def extract(r: Row, name: String) = underlying.extract(r, name)
-    override def decode(r: Row, name: String): Either[Throwable, Option[A]] = Right(super.decode(r, name).right getOrElse None)
+    override def decode(r: Row, name: String): Either[Throwable, Option[A]] = super.decode(r, name) match {
+      case Left(_: ValueNotDefinedException) => Right(None)
+      case other                             => other
+    }
     def tupleExtract(tup: TupleValue, pos: Int) = underlying.tupleExtract(tup, pos)
-    override def tupleDecode(tup: TupleValue, pos: Int): Either[Throwable, Option[A]] =
-      Right(super.tupleDecode(tup, pos).right getOrElse None)
+    override def tupleDecode(tup: TupleValue, pos: Int): Either[Throwable, Option[A]] = super.tupleDecode(tup, pos) match {
+      case Left(_: ValueNotDefinedException) => Right(IsNull)
+      case other                             => other
+    }
   }
 
   implicit def eitherFormat[A](implicit underlying: CassFormatDecoder[A]): CassFormatDecoder[Either[Throwable, A]] = new CassFormatDecoder[Either[Throwable, A]] {

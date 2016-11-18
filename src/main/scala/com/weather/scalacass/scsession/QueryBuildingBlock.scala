@@ -15,19 +15,38 @@ trait QueryBuildingBlock {
 object QueryBuildingBlock {
   import SCStatement.RightBiasedEither
 
-  @SuppressWarnings(Array("org.brianmckenna.wartremover.warts.AsInstanceOf", "org.brianmckenna.wartremover.warts.IsInstanceOf", "org.brianmckenna.wartremover.warts.Any"))
-  private[this] def encode(encoded: Result[List[(String, AnyRef)]]): Result[(List[String], List[AnyRef])] = {
-    encoded.right.map(_.flatMap {
-      case (str, Some(anyref: AnyRef)) => List((str, anyref))
-      case (_, None)                   => Nil
-      case other                       => List(other)
-    }.unzip)
-  }
   def namedEncode[A](toEncode: A)(implicit encoder: CCCassFormatEncoder[A]): Result[(List[String], List[AnyRef])] =
-    encode(encoder.encodeWithName(toEncode))
+    encoder.encodeWithName(toEncode).right.map { e =>
+      val strList = List.newBuilder[String]
+      val anyrefList = List.newBuilder[AnyRef]
+
+      e.foreach {
+        case (str, Some(anyref: AnyRef)) =>
+          strList += str; anyrefList += anyref
+        case (_, None) =>
+        case (str, anyref) =>
+          strList += str; anyrefList += anyref
+      }
+      (strList.result, anyrefList.result)
+    }
 
   def queryEncode[A](toEncode: A)(implicit encoder: CCCassFormatEncoder[A]): Result[(List[String], List[AnyRef])] =
-    encode(encoder.encodeWithQuery(toEncode))
+    encoder.encodeWithQuery(toEncode).right.map { e =>
+      val strList = List.newBuilder[String]
+      val anyrefList = List.newBuilder[AnyRef]
+
+      e.foreach {
+        case (str, Some(anyref: AnyRef)) =>
+          strList += str; anyrefList += anyref
+        case (_, None) =>
+        case (str, Valid(anyref: AnyRef)) =>
+          strList += str; anyrefList += anyref
+        case (str, _: Nullable[_]) => strList += str
+        case (str, anyref) =>
+          strList += str; anyrefList += anyref
+      }
+      (strList.result, anyrefList.result)
+    }
 
   trait NoQuery { this: QueryBuildingBlock =>
     val strRepr: Result[String] = Right("")
@@ -105,7 +124,6 @@ object QueryBuildingBlock {
 
     def strRepr: Result[String] = strList.map(strs => if (skipIfEmpty && strs.isEmpty) "" else strs.mkString(prefix, infix, suffix))
   }
-
 
   abstract class CCBlockWithNamedValue[T: CCCassFormatEncoder](protected val skipIfEmpty: Boolean, protected val prefix: String, protected val infix: String, protected val suffix: String) extends CCBlock { this: QueryBuildingBlock =>
     protected def cc: T

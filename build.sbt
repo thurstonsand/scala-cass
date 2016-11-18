@@ -15,11 +15,11 @@ def wrongCassVersion = new RuntimeException("unknown cassVersion. use either \""
 
 version := {
   val majorVersion = (cassVersion.value, javaVersion.value) match {
-    case (`cassV3`, "1.8") => "6"
-    case (`cassV21`, "1.7") => "5"
+    case (`cassV3`, "1.8") => "2"
+    case (`cassV21`, "1.7") => "1"
     case (cv, jv) => throw new RuntimeException("invalid cassandra/java version combination: " + cv + "/" + jv + ". use either cass \"" + cassV3 + "\" with java 8 or cass \"" + cassV21 + "\" with java 7")
   }
-  s"0.$majorVersion.13"
+  s"$majorVersion.0.0-M1"
 }
 
 scalaVersion := "2.11.8"
