@@ -33,6 +33,8 @@ scalacOptions ++= Seq(
   case _             => Seq.empty
 })
 
+addCompilerPlugin("org.scalamacros" % "paradise" % "2.1.0" cross CrossVersion.full)
+
 libraryDependencies ++= Seq(
   "com.google.code.findbugs" % "jsr305" % "3.0.1" % "provided", // Intellij does not like "compile-internal, test-internal", use "provided" instead
   "org.joda" % "joda-convert" % "1.8.1" % "provided", // Intellij does not like "compile-internal, test-internal", use "provided" instead
@@ -88,6 +90,17 @@ wartremoverWarnings in (Compile, compile) ++= Seq(
   Wart.TryPartial, Wart.Var,
   Wart.Enumeration, Wart.FinalCaseClass, Wart.JavaConversions)
 wartremoverWarnings in (Compile, console) := Seq.empty
+
+initialize := {
+  CrossVersion.partialVersion(scalaVersion.value) match {
+    case Some((2, 10)) => sys.props("scalac.patmat.analysisBudget") = "off"
+    case _             => sys.props remove "scalac.patmat.analysisBudget"
+  }
+}
+
+scalacOptions in (Compile, console) ~= (_ filterNot (_ == "-Ywarn-unused-import"))
+scalacOptions in (Test, console) := (scalacOptions in (Compile, console)).value
+parallelExecution in Test := false
 
 organization := "com.github.thurstonsand"
 name := "ScalaCass"
