@@ -1,7 +1,7 @@
 #!/usr/bin/env sh
 
-mkdir lib
-wget https://github.com/Ichoran/thyme/raw/master/Thyme.jar -O lib/Thyme.jar
+mkdir scalacass/lib
+wget https://github.com/Ichoran/thyme/raw/master/Thyme.jar -O scalacass/lib/Thyme.jar
 
 sudo rm /etc/init.d/cassandra /etc/security/limits.d/cassandra.conf
 cassVersion=""
