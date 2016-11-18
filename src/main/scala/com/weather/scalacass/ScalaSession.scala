@@ -114,7 +114,7 @@ case class ScalaSession(keyspace: String)(implicit val session: Session) {
   }
 
   def batch(batches: Seq[Batchable]): SCBatchStatement = SCBatchStatement(batches, this)
-  def batchOf(batches: Batchable*): SCBatchStatement = SCBatchStatement(batches, this)
+  def batchOf(batch: Batchable, batches: Batchable*): SCBatchStatement = SCBatchStatement(batch +: batches, this)
 
   def select[S] = sh.asInstanceOf[SelectHelper[S]]
   def selectStar = sh.asInstanceOf[SelectHelper[Star]]
