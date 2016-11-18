@@ -3,14 +3,12 @@ package com.weather.scalacass
 import java.nio.ByteBuffer
 
 import com.datastax.driver.core.{DataType, Row, TupleValue}
-import com.datastax.driver.core.exceptions.{InvalidTypeException, QueryExecutionException}
+import com.datastax.driver.core.exceptions.InvalidTypeException
 import NotRecoverable.Try2Either
 
 import scala.util.Try
 
 trait CassFormatDecoder[T] { self =>
-  import CassFormatDecoder.ValueNotDefinedException
-
   private[scalacass]type From <: AnyRef
   private[scalacass] def clazz: Class[From]
   private[scalacass] def f2t(f: From): Result[T]
@@ -70,8 +68,6 @@ trait LowPriorityCassFormatDecoder {
 object CassFormatDecoder extends CassFormatDecoderVersionSpecific {
   type Aux[T, From0] = CassFormatDecoder[T] { type From = From0 }
   def apply[T](implicit decoder: CassFormatDecoder[T]): CassFormatDecoder[T] = decoder
-
-  class ValueNotDefinedException(m: String) extends QueryExecutionException(m)
 
   private[scalacass] def sameTypeCassFormatDecoder[T <: AnyRef](_clazz: Class[T], _extract: (Row, String) => T, _tupExtract: (TupleValue, Int) => T) = new CassFormatDecoder[T] {
     type From = T

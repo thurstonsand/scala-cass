@@ -1,6 +1,5 @@
 package com.weather.scalacass
 import com.datastax.driver.core.{DataType, Row, TupleValue}
-import com.weather.scalacass.CassFormatDecoder.ValueNotDefinedException
 
 sealed trait Nullable[+A] {
   def toOption: Option[A]
