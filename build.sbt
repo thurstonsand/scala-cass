@@ -114,12 +114,16 @@ pomIncludeRepository := (_ => false)
 bintrayReleaseOnPublish in ThisBuild := false
 bintrayPackageLabels := Seq("cassandra")
 
+enablePlugins(MicrositesPlugin)
 micrositeAuthor := "Thurston Sandberg"
 micrositeDescription := "Java Cassandra driver bindings for friendlier Scala"
 micrositeGithubOwner := "thurstonsand"
 micrositeGithubRepo := "scala-cass"
 micrositeBaseUrl := ""
-com.typesafe.sbt.SbtGhPages.GhPagesKeys.ghpagesNoJekyll := false
 micrositeHomepage := "http://thurstonsand.github.io/scala-cass"
+micrositeImgDirectory := baseDirectory.value / "docs" / "imgs"
+micrositeCssDirectory := baseDirectory.value / "docs" / "css"
+micrositeDataDirectory := baseDirectory.value / "docs" / "data"
 includeFilter in makeSite := "*.html" | "*.css" | "*.png" | "*.jpg" | "*.gif" | "*.js" | "*.swf" | "*.yml" | "*.md"
+com.typesafe.sbt.SbtGhPages.GhPagesKeys.ghpagesNoJekyll := false
 fork in tut := true
