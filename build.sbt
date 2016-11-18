@@ -1,11 +1,11 @@
 val cassV2 = "2.1"
 val cassV3 = "3.0+"
-lazy val javaVersion = sys.props("java.specification.version")
-lazy val cassVersion = sys.props.getOrElse("cassVersion", javaVersion match {
+val javaVersion = sys.props("java.specification.version")
+val cassVersion = sys.props.getOrElse("cassVersion", javaVersion match {
   case "1.7" => cassV2
   case _     => cassV3
 })
-lazy val projectVersion = {
+version := {
   val majorVersion = (cassVersion, javaVersion) match {
     case (`cassV3`, "1.8") => "2"
     case (`cassV2`, "1.7") => "1"
@@ -14,7 +14,7 @@ lazy val projectVersion = {
   s"$majorVersion.0.0-M2"
 }
 
-lazy val commonScalacOptions = scalacOptions ++= Seq(
+scalacOptions ++= Seq(
   "-deprecation",
   "-encoding", "UTF-8",
   "-feature",
@@ -33,7 +33,7 @@ lazy val commonScalacOptions = scalacOptions ++= Seq(
   case _             => Seq.empty
 })
 
-lazy val commonDependencies = libraryDependencies ++= Seq(
+libraryDependencies ++= Seq(
   "com.google.code.findbugs" % "jsr305" % "3.0.1" % "provided", // Intellij does not like "compile-internal, test-internal", use "provided" instead
   "org.joda" % "joda-convert" % "1.8.1" % "provided", // Intellij does not like "compile-internal, test-internal", use "provided" instead
   "org.slf4j" % "slf4j-api" % "1.7.21" % "provided", // Intellij does not like "compile-internal, test-internal", use "provided" instead
@@ -55,109 +55,71 @@ lazy val commonDependencies = libraryDependencies ++= Seq(
   case _ => throw new RuntimeException("unknown cassVersion. use either \"" + cassV3 + "\" or \"" + cassV2 + "\"")
 })
 
-lazy val versionSpecificSourceDirectories = {
-  def addSourceFilesTo(conf: Configuration) =
-    unmanagedSourceDirectories in conf := {
-      val sds = (unmanagedSourceDirectories in conf).value
-      val sd = (sourceDirectory in conf).value
+def addSourceFilesTo(conf: Configuration) =
+  unmanagedSourceDirectories in conf := {
+    val sds = (unmanagedSourceDirectories in conf).value
+    val sd = (sourceDirectory in conf).value
 
-      cassVersion match {
-        case `cassV3` => sds ++ Seq(new java.io.File(sd, "scala_cass3"))
-        case `cassV2` => sds ++ Seq(new java.io.File(sd, "scala_cass21"))
-        case _ => throw new RuntimeException("unknown cassVersion. use either \"" + cassV3 + "\" or \"" + cassV2 + "\"")
-      }
+    cassVersion match {
+      case `cassV3` => sds ++ Seq(new java.io.File(sd, "scala_cass3"))
+      case `cassV2` => sds ++ Seq(new java.io.File(sd, "scala_cass21"))
+      case _ => throw new RuntimeException("unknown cassVersion. use either \"" + cassV3 + "\" or \"" + cassV2 + "\"")
     }
-  Seq(
-    addSourceFilesTo(Compile),
-    addSourceFilesTo(Test)
-  )
-}
+  }
+addSourceFilesTo(Compile)
+addSourceFilesTo(Test)
 
-lazy val codeStyleSettings = {
-  import scalariform.formatter.preferences._
-  import com.typesafe.sbt.SbtScalariform, SbtScalariform.ScalariformKeys
+import scalariform.formatter.preferences._
+import com.typesafe.sbt.SbtScalariform, SbtScalariform.ScalariformKeys
 
-  SbtScalariform.scalariformSettings ++
-  Seq(
-    ScalariformKeys.preferences := ScalariformKeys.preferences.value
-      .setPreference(AlignSingleLineCaseStatements, true)
-      .setPreference(DoubleIndentClassDeclaration, true)
-      .setPreference(DanglingCloseParenthesis, Force)
-      .setPreference(SpacesAroundMultiImports, false),
-    wartremoverWarnings in (Compile, compile) := Seq.empty,
-    wartremoverWarnings in (Compile, compile) ++= Seq(
-      Wart.Any, Wart.Any2StringAdd,
-      Wart.EitherProjectionPartial, Wart.ListOps,
-      Wart.Null, Wart.OptionPartial,
-      Wart.Product, Wart.Return, Wart.Serializable,
-      Wart.TryPartial, Wart.Var,
-      Wart.Enumeration, Wart.FinalCaseClass, Wart.JavaConversions),
-    wartremoverWarnings in (Compile, console) := Seq.empty
-  )
-}
+SbtScalariform.scalariformSettings
+ScalariformKeys.preferences := ScalariformKeys.preferences.value
+  .setPreference(AlignSingleLineCaseStatements, true)
+  .setPreference(DoubleIndentClassDeclaration, true)
+  .setPreference(DanglingCloseParenthesis, Force)
+  .setPreference(SpacesAroundMultiImports, false)
 
-lazy val buildSettings = Seq(
-  organization := "com.github.thurstonsand",
-  name := "ScalaCass",
-  description := "a wrapper for the Java Cassandra driver that uses case classes to simplify and codify creating cached statements in a type-safe manner",
-  scalaVersion := "2.11.8",
-  crossScalaVersions := Seq("2.11.8", "2.10.6")
-)
+wartremoverWarnings in (Compile, compile) := Seq.empty
+wartremoverWarnings in (Compile, compile) ++= Seq(
+  Wart.Any, Wart.Any2StringAdd,
+  Wart.EitherProjectionPartial, Wart.ListOps,
+  Wart.Null, Wart.OptionPartial,
+  Wart.Product, Wart.Return, Wart.Serializable,
+  Wart.TryPartial, Wart.Var,
+  Wart.Enumeration, Wart.FinalCaseClass, Wart.JavaConversions)
+wartremoverWarnings in (Compile, console) := Seq.empty
 
-lazy val publishSettings = Seq(
-  homepage := Some(url("http://scala-cass.github.io")),
-  licenses := Seq("MIT" -> url("http://www.opensource.org/licenses/mit-license.php")),
-  pomExtra :=
-    <scm>
-      <url>git@github.com/thurstonsand/scala-cass.git</url>
-      <connection>scm:git:git@github.com/thurstonsand/scala-cass.git</connection>
-    </scm>
-      <developers>
-        <developer>
-          <id>thurstonsand</id>
-          <name>Thurston Sandberg</name>
-          <url>https://github.com/thurstonsand</url>
-        </developer>
-      </developers>,
-  publishMavenStyle := true,
-  pomIncludeRepository := (_ => false),
-  bintrayReleaseOnPublish in ThisBuild := false,
-  bintrayPackageLabels := Seq("cassandra")
-)
+organization := "com.github.thurstonsand"
+name := "ScalaCass"
+description := "a wrapper for the Java Cassandra driver that uses case classes to simplify and codify creating cached statements in a type-safe manner"
+scalaVersion := "2.11.8"
+crossScalaVersions := Seq("2.11.8", "2.10.6")
 
-lazy val noPublishSettings = Seq(
-  publish := (),
-  publishLocal := (),
-  publishArtifact := false
-)
+homepage := Some(url("http://scala-cass.github.io"))
+licenses := Seq("MIT" -> url("http://www.opensource.org/licenses/mit-license.php"))
+pomExtra :=
+  <scm>
+    <url>git@github.com/thurstonsand/scala-cass.git</url>
+    <connection>scm:git:git@github.com/thurstonsand/scala-cass.git</connection>
+  </scm>
+    <developers>
+      <developer>
+        <id>thurstonsand</id>
+        <name>Thurston Sandberg</name>
+        <url>https://github.com/thurstonsand</url>
+      </developer>
+    </developers>
+publishMavenStyle := true
+pomIncludeRepository := (_ => false)
+bintrayReleaseOnPublish in ThisBuild := false
+bintrayPackageLabels := Seq("cassandra")
 
-lazy val micrositeSettings = Seq(
-  micrositeAuthor := "Thurston Sandberg",
-  micrositeDescription := "Java Cassandra driver bindings for friendlier Scala",
-  micrositeGithubOwner := "thurstonsand",
-  micrositeGithubRepo := "scala-cass",
-  micrositeBaseUrl := "",
-  com.typesafe.sbt.SbtGhPages.GhPagesKeys.ghpagesNoJekyll := false,
-  micrositeHomepage := "http://thurstonsand.github.io/scala-cass",
-  includeFilter in makeSite := "*.html" | "*.css" | "*.png" | "*.jpg" | "*.gif" | "*.js" | "*.swf" | "*.yml" | "*.md",
-  fork in tut := true
-)
-
-lazy val scalacass = project.in(file("scalacass")).settings(moduleName := "scalacass")
-  .settings(commonScalacOptions, commonDependencies)
-  .settings(versionSpecificSourceDirectories)
-  .settings(codeStyleSettings)
-  .settings(buildSettings)
-  .settings(publishSettings)
-
-lazy val docs = project.in(file("docs")).settings(moduleName := "docs")
-  .enablePlugins(MicrositesPlugin)
-  .settings(commonScalacOptions, commonDependencies)
-  .settings(versionSpecificSourceDirectories)
-  .settings(buildSettings)
-  .settings(noPublishSettings)
-  .dependsOn(scalacass)
-
-lazy val root = project.in(file("."))
-  .settings(noPublishSettings)
-  .aggregate(scalacass, docs)
+micrositeAuthor := "Thurston Sandberg"
+micrositeDescription := "Java Cassandra driver bindings for friendlier Scala"
+micrositeGithubOwner := "thurstonsand"
+micrositeGithubRepo := "scala-cass"
+micrositeBaseUrl := ""
+com.typesafe.sbt.SbtGhPages.GhPagesKeys.ghpagesNoJekyll := false
+micrositeHomepage := "http://thurstonsand.github.io/scala-cass"
+includeFilter in makeSite := "*.html" | "*.css" | "*.png" | "*.jpg" | "*.gif" | "*.js" | "*.swf" | "*.yml" | "*.md"
+fork in tut := true

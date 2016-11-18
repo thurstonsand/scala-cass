@@ -1,4 +1,5 @@
 package com.weather.scalacass
+
 import com.datastax.driver.core.{DataType, Row, TupleValue}
 
 sealed trait Nullable[+A] {
