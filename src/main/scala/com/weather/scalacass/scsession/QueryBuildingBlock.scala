@@ -41,7 +41,7 @@ private[scalacass] object QueryBuildingBlock {
         case (str, Some(anyref: AnyRef)) =>
           strList += str; anyrefList += anyref
         case (_, None) =>
-        case (str, Valid(anyref: AnyRef)) =>
+        case (str, Is(anyref: AnyRef)) =>
           strList += str; anyrefList += anyref
         case (str, _: Nullable[_]) => strList += str
         case (str, anyref) =>

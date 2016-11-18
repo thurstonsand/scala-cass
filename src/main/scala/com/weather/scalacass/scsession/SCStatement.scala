@@ -88,7 +88,7 @@ final case class SCUpdateStatement private (
     private val whereBlock: QueryBuildingBlock,
     private val usingBlock: TTLTimestamp = TTLTimestamp.Neither,
     private val ifBlock: If = If.NoConditional
-)(implicit protected val sSession: ScalaSession) extends SCStatement[ResultSet] with SCBatchStatement.Batchable {
+)(implicit protected val sSession: ScalaSession) extends SCStatement[ResultSet] with SCBatchStatement.Batchable with SCUpdateStatementVersionSpecific {
   def ifExists: SCUpdateStatement = copy(ifBlock = If.IfExists)
   def `if`[A: CCCassFormatEncoder](statement: A) = copy(ifBlock = If.IfStatement(statement))
   def noConditional: SCUpdateStatement = copy(ifBlock = If.NoConditional)
@@ -164,12 +164,15 @@ trait SCRaw[Response] extends SCStatement[Response] {
   protected def rawBlock: Raw
   protected def queryBuildingBlocks: Seq[QueryBuildingBlock] = Seq(rawBlock)
 }
-final case class SCRawStatement private (
+final case class SCRawStatement private[scsession] (
     protected val rawBlock: Raw
 )(implicit protected val sSession: ScalaSession) extends SCRaw[ResultSet] with SCBatchStatement.Batchable {
   protected def mkResponse(rs: ResultSet): ResultSet = rs
 }
-final case class SCRawSelectStatement[F[_]](private val _mkResponse: ResultSet => F[Row], protected val rawBlock: Raw)(implicit protected val sSession: ScalaSession) extends SCRaw[F[Row]] {
+final case class SCRawSelectStatement[F[_]] private[scsession] (
+    private val _mkResponse: ResultSet => F[Row],
+    protected val rawBlock: Raw
+)(implicit protected val sSession: ScalaSession) extends SCRaw[F[Row]] {
   protected def mkResponse(rs: ResultSet): F[Row] = _mkResponse(rs)
 }
 
