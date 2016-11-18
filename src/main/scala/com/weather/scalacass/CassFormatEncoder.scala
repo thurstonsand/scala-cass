@@ -6,20 +6,20 @@ import ScalaSession.UpdateBehavior
 trait CassFormatEncoder[F] { self =>
   type To <: AnyRef
   def cassDataType: DataType
-  def encode(f: F): Either[Throwable, To]
+  def encode(f: F): Result[To]
   def withQuery(instance: F, name: String) = s"$name=?"
   def cassType: String = cassDataType.toString
 
   final def map[G](fn: G => F): CassFormatEncoder[G] = new CassFormatEncoder[G] {
     type To = self.To
     val cassDataType = self.cassDataType
-    def encode(f: G): Either[Throwable, To] = self.encode(fn(f))
+    def encode(f: G): Result[To] = self.encode(fn(f))
   }
 
-  final def flatMap[G](fn: G => Either[Throwable, F]): CassFormatEncoder[G] = new CassFormatEncoder[G] {
+  final def flatMap[G](fn: G => Result[F]): CassFormatEncoder[G] = new CassFormatEncoder[G] {
     type To = self.To
     val cassDataType = self.cassDataType
-    def encode(f: G): Either[Throwable, To] = fn(f).right.flatMap(self.encode)
+    def encode(f: G): Result[To] = fn(f).right.flatMap(self.encode)
   }
 }
 
@@ -56,10 +56,10 @@ object CassFormatEncoder extends CassFormatEncoderVersionSpecific {
   def updateBehaviorListEncoder[A, UB <: UpdateBehavior[List, A]](implicit underlying: CassFormatEncoder[A]) = new CassFormatEncoder[UB] {
     type To = java.util.List[underlying.To]
     val cassDataType = DataType.list(underlying.cassDataType)
-    def encode(f: UB): Either[Throwable, java.util.List[underlying.To]] = {
+    def encode(f: UB): Result[java.util.List[underlying.To]] = {
       val acc = new java.util.ArrayList[underlying.To]()
       @scala.annotation.tailrec
-      def process(l: List[A]): Either[Throwable, java.util.List[underlying.To]] = l.headOption.map(underlying.encode(_)) match {
+      def process(l: List[A]): Result[java.util.List[underlying.To]] = l.headOption.map(underlying.encode(_)) match {
         case Some(Left(ff)) => Left(ff)
         case Some(Right(n)) =>
           acc.add(n)
@@ -74,10 +74,10 @@ object CassFormatEncoder extends CassFormatEncoderVersionSpecific {
   def updateBehaviorSetEncoder[A, UB <: UpdateBehavior[Set, A]](implicit underlying: CassFormatEncoder[A]) = new CassFormatEncoder[UB] {
     type To = java.util.Set[underlying.To]
     val cassDataType = DataType.set(underlying.cassDataType)
-    def encode(f: UB): Either[Throwable, java.util.Set[underlying.To]] = {
+    def encode(f: UB): Result[java.util.Set[underlying.To]] = {
       val acc = new java.util.HashSet[underlying.To]()
       @scala.annotation.tailrec
-      def process(s: Set[A]): Either[Throwable, java.util.Set[underlying.To]] = s.headOption.map(underlying.encode(_)) match {
+      def process(s: Set[A]): Result[java.util.Set[underlying.To]] = s.headOption.map(underlying.encode(_)) match {
         case Some(Left(ff)) => Left(ff)
         case Some(Right(n)) =>
           acc.add(n)
@@ -117,10 +117,10 @@ object CassFormatEncoder extends CassFormatEncoderVersionSpecific {
     new CassFormatEncoder[Map[A, B]] {
       type To = java.util.Map[underlyingA.To, underlyingB.To]
       val cassDataType = DataType.map(underlyingA.cassDataType, underlyingB.cassDataType)
-      def encode(f: Map[A, B]): Either[Throwable, java.util.Map[underlyingA.To, underlyingB.To]] = {
+      def encode(f: Map[A, B]): Result[java.util.Map[underlyingA.To, underlyingB.To]] = {
         val acc = new java.util.HashMap[underlyingA.To, underlyingB.To]()
         @scala.annotation.tailrec
-        def process(l: Iterable[(A, B)]): Either[Throwable, java.util.Map[underlyingA.To, underlyingB.To]] = l.headOption.map {
+        def process(l: Iterable[(A, B)]): Result[java.util.Map[underlyingA.To, underlyingB.To]] = l.headOption.map {
           case (k, v) => for {
             kk <- underlyingA.encode(k).right
             vv <- underlyingB.encode(v).right
@@ -139,17 +139,17 @@ object CassFormatEncoder extends CassFormatEncoderVersionSpecific {
   implicit def optionFormat[A](implicit underlying: CassFormatEncoder[A]) = new CassFormatEncoder[Option[A]] {
     type To = Option[underlying.To]
     val cassDataType = underlying.cassDataType
-    def encode(f: Option[A]): Either[Throwable, Option[underlying.To]] = f.map(underlying.encode(_)) match {
+    def encode(f: Option[A]): Result[Option[underlying.To]] = f.map(underlying.encode(_)) match {
       case None           => Right(None)
       case Some(Left(_))  => Right(None)
       case Some(Right(n)) => Right(Some(n))
     }
   }
-  implicit def eitherFormat[A](implicit underlying: CassFormatEncoder[A]) = new CassFormatEncoder[Either[Throwable, A]] {
-    type To = Either[Throwable, underlying.To]
+  implicit def eitherFormat[A](implicit underlying: CassFormatEncoder[A]) = new CassFormatEncoder[Result[A]] {
+    type To = Result[underlying.To]
     val cassDataType = underlying.cassDataType
     @SuppressWarnings(Array("org.brianmckenna.wartremover.warts.Product", "org.brianmckenna.wartremover.warts.Serializable"))
-    def encode(f: Either[Throwable, A]): Either[Throwable, Either[Throwable, underlying.To]] = f.right.map(underlying.encode(_)) match {
+    def encode(f: Result[A]): Result[Result[underlying.To]] = f.right.map(underlying.encode(_)) match {
       case Left(ff) => Right(Left(ff))
       case other    => other
     }
@@ -158,6 +158,6 @@ object CassFormatEncoder extends CassFormatEncoderVersionSpecific {
   implicit val nothingFormat = new CassFormatEncoder[Nothing] {
     type To = Nothing
     def cassDataType = throw new IllegalArgumentException("Nothing isn't a real type!")
-    def encode(f: Nothing): Either[Throwable, To] = throw new IllegalArgumentException("Nothing isn't a real type!")
+    def encode(f: Nothing): Result[To] = throw new IllegalArgumentException("Nothing isn't a real type!")
   }
 }

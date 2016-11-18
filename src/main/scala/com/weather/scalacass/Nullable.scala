@@ -32,7 +32,7 @@ object Nullable {
 
     def cassDataType: DataType = underlying.cassDataType
 
-    def encode(f: Nullable[A]): Either[Throwable, Nullable[underlying.To]] = f match {
+    def encode(f: Nullable[A]): Result[Nullable[underlying.To]] = f match {
       case Valid(x)  => underlying.encode(x).right.map(Valid.apply)
       case IsNotNull => Right(IsNotNull)
       case IsNull    => Right(IsNull)
@@ -48,16 +48,16 @@ object Nullable {
   implicit def decoder[A](implicit underlying: CassFormatDecoder[A]): CassFormatDecoder[Nullable[A]] = new CassFormatDecoder[Nullable[A]] {
     type From = underlying.From
     val clazz = underlying.clazz
-    def f2t(f: From): Either[Throwable, Nullable[A]] = underlying.f2t(f).right.map(Valid.apply)
+    def f2t(f: From): Result[Nullable[A]] = underlying.f2t(f).right.map(Valid.apply)
     def extract(r: Row, name: String): From = underlying.extract(r, name)
 
-    override def decode(r: Row, name: String): Either[Throwable, Nullable[A]] = super.decode(r, name) match {
+    override def decode(r: Row, name: String): Result[Nullable[A]] = super.decode(r, name) match {
       case Left(_: ValueNotDefinedException) => Right(IsNull)
       case other                             => other
     }
     def tupleExtract(tup: TupleValue, pos: Int): From = underlying.tupleExtract(tup, pos)
 
-    override def tupleDecode(tup: TupleValue, pos: Int): Either[Throwable, Nullable[A]] = super.tupleDecode(tup, pos) match {
+    override def tupleDecode(tup: TupleValue, pos: Int): Result[Nullable[A]] = super.tupleDecode(tup, pos) match {
       case Left(_: ValueNotDefinedException) => Right(IsNull)
       case other                             => other
     }

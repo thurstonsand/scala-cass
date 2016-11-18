@@ -5,42 +5,24 @@ import java.util.concurrent.Callable
 import com.datastax.driver.core._
 import com.google.common.cache.CacheBuilder
 import com.weather.scalacass.scsession._
-import com.google.common.util.concurrent.{FutureCallback, Futures}
 import com.weather.scalacass.scsession.SCBatchStatement.Batchable
 
-import scala.concurrent.{Future, Promise}
-
 object ScalaSession {
-  private[scalacass] implicit def resultSetFutureToScalaFuture(f: ResultSetFuture): Future[ResultSet] = {
-    val p = Promise[ResultSet]()
-    Futures.addCallback(
-      f,
-      new FutureCallback[ResultSet] {
-        def onSuccess(r: ResultSet) = { p success r; (): Unit }
-        def onFailure(t: Throwable) = { p failure t; (): Unit }
-      }
-    )
-    p.future
-  }
-
   private implicit def Fn02Callable[V](f: => V): Callable[V] = new Callable[V] {
     override def call(): V = f
   }
 
   final case class Star(`*`: Nothing)
   object Star {
-    @SuppressWarnings(Array("org.brianmckenna.wartremover.warts.AsInstanceOf"))
-    implicit val ccCassEncoder: CCCassFormatEncoder[Star] = CCCassFormatEncoder.derive[Star]
+    implicit val ccCassEncoder: CCCassFormatEncoder[Star] = CCCassFormatEncoder.derive
   }
   final case class NoQuery()
   object NoQuery {
-    @SuppressWarnings(Array("org.brianmckenna.wartremover.warts.AsInstanceOf"))
-    implicit val ccCassEncoder: CCCassFormatEncoder[NoQuery] = CCCassFormatEncoder.derive[NoQuery]
+    implicit val ccCassEncoder: CCCassFormatEncoder[NoQuery] = CCCassFormatEncoder.derive
   }
   final case class NoUpdate()
   object NoUpdate {
-    @SuppressWarnings(Array("org.brianmckenna.wartremover.warts.AsInstanceOf"))
-    implicit val ccCassEncoder: CCCassFormatEncoder[NoUpdate] = CCCassFormatEncoder.derive[NoUpdate]
+    implicit val ccCassEncoder: CCCassFormatEncoder[NoUpdate] = CCCassFormatEncoder.derive
   }
 
   sealed trait UpdateBehavior[F[_], A] {
@@ -78,11 +60,11 @@ object ScalaSession {
   }
 }
 
-case class ScalaSession(keyspace: String)(implicit val session: Session) {
+final case class ScalaSession(keyspace: String)(implicit val session: Session) {
   import ScalaSession.{Fn02Callable, Star}
 
   //  private[this] val queryCache = new LRUCache[Set[String], PreparedStatement](100)
-  private[this] val queryCache = CacheBuilder.newBuilder().maximumSize(1000).build[Set[String], PreparedStatement]()
+  private[this] val queryCache = CacheBuilder.newBuilder().maximumSize(1000).build[String, PreparedStatement]()
 
   def close(): Unit = session.close()
 
@@ -96,7 +78,7 @@ case class ScalaSession(keyspace: String)(implicit val session: Session) {
   def truncateTable(table: String): ResultSet = session.execute(s"TRUNCATE TABLE $keyspace.$table")
   def dropTable(table: String): ResultSet = session.execute(s"DROP TABLE $keyspace.$table")
 
-  private[scalacass] def getFromCacheOrElse(key: String, statement: => PreparedStatement) = queryCache.get(Set(key), statement)
+  private[scalacass] def getFromCacheOrElse(key: String, statement: => PreparedStatement) = queryCache.get(key, statement)
   def invalidateCache(): Unit = queryCache.invalidateAll()
 
   def insert[I: CCCassFormatEncoder](table: String, insertable: I): SCInsertStatement = SCInsertStatement(keyspace, table, insertable, this)
@@ -134,10 +116,10 @@ case class ScalaSession(keyspace: String)(implicit val session: Session) {
       SCSelectStatement.applyOne[S, Q](keyspace, table, where, ScalaSession.this)
   }
 
-  def rawStatement(query: String, anyrefArgs: AnyRef*): SCRawStatement[ResultSet] =
-    SCRawStatement.apply(query, anyrefArgs.toList, this)
-  def rawSelect(query: String, anyrefArgs: AnyRef*): SCRawStatement[Iterator[Row]] =
-    SCRawStatement.applyIterator(query, anyrefArgs.toList, this)
-  def rawSelectOne(query: String, anyrefArgs: AnyRef*): SCRawStatement[Option[Row]] =
-    SCRawStatement.applyOne(query, anyrefArgs.toList, this)
+  def rawStatement(query: String, anyrefArgs: AnyRef*): SCRawStatement =
+    SCRaw.apply(query, anyrefArgs.toList, this)
+  def rawSelect(query: String, anyrefArgs: AnyRef*): SCRawSelectStatement[Iterator] =
+    SCRaw.applyIterator(query, anyrefArgs.toList, this)
+  def rawSelectOne(query: String, anyrefArgs: AnyRef*): SCRawSelectStatement[Option] =
+    SCRaw.applyOne(query, anyrefArgs.toList, this)
 }

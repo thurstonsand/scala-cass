@@ -104,13 +104,13 @@ ScalariformKeys.preferences := ScalariformKeys.preferences.value
   .setPreference(SpacesAroundMultiImports, false)
 
 wartremoverWarnings in (Compile, compile) := Seq.empty
-/*wartremoverWarnings in (Compile, compile) ++= Seq(
-  Wart.Any, Wart.Any2StringAdd, Wart.AsInstanceOf,
-  Wart.EitherProjectionPartial, Wart.IsInstanceOf, Wart.ListOps,
+wartremoverWarnings in (Compile, compile) ++= Seq(
+  Wart.Any, Wart.Any2StringAdd,
+  Wart.EitherProjectionPartial, Wart.ListOps,
   Wart.Null, Wart.OptionPartial,
   Wart.Product, Wart.Return, Wart.Serializable,
   Wart.TryPartial, Wart.Var,
-  Wart.Enumeration, Wart.FinalCaseClass, Wart.JavaConversions) */
+  Wart.Enumeration, Wart.FinalCaseClass, Wart.JavaConversions)
 wartremoverWarnings in (Compile, console) := Seq.empty
 
 publishMavenStyle := true

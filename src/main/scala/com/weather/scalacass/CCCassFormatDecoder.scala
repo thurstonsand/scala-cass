@@ -21,17 +21,17 @@ object DerivedCCCassFormatDecoder {
 
   implicit def ccConverter[T, Repr](implicit gen: LabelledGeneric.Aux[T, Repr], hListDecoder: Lazy[DerivedCCCassFormatDecoder[Repr]]): DerivedCCCassFormatDecoder[T] =
     new DerivedCCCassFormatDecoder[T] {
-      def decode(r: Row): Either[Throwable, T] = hListDecoder.value.decode(r).right.map(gen.from)
+      def decode(r: Row): Result[T] = hListDecoder.value.decode(r).right.map(gen.from)
     }
 }
 
 trait CCCassFormatDecoder[T] { self =>
-  private[scalacass] def decode(r: Row): Either[Throwable, T]
+  private[scalacass] def decode(r: Row): Result[T]
   final def map[U](f: T => U): CCCassFormatDecoder[U] = new CCCassFormatDecoder[U] {
-    def decode(r: Row): Either[Throwable, U] = self.decode(r).right.map(f)
+    def decode(r: Row): Result[U] = self.decode(r).right.map(f)
   }
-  final def flatMap[U](f: T => Either[Throwable, U]): CCCassFormatDecoder[U] = new CCCassFormatDecoder[U] {
-    def decode(r: Row): Either[Throwable, U] = self.decode(r).right.flatMap(f)
+  final def flatMap[U](f: T => Result[U]): CCCassFormatDecoder[U] = new CCCassFormatDecoder[U] {
+    def decode(r: Row): Result[U] = self.decode(r).right.flatMap(f)
   }
 
   final def as(r: Row): T = decode(r) match {
@@ -40,7 +40,7 @@ trait CCCassFormatDecoder[T] { self =>
   }
   final def getAs(r: Row): Option[T] = decode(r).right.toOption
   final def getOrElse(r: Row)(default: => T): T = decode(r).right.getOrElse(default)
-  final def attemptAs(r: Row): Either[Throwable, T] = decode(r)
+  final def attemptAs(r: Row): Result[T] = decode(r)
 }
 
 object CCCassFormatDecoder {

@@ -1,13 +1,26 @@
 package com.weather.scalacass
 package scsession
 
-import com.datastax.driver.core.{BatchStatement, BoundStatement, ResultSet, Row}
+import com.datastax.driver.core._
+import com.google.common.util.concurrent.{FutureCallback, Futures}
 import com.weather.scalacass.scsession.QueryBuildingBlock._
 import com.weather.scalacass.scsession.SCBatchStatement.Batchable
 
-import scala.concurrent.Future
+import scala.concurrent.{Future, Promise}
 
 object SCStatement {
+  private[scalacass] implicit def resultSetFutureToScalaFuture(f: ResultSetFuture): Future[ResultSet] = {
+    val p = Promise[ResultSet]()
+    Futures.addCallback(
+      f,
+      new FutureCallback[ResultSet] {
+        def onSuccess(r: ResultSet) = { p success r; (): Unit }
+        def onFailure(t: Throwable) = { p failure t; (): Unit }
+      }
+    )
+    p.future
+  }
+
   implicit class RightBiasedEither[+A, +B](val e: Either[A, B]) extends AnyVal {
     def map[C](fn: B => C): Either[A, C] = e.right.map(fn)
     def flatMap[AA >: A, C](fn: B => Either[AA, C]) = e.right.flatMap(fn)
@@ -23,8 +36,7 @@ object SCStatement {
   type SCOptionStatement = SCStatement[Option[Row]]
 }
 trait SCStatement[Response] {
-  import SCStatement.RightBiasedEither
-  import ScalaSession.resultSetFutureToScalaFuture
+  import SCStatement.{RightBiasedEither, resultSetFutureToScalaFuture}
 
   protected def sSession: ScalaSession
 
@@ -44,7 +56,7 @@ trait SCStatement[Response] {
   }
 }
 
-case class SCInsertStatement(
+final case class SCInsertStatement private (
     private val preableBlock: Preamble,
     private val insertBlock: QueryBuildingBlock,
     private val ifBlock: If = If.NoConditional,
@@ -70,7 +82,7 @@ object SCInsertStatement {
     new SCInsertStatement(Preamble("INSERT INTO", keyspace, table), CCBlockInsert(insertable))(sSession)
 }
 
-case class SCUpdateStatement(
+final case class SCUpdateStatement private (
     private val preamble: Preamble,
     private val updateBlock: QueryBuildingBlock,
     private val whereBlock: QueryBuildingBlock,
@@ -95,7 +107,7 @@ object SCUpdateStatement {
     new SCUpdateStatement(Preamble("UPDATE", keyspace, table), CCBlockUpdate(updateable), CCBlockWhere(where))(sSession)
 }
 
-case class SCDeleteStatement(
+final case class SCDeleteStatement private (
     private val deleteBlock: QueryBuildingBlock,
     private val whereBlock: QueryBuildingBlock,
     private val usingBlock: TTLTimestamp = TTLTimestamp.Neither,
@@ -117,7 +129,7 @@ object SCDeleteStatement {
     new SCDeleteStatement(CCBlockDelete[D](Preamble("DELETE", keyspace, table)), CCBlockWhere(where))(sSession)
 }
 
-case class SCSelectStatement[F[_]](
+final case class SCSelectStatement[F[_]](
     private val _mkResponse: ResultSet => F[Row],
     private val selectBlock: QueryBuildingBlock,
     private val whereBlock: QueryBuildingBlock,
@@ -148,21 +160,26 @@ object SCSelectStatement {
     new SCSelectStatement[Option](mkOptionResponse, CCBlockSelect[S](Preamble("SELECT", keyspace, table)), CCBlockWhere(where))(sSession)
 }
 
-case class SCRawStatement[Response] private (
-    private val _mkResponse: ResultSet => Response,
-    private val rawBlock: Raw
-)(implicit protected val sSession: ScalaSession) extends SCStatement[Response] {
-  protected def mkResponse(rs: ResultSet): Response = _mkResponse(rs)
-
+trait SCRaw[Response] extends SCStatement[Response] {
+  protected def rawBlock: Raw
   protected def queryBuildingBlocks: Seq[QueryBuildingBlock] = Seq(rawBlock)
 }
-object SCRawStatement {
-  def apply(strRepr: String, anyrefArgs: List[AnyRef], sSession: ScalaSession): SCRawStatement[ResultSet] with SCBatchStatement.Batchable = new SCRawStatement[ResultSet](identity, Raw(strRepr, anyrefArgs))(sSession) with SCBatchStatement.Batchable
-  def applyIterator(strRepr: String, anyrefArgs: List[AnyRef], sSession: ScalaSession): SCRawStatement[Iterator[Row]] = new SCRawStatement[Iterator[Row]](SCSelectStatement.mkIteratorResponse, Raw(strRepr, anyrefArgs))(sSession)
-  def applyOne(strRepr: String, anyrefArgs: List[AnyRef], sSession: ScalaSession): SCRawStatement[Option[Row]] = new SCRawStatement[Option[Row]](SCSelectStatement.mkOptionResponse, Raw(strRepr, anyrefArgs))(sSession)
+final case class SCRawStatement private (
+    protected val rawBlock: Raw
+)(implicit protected val sSession: ScalaSession) extends SCRaw[ResultSet] with SCBatchStatement.Batchable {
+  protected def mkResponse(rs: ResultSet): ResultSet = rs
+}
+final case class SCRawSelectStatement[F[_]](private val _mkResponse: ResultSet => F[Row], protected val rawBlock: Raw)(implicit protected val sSession: ScalaSession) extends SCRaw[F[Row]] {
+  protected def mkResponse(rs: ResultSet): F[Row] = _mkResponse(rs)
 }
 
-case class SCCreateTableStatement(
+object SCRaw {
+  def apply(strRepr: String, anyrefArgs: List[AnyRef], sSession: ScalaSession): SCRawStatement = new SCRawStatement(Raw(strRepr, anyrefArgs))(sSession)
+  def applyIterator(strRepr: String, anyrefArgs: List[AnyRef], sSession: ScalaSession): SCRawSelectStatement[Iterator] = new SCRawSelectStatement[Iterator](SCSelectStatement.mkIteratorResponse, Raw(strRepr, anyrefArgs))(sSession)
+  def applyOne(strRepr: String, anyrefArgs: List[AnyRef], sSession: ScalaSession): SCRawSelectStatement[Option] = new SCRawSelectStatement[Option](SCSelectStatement.mkOptionResponse, Raw(strRepr, anyrefArgs))(sSession)
+}
+
+final case class SCCreateTableStatement private (
     private val createTable: QueryBuildingBlock,
     private val tableProperties: TableProperties = TableProperties.NoProperties
 )(implicit protected val sSession: ScalaSession) extends SCStatement[ResultSet] {
@@ -177,15 +194,14 @@ object SCCreateTableStatement {
     new SCCreateTableStatement(CreateTable(keyspace, name, numPartitionKeys, numClusteringKeys))(sSession)
 }
 
-case class SCBatchStatement(
+final case class SCBatchStatement private (
     private val statements: Seq[SCBatchStatement.Batchable],
     private val batchType: BatchStatement.Type = BatchStatement.Type.LOGGED
 )(
     implicit
     protected val sSession: ScalaSession
 ) extends SCStatement[ResultSet] {
-  import SCStatement.RightBiasedEither
-  import ScalaSession.resultSetFutureToScalaFuture
+  import SCStatement.{RightBiasedEither, resultSetFutureToScalaFuture}
 
   protected def mkResponse(rs: ResultSet): ResultSet = throw new NotImplementedError("implementing execute/executeAsync directly -- not needed")
 
@@ -209,7 +225,7 @@ case class SCBatchStatement(
   def withBatchType(batchType: BatchStatement.Type) = copy(batchType = batchType)
 }
 object SCBatchStatement {
-  trait Batchable { this: SCStatement[ResultSet] =>
+  trait Batchable { this: SCStatement.SCResultSetStatement =>
     def asBatch: Result[BoundStatement] = prepare
   }
 

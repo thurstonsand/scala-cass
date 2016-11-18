@@ -1,7 +1,7 @@
 package com.weather.scalacass
 package scsession
 
-trait QueryBuildingBlock {
+private[scalacass] sealed trait QueryBuildingBlock {
   import SCStatement.RightBiasedEither
 
   def strRepr: Result[String]
@@ -12,9 +12,10 @@ trait QueryBuildingBlock {
   } yield (nr, vr)
 }
 
-object QueryBuildingBlock {
+private[scalacass] object QueryBuildingBlock {
   import SCStatement.RightBiasedEither
 
+  @SuppressWarnings(Array("org.brianmckenna.wartremover.warts.Any"))
   def namedEncode[A](toEncode: A)(implicit encoder: CCCassFormatEncoder[A]): Result[(List[String], List[AnyRef])] =
     encoder.encodeWithName(toEncode).right.map { e =>
       val strList = List.newBuilder[String]
@@ -30,6 +31,7 @@ object QueryBuildingBlock {
       (strList.result, anyrefList.result)
     }
 
+  @SuppressWarnings(Array("org.brianmckenna.wartremover.warts.Any"))
   def queryEncode[A](toEncode: A)(implicit encoder: CCCassFormatEncoder[A]): Result[(List[String], List[AnyRef])] =
     encoder.encodeWithQuery(toEncode).right.map { e =>
       val strList = List.newBuilder[String]
@@ -152,40 +154,40 @@ object QueryBuildingBlock {
     def valueRepr = Right(Nil)
   }
 
-  case class CCBlockInsert[T: CCCassFormatEncoder](protected val cc: T) extends CCBlockWithNamedValue(true, " (", ", ", ")") with QueryBuildingBlock {
+  final case class CCBlockInsert[T: CCCassFormatEncoder](protected val cc: T) extends CCBlockWithNamedValue(true, " (", ", ", ")") with QueryBuildingBlock {
     override def strRepr: Result[String] = strList.map { ns =>
       if (ns.isEmpty) ""
       else s"${ns.mkString(prefix, infix, suffix)} VALUES ${List.fill(ns.length)("?").mkString(prefix, infix, suffix)}"
     }
   }
-  case class CCBlockDelete[T](protected val preamble: Preamble)(implicit encoder: CCCassFormatEncoder[T]) extends CCBlockWithNoValue[T](false, "FROM") with QueryBuildingBlock
-  case class CCBlockSelect[T](preamble: Preamble)(implicit encoder: CCCassFormatEncoder[T]) extends CCBlockWithNoValue[T](false, "FROM") with QueryBuildingBlock
-  case class CCBlockUpdate[T: CCCassFormatEncoder](protected val cc: T) extends CCBlockWithQueryValue(true, " SET ", ", ", "") with QueryBuildingBlock
-  case class CCBlockWhere[T: CCCassFormatEncoder](protected val cc: T) extends CCBlockWithQueryValue(true, " WHERE ", " AND ", "") with QueryBuildingBlock
+  final case class CCBlockDelete[T](protected val preamble: Preamble)(implicit encoder: CCCassFormatEncoder[T]) extends CCBlockWithNoValue[T](false, "FROM") with QueryBuildingBlock
+  final case class CCBlockSelect[T](preamble: Preamble)(implicit encoder: CCCassFormatEncoder[T]) extends CCBlockWithNoValue[T](false, "FROM") with QueryBuildingBlock
+  final case class CCBlockUpdate[T: CCCassFormatEncoder](protected val cc: T) extends CCBlockWithQueryValue(true, " SET ", ", ", "") with QueryBuildingBlock
+  final case class CCBlockWhere[T: CCCassFormatEncoder](protected val cc: T) extends CCBlockWithQueryValue(true, " WHERE ", " AND ", "") with QueryBuildingBlock
 
   sealed trait If extends QueryBuildingBlock
 
   object If {
-    case object NoConditional extends If with NoQuery
+    final case object NoConditional extends If with NoQuery
 
-    case object IfNotExists extends If {
+    final case object IfNotExists extends If {
       val strRepr = Right(" IF NOT EXISTS")
       val valueRepr = Right(Nil)
     }
 
-    case object IfExists extends If {
+    final case object IfExists extends If {
       val strRepr = Right(" IF EXISTS")
       val valueRepr = Right(Nil)
     }
 
-    case class IfStatement[A: CCCassFormatEncoder](cc: A) extends CCBlockWithQueryValue(false, " IF ", " AND ", "") with If
+    final case class IfStatement[A: CCCassFormatEncoder](cc: A) extends CCBlockWithQueryValue(false, " IF ", " AND ", "") with If
   }
 
   sealed trait Limit extends QueryBuildingBlock
 
   object Limit {
-    case object NoLimit extends NoQuery with Limit
-    case class LimitN(limit: Int) extends Limit {
+    final case object NoLimit extends NoQuery with Limit
+    final case class LimitN(limit: Int) extends Limit {
       def strRepr: Result[String] = Right(" LIMIT ?")
       def valueRepr: Result[List[AnyRef]] = CassFormatEncoder[Int].encode(limit).map(_ :: Nil)
     }
@@ -194,20 +196,20 @@ object QueryBuildingBlock {
   sealed trait Filtering extends QueryBuildingBlock
 
   object Filtering {
-    case object NoFiltering extends NoQuery with Filtering
-    case object AllowFiltering extends Filtering {
+    final case object NoFiltering extends NoQuery with Filtering
+    final case object AllowFiltering extends Filtering {
       val strRepr: Result[String] = Right(" ALLOW FILTERING")
       val valueRepr: Result[List[AnyRef]] = Right(Nil)
     }
   }
 
-  case class Raw(private val _strRepr: String, private val anyrefArgs: List[AnyRef]) extends QueryBuildingBlock {
+  final case class Raw(private val _strRepr: String, private val anyrefArgs: List[AnyRef]) extends QueryBuildingBlock {
     def strRepr = Right(_strRepr)
     def valueRepr = Right(anyrefArgs)
   }
 
-  case class CreateTable[T](keyspace: String, name: String, numPartitionKeys: Int, numClusteringKeys: Int)(implicit encoder: CCCassFormatEncoder[T]) extends QueryBuildingBlock {
-    private[this] def wrongPKSize(m: String) = {
+  final case class CreateTable[T](keyspace: String, name: String, numPartitionKeys: Int, numClusteringKeys: Int)(implicit encoder: CCCassFormatEncoder[T]) extends QueryBuildingBlock {
+    private[this] def wrongPKSize(m: String): (Result[String], Result[List[AnyRef]]) = {
       val failed = Left(new WrongPrimaryKeySizeException(m))
       (failed, failed)
     }
@@ -228,8 +230,8 @@ object QueryBuildingBlock {
 
   sealed trait TableProperties extends QueryBuildingBlock
   object TableProperties {
-    case object NoProperties extends NoQuery with TableProperties
-    case class With(properties: String) extends TableProperties {
+    final case object NoProperties extends NoQuery with TableProperties
+    final case class With(properties: String) extends TableProperties {
       def strRepr = Right(s" WITH $properties")
       def valueRepr = Right(Nil)
     }

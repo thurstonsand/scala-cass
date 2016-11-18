@@ -38,21 +38,21 @@ object DerivedCCCassFormatEncoder {
 }
 
 trait CCCassFormatEncoder[F] { self =>
-  def encodeWithName(f: F): Either[Throwable, List[(String, AnyRef)]]
-  def encodeWithQuery(f: F): Either[Throwable, List[(String, AnyRef)]]
+  def encodeWithName(f: F): Result[List[(String, AnyRef)]]
+  def encodeWithQuery(f: F): Result[List[(String, AnyRef)]]
   def names: List[String]
   def types: List[String]
   def namesAndTypes: List[(String, String)] = names zip types
 
   final def map[G](fn: G => F): CCCassFormatEncoder[G] = new CCCassFormatEncoder[G] {
-    def encodeWithName(f: G): Either[Throwable, List[(String, AnyRef)]] = self.encodeWithName(fn(f))
-    def encodeWithQuery(f: G): Either[Throwable, List[(String, AnyRef)]] = self.encodeWithQuery(fn(f))
+    def encodeWithName(f: G): Result[List[(String, AnyRef)]] = self.encodeWithName(fn(f))
+    def encodeWithQuery(f: G): Result[List[(String, AnyRef)]] = self.encodeWithQuery(fn(f))
     def names = self.names
     def types = self.types
   }
-  final def flatMap[G](fn: G => Either[Throwable, F]): CCCassFormatEncoder[G] = new CCCassFormatEncoder[G] {
-    def encodeWithName(f: G): Either[Throwable, List[(String, AnyRef)]] = fn(f).right.flatMap(self.encodeWithName)
-    def encodeWithQuery(f: G): Either[Throwable, List[(String, AnyRef)]] = fn(f).right.flatMap(self.encodeWithQuery)
+  final def flatMap[G](fn: G => Result[F]): CCCassFormatEncoder[G] = new CCCassFormatEncoder[G] {
+    def encodeWithName(f: G): Result[List[(String, AnyRef)]] = fn(f).right.flatMap(self.encodeWithName)
+    def encodeWithQuery(f: G): Result[List[(String, AnyRef)]] = fn(f).right.flatMap(self.encodeWithQuery)
     def names = self.names
     def types = self.types
   }
