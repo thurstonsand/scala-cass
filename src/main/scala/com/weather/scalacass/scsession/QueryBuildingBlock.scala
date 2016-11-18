@@ -227,6 +227,14 @@ private[scalacass] object QueryBuildingBlock {
         (Right(s"CREATE TABLE $keyspace.$name (${allColumns.map(nt => s"${nt._1} ${nt._2}").mkString(", ")}, PRIMARY KEY $fullKey)"), Right(Nil))
       }
   }
+  final case class TruncateTable(keyspace: String, table: String) extends QueryBuildingBlock {
+    def strRepr: Result[String] = Right(s"TRUNCATE TABLE $keyspace.$table")
+    def valueRepr: Result[List[AnyRef]] = Right(Nil)
+  }
+  final case class DropTable(keyspace: String, table: String) extends QueryBuildingBlock {
+    def strRepr: Result[String] = Right(s"DROP TABLE $keyspace.$table")
+    def valueRepr: Result[List[AnyRef]] = Right(Nil)
+  }
 
   sealed trait TableProperties extends QueryBuildingBlock
   object TableProperties {
@@ -235,6 +243,15 @@ private[scalacass] object QueryBuildingBlock {
       def strRepr = Right(s" WITH $properties")
       def valueRepr = Right(Nil)
     }
+  }
+
+  final case class CreateKeyspace(keyspace: String, properties: String) extends QueryBuildingBlock {
+    def strRepr: Result[String] = Right(s"CREATE KEYSPACE $keyspace WITH $properties")
+    def valueRepr: Result[List[AnyRef]] = Right(Nil)
+  }
+  final case class DropKeyspace(keyspace: String) extends QueryBuildingBlock {
+    def strRepr: Result[String] = Right(s"DROP KEYSPACE $keyspace")
+    def valueRepr: Result[List[AnyRef]] = Right(Nil)
   }
 
   def build(qbbs: Seq[QueryBuildingBlock]): Result[(String, List[AnyRef])] = {

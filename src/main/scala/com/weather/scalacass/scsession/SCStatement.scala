@@ -182,6 +182,27 @@ object SCRaw {
   def applyOne(strRepr: String, anyrefArgs: List[AnyRef], sSession: ScalaSession): SCRawSelectStatement[Option] = new SCRawSelectStatement[Option](SCSelectStatement.mkOptionResponse, Raw(strRepr, anyrefArgs))(sSession)
 }
 
+final case class SCCreateKeyspaceStatement private (
+    private val createKeyspaceBlock: CreateKeyspace
+)(implicit protected val sSession: ScalaSession) extends SCStatement[ResultSet] {
+  protected def mkResponse(rs: ResultSet): ResultSet = rs
+
+  protected def queryBuildingBlocks: Seq[QueryBuildingBlock] = Seq(createKeyspaceBlock)
+}
+object SCCreateKeyspaceStatement {
+  def apply(keyspace: String, properties: String, sSession: ScalaSession): SCCreateKeyspaceStatement = new SCCreateKeyspaceStatement(CreateKeyspace(keyspace, properties))(sSession)
+}
+final case class SCDropKeyspaceStatement private (
+    private val dropKeyspaceBlock: DropKeyspace
+)(implicit protected val sSession: ScalaSession) extends SCStatement[ResultSet] {
+  protected def mkResponse(rs: ResultSet): ResultSet = rs
+
+  protected def queryBuildingBlocks: Seq[QueryBuildingBlock] = Seq(dropKeyspaceBlock)
+}
+object SCDropKeyspaceStatement {
+  def apply(keyspace: String, sSession: ScalaSession): SCDropKeyspaceStatement = new SCDropKeyspaceStatement(DropKeyspace(keyspace))(sSession)
+}
+
 final case class SCCreateTableStatement private (
     private val createTable: QueryBuildingBlock,
     private val tableProperties: TableProperties = TableProperties.NoProperties
@@ -195,6 +216,26 @@ final case class SCCreateTableStatement private (
 object SCCreateTableStatement {
   def apply[T: CCCassFormatEncoder](keyspace: String, name: String, numPartitionKeys: Int, numClusteringKeys: Int, sSession: ScalaSession): SCCreateTableStatement =
     new SCCreateTableStatement(CreateTable(keyspace, name, numPartitionKeys, numClusteringKeys))(sSession)
+}
+final case class SCTruncateTableStatement private (
+    private val truncateTableBlock: TruncateTable
+)(implicit protected val sSession: ScalaSession) extends SCStatement[ResultSet] {
+  protected def mkResponse(rs: ResultSet): ResultSet = rs
+
+  protected def queryBuildingBlocks: Seq[QueryBuildingBlock] = Seq(truncateTableBlock)
+}
+object SCTruncateTableStatement {
+  def apply(keyspace: String, table: String, sSession: ScalaSession): SCTruncateTableStatement = new SCTruncateTableStatement(TruncateTable(keyspace, table))(sSession)
+}
+final case class SCDropTableStatement private (
+    private val dropTableBlock: DropTable
+)(implicit protected val sSession: ScalaSession) extends SCStatement[ResultSet] {
+  protected def mkResponse(rs: ResultSet): ResultSet = rs
+
+  protected def queryBuildingBlocks: Seq[QueryBuildingBlock] = Seq(dropTableBlock)
+}
+object SCDropTableStatement {
+  def apply(keyspace: String, table: String, sSession: ScalaSession): SCDropTableStatement = new SCDropTableStatement(DropTable(keyspace, table))(sSession)
 }
 
 final case class SCBatchStatement private (

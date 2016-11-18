@@ -64,7 +64,7 @@ abstract class ScalaCassUnitTests extends CassandraWithTableTester("testDB", "te
     }
     ss.delete[ScalaSession.NoQuery](tname, q1).execute
     ss.select[ScalaSession.Star](tname, q1).execute.right.toOption.value.toList.map(_.as[TestCC]) shouldBe empty
-    ss.dropTable(tname)
+    ss.dropTable(tname).execute
   }
 }
 class ScalaCassUnitTestsAll extends ScalaCassUnitTests with ScalaCassUnitTestsVersionSpecific {

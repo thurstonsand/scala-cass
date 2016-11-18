@@ -66,20 +66,20 @@ final case class ScalaSession(keyspace: String)(implicit val session: Session) {
   //  private[this] val queryCache = new LRUCache[Set[String], PreparedStatement](100)
   private[this] val queryCache = CacheBuilder.newBuilder().maximumSize(1000).build[String, PreparedStatement]()
 
+  private[scalacass] def getFromCacheOrElse(key: String, statement: => PreparedStatement) = queryCache.get(key, statement)
+  def invalidateCache(): Unit = queryCache.invalidateAll()
+
   def close(): Unit = session.close()
 
-  def createKeyspace(properties: String): ResultSet = session.execute(s"CREATE KEYSPACE $keyspace WITH $properties")
+  def createKeyspace(properties: String): SCCreateKeyspaceStatement = SCCreateKeyspaceStatement(keyspace, properties, this)
 
-  def dropKeyspace(): ResultSet = session.execute(s"DROP KEYSPACE $keyspace")
+  def dropKeyspace(): SCDropKeyspaceStatement = SCDropKeyspaceStatement(keyspace, this)
 
   def createTable[T: CCCassFormatEncoder](name: String, numPartitionKeys: Int, numClusteringKeys: Int): SCCreateTableStatement =
     SCCreateTableStatement[T](keyspace, name, numPartitionKeys, numClusteringKeys, this)
 
-  def truncateTable(table: String): ResultSet = session.execute(s"TRUNCATE TABLE $keyspace.$table")
-  def dropTable(table: String): ResultSet = session.execute(s"DROP TABLE $keyspace.$table")
-
-  private[scalacass] def getFromCacheOrElse(key: String, statement: => PreparedStatement) = queryCache.get(key, statement)
-  def invalidateCache(): Unit = queryCache.invalidateAll()
+  def truncateTable(table: String): SCTruncateTableStatement = SCTruncateTableStatement(keyspace, table, this)
+  def dropTable(table: String): SCDropTableStatement = SCDropTableStatement(keyspace, table, this)
 
   def insert[I: CCCassFormatEncoder](table: String, insertable: I): SCInsertStatement = SCInsertStatement(keyspace, table, insertable, this)
 
