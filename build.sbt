@@ -108,7 +108,7 @@ description := "a wrapper for the Java Cassandra driver that uses case classes t
 scalaVersion := "2.11.8"
 crossScalaVersions := Seq("2.11.8", "2.10.6")
 
-homepage := Some(url("http://scala-cass.github.io"))
+homepage := Some(url("https://github.com/thurstonsand"))
 licenses := Seq("MIT" -> url("http://www.opensource.org/licenses/mit-license.php"))
 pomExtra :=
   <scm>
@@ -133,10 +133,11 @@ micrositeDescription := "Java Cassandra driver bindings for friendlier Scala"
 micrositeGithubOwner := "thurstonsand"
 micrositeGithubRepo := "scala-cass"
 micrositeBaseUrl := ""
-micrositeHomepage := "http://thurstonsand.github.io/scala-cass"
+//micrositeHomepage := "https://github.com/thurstonsand"
 micrositeImgDirectory := baseDirectory.value / "docs" / "imgs"
 micrositeCssDirectory := baseDirectory.value / "docs" / "css"
 micrositeDataDirectory := baseDirectory.value / "docs" / "data"
+micrositeHighlightTheme := "docco"
 includeFilter in makeSite := "*.html" | "*.css" | "*.png" | "*.jpg" | "*.gif" | "*.js" | "*.swf" | "*.yml" | "*.md"
 com.typesafe.sbt.SbtGhPages.GhPagesKeys.ghpagesNoJekyll := false
 fork in tut := true

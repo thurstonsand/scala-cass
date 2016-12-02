@@ -14,8 +14,8 @@ object SCStatement {
     Futures.addCallback(
       f,
       new FutureCallback[ResultSet] {
-        def onSuccess(r: ResultSet) = { p success r; (): Unit }
-        def onFailure(t: Throwable) = { p failure t; (): Unit }
+        def onSuccess(r: ResultSet): Unit = { p success r; (): Unit }
+        def onFailure(t: Throwable): Unit = { p failure t; (): Unit }
       }
     )
     p.future
@@ -23,7 +23,7 @@ object SCStatement {
 
   implicit class RightBiasedEither[+A, +B](val e: Either[A, B]) extends AnyVal {
     def map[C](fn: B => C): Either[A, C] = e.right.map(fn)
-    def flatMap[AA >: A, C](fn: B => Either[AA, C]) = e.right.flatMap(fn)
+    def flatMap[AA >: A, C](fn: B => Either[AA, C]): Either[AA, C] = e.right.flatMap(fn)
     def foreach[U](fn: B => U): Unit = e match {
       case Right(b) =>
         fn(b); (): Unit
@@ -41,8 +41,8 @@ trait SCStatement[Response] {
   protected def sSession: ScalaSession
 
   protected def mkResponse(rs: ResultSet): Response
-  def execute: Result[Response] = prepare.map(p => mkResponse(sSession.session.execute(p)))
-  def executeAsync: Result[Future[Response]] = prepare.map(p => sSession.session.executeAsync(p).map(mkResponse)(scala.concurrent.ExecutionContext.global))
+  def execute(): Result[Response] = prepare.map(p => mkResponse(sSession.session.execute(p)))
+  def executeAsync(): Result[Future[Response]] = prepare.map(p => sSession.session.executeAsync(p).map(mkResponse)(scala.concurrent.ExecutionContext.global))
 
   protected def queryBuildingBlocks: Seq[QueryBuildingBlock]
   private[this] def buildQuery: Result[(String, List[AnyRef])] = QueryBuildingBlock.build(queryBuildingBlocks)
@@ -54,6 +54,8 @@ trait SCStatement[Response] {
       val prepared = sSession.getFromCacheOrElse(queryStr, sSession.session.prepare(queryStr))
       prepared.bind(anyrefArgs: _*)
   }
+
+  override def toString: String = getStringRepr.map(repr =>s"${getClass.getName}($repr)").toString
 }
 
 final case class SCInsertStatement private (
@@ -62,9 +64,6 @@ final case class SCInsertStatement private (
     private val ifBlock: If = If.NoConditional,
     private val usingBlock: TTLTimestamp = TTLTimestamp.Neither
 )(implicit protected val sSession: ScalaSession) extends SCStatement[ResultSet] with SCBatchStatement.Batchable {
-  //  def withKeyspace(keyspace: String): SCInsertStatement[T] = copy(preableBlock = preableBlock.copy(keyspace = keyspace))
-  //  def withTable(table: String): SCInsertStatement[T] = copy(preableBlock = preableBlock.copy(table = table))
-
   def ifNotExists: SCInsertStatement = copy(ifBlock = If.IfNotExists)
   def noConditional: SCInsertStatement = copy(ifBlock = If.NoConditional)
 
@@ -75,7 +74,7 @@ final case class SCInsertStatement private (
   def noTimestamp: SCInsertStatement = copy(usingBlock = usingBlock.removeTimestamp)
 
   protected def queryBuildingBlocks: Seq[QueryBuildingBlock] = Seq(preableBlock, insertBlock, ifBlock, usingBlock)
-  protected def mkResponse(rs: ResultSet) = rs
+  protected def mkResponse(rs: ResultSet): ResultSet = rs
 }
 object SCInsertStatement {
   def apply[I: CCCassFormatEncoder](keyspace: String, table: String, insertable: I, sSession: ScalaSession) =
@@ -90,7 +89,7 @@ final case class SCUpdateStatement private (
     private val ifBlock: If = If.NoConditional
 )(implicit protected val sSession: ScalaSession) extends SCStatement[ResultSet] with SCBatchStatement.Batchable with SCUpdateStatementVersionSpecific {
   def ifExists: SCUpdateStatement = copy(ifBlock = If.IfExists)
-  def `if`[A: CCCassFormatEncoder](statement: A) = copy(ifBlock = If.IfStatement(statement))
+  def `if`[A: CCCassFormatEncoder](statement: A): SCUpdateStatement = copy(ifBlock = If.IfStatement(statement))
   def noConditional: SCUpdateStatement = copy(ifBlock = If.NoConditional)
 
   def usingTTL(ttl: Int): SCUpdateStatement = copy(usingBlock = usingBlock.updateWith(ttl))
@@ -100,7 +99,7 @@ final case class SCUpdateStatement private (
   def noTimestamp: SCUpdateStatement = copy(usingBlock = usingBlock.removeTimestamp)
 
   protected def queryBuildingBlocks: Seq[QueryBuildingBlock] = Seq(preamble, usingBlock, updateBlock, whereBlock, ifBlock)
-  protected def mkResponse(rs: ResultSet) = rs
+  protected def mkResponse(rs: ResultSet): ResultSet = rs
 }
 object SCUpdateStatement {
   def apply[U: CCCassFormatEncoder, Q: CCCassFormatEncoder](keyspace: String, table: String, updateable: U, where: Q, sSession: ScalaSession) =
@@ -121,7 +120,7 @@ final case class SCDeleteStatement private (
   def noTimestamp: SCDeleteStatement = copy(usingBlock = TTLTimestamp.Neither)
 
   def ifExists: SCDeleteStatement = copy(ifBlock = If.IfExists)
-  def `if`[A: CCCassFormatEncoder](statement: A) = copy(ifBlock = If.IfStatement(statement))
+  def `if`[A: CCCassFormatEncoder](statement: A): SCDeleteStatement = copy(ifBlock = If.IfStatement(statement))
   def noConditional: SCDeleteStatement = copy(ifBlock = If.NoConditional)
 }
 object SCDeleteStatement {
@@ -177,7 +176,7 @@ final case class SCRawSelectStatement[F[_]] private[scsession] (
 }
 
 object SCRaw {
-  def apply(strRepr: String, anyrefArgs: List[AnyRef], sSession: ScalaSession): SCRawStatement = new SCRawStatement(Raw(strRepr, anyrefArgs))(sSession)
+  def apply(strRepr: String, anyrefArgs: List[AnyRef], sSession: ScalaSession): SCRawStatement = SCRawStatement(Raw(strRepr, anyrefArgs))(sSession)
   def applyIterator(strRepr: String, anyrefArgs: List[AnyRef], sSession: ScalaSession): SCRawSelectStatement[Iterator] = new SCRawSelectStatement[Iterator](SCSelectStatement.mkIteratorResponse, Raw(strRepr, anyrefArgs))(sSession)
   def applyOne(strRepr: String, anyrefArgs: List[AnyRef], sSession: ScalaSession): SCRawSelectStatement[Option] = new SCRawSelectStatement[Option](SCSelectStatement.mkOptionResponse, Raw(strRepr, anyrefArgs))(sSession)
 }
@@ -188,9 +187,14 @@ final case class SCCreateKeyspaceStatement private (
   protected def mkResponse(rs: ResultSet): ResultSet = rs
 
   protected def queryBuildingBlocks: Seq[QueryBuildingBlock] = Seq(createKeyspaceBlock)
+
+  def ifNotExists: SCCreateKeyspaceStatement =
+    copy(createKeyspaceBlock = CreateKeyspace(createKeyspaceBlock.keyspace, If.IfNotExists, createKeyspaceBlock.properties))
+  def noConditional: SCCreateKeyspaceStatement =
+    copy(createKeyspaceBlock = CreateKeyspace(createKeyspaceBlock.keyspace, If.NoConditional, createKeyspaceBlock.properties))
 }
 object SCCreateKeyspaceStatement {
-  def apply(keyspace: String, properties: String, sSession: ScalaSession): SCCreateKeyspaceStatement = new SCCreateKeyspaceStatement(CreateKeyspace(keyspace, properties))(sSession)
+  def apply(keyspace: String, properties: String, sSession: ScalaSession): SCCreateKeyspaceStatement = new SCCreateKeyspaceStatement(CreateKeyspace(keyspace, If.NoConditional, properties))(sSession)
 }
 final case class SCDropKeyspaceStatement private (
     private val dropKeyspaceBlock: DropKeyspace
@@ -211,7 +215,7 @@ final case class SCCreateTableStatement private (
 
   protected def queryBuildingBlocks: Seq[QueryBuildingBlock] = Seq(createTable, tableProperties)
 
-  def `with`(properties: String) = copy(tableProperties = TableProperties.With(properties))
+  def `with`(properties: String): SCCreateTableStatement = copy(tableProperties = TableProperties.With(properties))
 }
 object SCCreateTableStatement {
   def apply[T: CCCassFormatEncoder](keyspace: String, name: String, numPartitionKeys: Int, numClusteringKeys: Int, sSession: ScalaSession): SCCreateTableStatement =
@@ -258,15 +262,15 @@ final case class SCBatchStatement private (
         b <- s.asBatch
       } yield { _bs.add(b); _bs }
   }
-  override def execute: Result[ResultSet] = mkBatch.map(sSession.session.execute)
+  override def execute(): Result[ResultSet] = mkBatch.map(sSession.session.execute)
 
-  override def executeAsync: Result[Future[ResultSet]] = mkBatch.map(sSession.session.executeAsync(_))
+  override def executeAsync(): Result[Future[ResultSet]] = mkBatch.map(sSession.session.executeAsync(_))
 
   def +(batchable: Batchable): SCBatchStatement = copy(statements = batchable +: statements)
   def ++(batchables: Seq[Batchable]): SCBatchStatement = copy(statements = batchables ++ statements)
   def and(batchables: Batchable*): SCBatchStatement = copy(statements = batchables ++ statements)
 
-  def withBatchType(batchType: BatchStatement.Type) = copy(batchType = batchType)
+  def withBatchType(batchType: BatchStatement.Type): SCBatchStatement = copy(batchType = batchType)
 }
 object SCBatchStatement {
   trait Batchable { this: SCStatement.SCResultSetStatement =>

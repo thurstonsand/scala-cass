@@ -129,29 +129,29 @@ private[scalacass] object QueryBuildingBlock {
 
   abstract class CCBlockWithNamedValue[T: CCCassFormatEncoder](protected val skipIfEmpty: Boolean, protected val prefix: String, protected val infix: String, protected val suffix: String) extends CCBlock { this: QueryBuildingBlock =>
     protected def cc: T
-    protected lazy val namedEncoded = namedEncode(cc)
-    protected lazy val strList = namedEncoded.map(_._1)
+    protected lazy val namedEncoded: Result[(List[String], List[AnyRef])] = namedEncode(cc)
+    protected lazy val strList: Result[List[String]] = namedEncoded.map(_._1)
 
-    def valueRepr = namedEncoded.map(_._2)
+    def valueRepr: Result[List[AnyRef]] = namedEncoded.map(_._2)
   }
 
   abstract class CCBlockWithQueryValue[T: CCCassFormatEncoder](protected val skipIfEmpty: Boolean, protected val prefix: String, protected val infix: String, protected val suffix: String) extends CCBlock { this: QueryBuildingBlock =>
     protected def cc: T
-    protected lazy val queryEncoded = queryEncode(cc)
-    protected lazy val strList = queryEncoded.map(_._1)
+    protected lazy val queryEncoded: Result[(List[String], List[AnyRef])] = queryEncode(cc)
+    protected lazy val strList: Result[List[String]] = queryEncoded.map(_._1)
 
-    def valueRepr = queryEncoded.map(_._2)
+    def valueRepr: Result[List[AnyRef]] = queryEncoded.map(_._2)
   }
 
   abstract class CCBlockWithNoValue[T](protected val skipIfEmpty: Boolean, protected val preambleInfix: String)(implicit encoder: CCCassFormatEncoder[T]) extends CCBlock { this: QueryBuildingBlock =>
     protected def preamble: Preamble
-    protected lazy val strList = Right(encoder.names)
+    protected lazy val strList: Result[List[String]] = Right(encoder.names)
 
     protected val prefix = s"${preamble.verb} "
     protected val infix = s", "
     protected val suffix = s" $preambleInfix ${preamble.keyspace}.${preamble.table}"
 
-    def valueRepr = Right(Nil)
+    def valueRepr: Result[List[AnyRef]] = Right(Nil)
   }
 
   final case class CCBlockInsert[T: CCCassFormatEncoder](protected val cc: T) extends CCBlockWithNamedValue(true, " (", ", ", ")") with QueryBuildingBlock {
@@ -214,7 +214,7 @@ private[scalacass] object QueryBuildingBlock {
       (failed, failed)
     }
 
-    lazy val allColumns = encoder.namesAndTypes
+    lazy val allColumns: List[(String, String)] = encoder.namesAndTypes
 
     lazy val (strRepr: Result[String], valueRepr: Result[List[AnyRef]]) =
       if (numPartitionKeys <= 0) wrongPKSize("must include at least one partition key")
@@ -245,8 +245,8 @@ private[scalacass] object QueryBuildingBlock {
     }
   }
 
-  final case class CreateKeyspace(keyspace: String, properties: String) extends QueryBuildingBlock {
-    def strRepr: Result[String] = Right(s"CREATE KEYSPACE $keyspace WITH $properties")
+  final case class CreateKeyspace(keyspace: String, ifBlock: If, properties: String) extends QueryBuildingBlock {
+    def strRepr: Result[String] = ifBlock.strRepr.map("CREATE KEYSPACE" + _ + s" $keyspace WITH $properties")
     def valueRepr: Result[List[AnyRef]] = Right(Nil)
   }
   final case class DropKeyspace(keyspace: String) extends QueryBuildingBlock {
@@ -263,5 +263,5 @@ private[scalacass] object QueryBuildingBlock {
         } yield (_acc._1 + tup._1, _acc._2 ::: tup._2)
     }
   }
-  def of(qbbs: QueryBuildingBlock*) = build(qbbs)
+  def of(qbbs: QueryBuildingBlock*): Result[(String, List[AnyRef])] = build(qbbs)
 }
