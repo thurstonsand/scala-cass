@@ -3,6 +3,26 @@ layout: docs
 title: "Date Codecs for C* 3.0+"
 section: "c30"
 ---
+```tut:invisible
+import com.datastax.driver.core.Cluster
+import com.weather.scalacass.ScalaSession
+import com.weather.scalacass.joda.Implicits._
+import com.weather.scalacass.syntax._
+
+implicit val cluster = Cluster.builder.addContactPoint("localhost").build()
+com.weather.scalacass.joda.register(cluster)
+val session: ScalaSession = ScalaSession("datecodeckeyspace")(cluster.connect())
+session.createKeyspace("replication = {'class':'SimpleStrategy', 'replication_factor' : 3}").execute()
+
+case class TS(str: String, mytimestamp: org.joda.time.Instant, mydate: org.joda.time.LocalDate, mytime: org.joda.time.LocalTime, mydt: org.joda.time.DateTime)
+case class Query(str: String)
+val table = "mytable"
+session.createTable[TS](table, 1, 0).execute()
+val ts = TS("a primary key", org.joda.time.Instant.now, org.joda.time.LocalDate.now, org.joda.time.LocalTime.now, org.joda.time.DateTime.now)
+session.insert(table, ts).execute()
+val r = session.selectOneStar(table, Query(ts.str)).execute().right.toOption.flatten.get
+```
+
 # Date Codecs for Cassandra 3.0+
 
 By default, Scala-Cass uses the date/time formats provided as default for the Java driver. They are:
@@ -27,17 +47,12 @@ is derived from the `Cluster`
 `com.weather.scalacass.joda.register`
 * then, import the implicits required to use the joda types, provided in `com.weather.scalacass.joda.Implicits._`
 
-```scala
-import com.datastax.driver.core.{Cluster, Row}
-
-// under the hood, DateTime uses a tuple, meaning the cluster must be implicit
-implicit val c: Cluster = _ // your cluster
-com.weather.scalacass.joda.register(c)
-
-import com.weather.scalacass.syntax._
+```tut
+cluster // your cluster, which must be implicit for DateTime
+com.weather.scalacass.joda.register(cluster)
 import com.weather.scalacass.joda.Implicits._
 
-val r: Row = _ // some row from your cluster
+r // some row from your cluster
 r.as[org.joda.time.Instant]("mytimestamp") // cassandra "timestamp"
 r.as[org.joda.time.LocalDate]("mydate") // cassandra "date"
 r.as[org.joda.time.LocalTime]("mytime") // cassandra "time"
@@ -55,17 +70,14 @@ is derived from the `Cluster`
 `com.weather.scalacass.jdk8.register`
 * then, import the implicits required to use the joda types, provided in `com.weather.scalacass.jdk8.Implicits._`
 
-```scala
-import com.datastax.driver.core.{Cluster, Row}
-
+```tut
 // under the hood ZonedDateTime uses a tuple, meaning the cluster must be implicit
-implicit val c: Cluster = _ // your cluster
-com.weather.scalacass.jdk8.register(c)
+cluster // your cluster, which must be implicit for DateTime
+com.weather.scalacass.jdk8.register(cluster)
 
-import com.weather.scalacass.syntax._
 import com.weather.scalacass.jdk8.Implicits._
 
-val r: Row = _ // some row from your cluster
+r // some row from your cluster
 r.as[java.time.Instant]("mytimestamp") // cassandra "timestamp"
 r.as[java.time.LocalDate]("mydate") // cassandra "date"
 r.as[java.time.LocalTime]("mytime") // cassandra "time"
@@ -74,3 +86,9 @@ r.as[java.time.ZonedDateTime]("myzdt") // cassandra "tuple<timestamp,varchar>"
 
 [See here](https://datastax.github.io/java-driver/manual/custom_codecs/extras/#jdk-8) for information about the format 
 of `ZonedDateTime`
+
+```tut:invisible
+session.dropKeyspace.execute()
+session.close()
+cluster.close()
+```

@@ -55,7 +55,7 @@ trait SCStatement[Response] {
       prepared.bind(anyrefArgs: _*)
   }
 
-  override def toString: String = getStringRepr.map(repr =>s"${getClass.getName}($repr)").toString
+  override def toString: String = getStringRepr.fold("problem generating statement: " + _, repr => s"${getClass.getSimpleName}($repr)")
 }
 
 final case class SCInsertStatement private (

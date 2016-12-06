@@ -48,7 +48,8 @@ createStatement.execute()
 Additionally, you can specify `IF NOT EXISTS` like
 
 ```tut
-createStatement.ifNotExists.execute()
+val createStatementIfNotExists = createStatement.ifNotExists
+val result = createStatementIfNotExists.execute()
 ```
 
 ```tut:invisible
