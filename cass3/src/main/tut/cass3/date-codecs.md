@@ -1,7 +1,7 @@
 ---
 layout: docs
-title: "Date Codecs for C* 3.0+"
-section: "c30"
+title: "Date Codecs"
+section: "cthree"
 ---
 ```tut:invisible
 import com.datastax.driver.core.Cluster
@@ -23,7 +23,7 @@ session.insert(table, ts).execute()
 val r = session.selectOneStar(table, Query(ts.str)).execute().right.toOption.flatten.get
 ```
 
-# Date Codecs for Cassandra 3.0+
+# Date Codecs
 
 By default, Scala-Cass uses the date/time formats provided as default for the Java driver. They are:
 
@@ -81,7 +81,7 @@ r // some row from your cluster
 r.as[java.time.Instant]("mytimestamp") // cassandra "timestamp"
 r.as[java.time.LocalDate]("mydate") // cassandra "date"
 r.as[java.time.LocalTime]("mytime") // cassandra "time"
-r.as[java.time.ZonedDateTime]("myzdt") // cassandra "tuple<timestamp,varchar>"
+r.as[java.time.ZonedDateTime]("mydt") // cassandra "tuple<timestamp,varchar>"
 ```
 
 [See here](https://datastax.github.io/java-driver/manual/custom_codecs/extras/#jdk-8) for information about the format 
