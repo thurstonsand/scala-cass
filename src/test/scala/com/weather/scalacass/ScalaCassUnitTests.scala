@@ -8,8 +8,8 @@ import syntax._
 
 abstract class ScalaCassUnitTests extends CassandraWithTableTester("testDB", "testTable", ScalaCassUnitTestsVersionSpecific.extraHeaders ::: List("str varchar", "str2 ascii", "b blob",
   "d decimal", "f float", "net inet", "tid timeuuid", "vi varint", "i int", "bi bigint", "bool boolean", "dub double",
-  "l list<varchar>", "m map<varchar, bigint>", "s set<double>", "id uuid", "sblob set<blob>, tup tuple<int, varchar>"), List("str")) with OptionValues {
-  def testType[GoodType: CassFormatDecoder, BadType: CassFormatDecoder](k: String, v: GoodType, default: GoodType)(implicit goodCF: CassFormatEncoder[GoodType]) = {
+  "l list<varchar>", "m map<varchar, bigint>", "s set<double>", "id uuid", "sblob set<blob>, tup tuple<int, varchar>", "nest map<varchar, frozen<set<int>>>"), List("str")) with OptionValues {
+  def testType[GoodType: CassFormatDecoder, BadType: CassFormatDecoder](k: String, v: GoodType, default: GoodType, testCC: Boolean = true)(implicit goodCF: CassFormatEncoder[GoodType]) = {
     val args = {
       val converted = goodCF.encode(v).fold(throw _, identity).asInstanceOf[AnyRef]
       if (k == "str") Seq((k, converted)) else Seq((k, converted), ("str", "asdf"))
@@ -46,25 +46,27 @@ abstract class ScalaCassUnitTests extends CassandraWithTableTester("testDB", "te
     res.attemptAs[BadType](k).left.toOption.value shouldBe a[BadTypeException]
     res.attemptAs[BadType](s"not$k").left.toOption.value shouldBe an[IllegalArgumentException]
 
-    case class TestCC(pkField: String, refField: GoodType)
-    case class QueryCC(pkField: String)
-    val ss = new ScalaSession(dbName)
-    val tname = s"testdb${scala.util.Random.alphanumeric.take(12).mkString}"
-    ss.createTable[TestCC](tname, 1, 0)(CCCassFormatEncoder[TestCC])
-    val t1 = TestCC("t1", v)
-    val q1 = QueryCC(t1.pkField)
-    ss.insert(tname, t1)(CCCassFormatEncoder[TestCC])
-    k match {
-      case "b" =>
-        ss.selectOne(tname, ScalaSession.NoQuery()).flatMap(_.getAs[TestCC]).map(_.refField.asInstanceOf[Array[Byte]]).value should contain theSameElementsInOrderAs t1.refField.asInstanceOf[Array[Byte]]
-      case "sblob" =>
-        ss.selectOne(tname, ScalaSession.NoQuery()).flatMap(_.getAs[TestCC]).flatMap(_.refField.asInstanceOf[Set[Array[Byte]]].headOption).value should contain theSameElementsInOrderAs t1.refField.asInstanceOf[Set[Array[Byte]]].head
-      case _ =>
-        ss.selectOne(tname, q1).flatMap(_.getAs[TestCC]).value shouldBe t1
+    if (testCC) {
+      case class TestCC(pkField: String, refField: GoodType)
+      case class QueryCC(pkField: String)
+      val ss = new ScalaSession(dbName)
+      val tname = s"testdb${scala.util.Random.alphanumeric.take(12).mkString}"
+      ss.createTable[TestCC](tname, 1, 0)(CCCassFormatEncoder[TestCC])
+      val t1 = TestCC("t1", v)
+      val q1 = QueryCC(t1.pkField)
+      ss.insert(tname, t1)(CCCassFormatEncoder[TestCC])
+      k match {
+        case "b" =>
+          ss.selectOne(tname, ScalaSession.NoQuery()).flatMap(_.getAs[TestCC]).map(_.refField.asInstanceOf[Array[Byte]]).value should contain theSameElementsInOrderAs t1.refField.asInstanceOf[Array[Byte]]
+        case "sblob" =>
+          ss.selectOne(tname, ScalaSession.NoQuery()).flatMap(_.getAs[TestCC]).flatMap(_.refField.asInstanceOf[Set[Array[Byte]]].headOption).value should contain theSameElementsInOrderAs t1.refField.asInstanceOf[Set[Array[Byte]]].head
+        case _ =>
+          ss.selectOne(tname, q1).flatMap(_.getAs[TestCC]).value shouldBe t1
+      }
+      ss.delete(tname, q1)
+      ss.select(tname, q1).toList.map(_.as[TestCC]) shouldBe empty
+      ss.dropTable(tname)
     }
-    ss.delete(tname, q1)
-    ss.select(tname, q1).toList.map(_.as[TestCC]) shouldBe empty
-    ss.dropTable(tname)
   }
 }
 class ScalaCassUnitTestsAll extends ScalaCassUnitTests with ScalaCassUnitTestsVersionSpecific {
@@ -78,6 +80,9 @@ class ScalaCassUnitTestsAll extends ScalaCassUnitTests with ScalaCassUnitTestsVe
   "map" should "be extracted correctly (wrong basic)" in testType[Map[String, Long], String]("m", Map("asdf" -> 10L), Map("fdsa" -> -10L))
   "map" should "be extracted correctly (wrong 1st type param)" in testType[Map[String, Long], Map[Long, Long]]("m", Map("asdf" -> 10L), Map("fdsa" -> -10L))
   "map" should "be extracted correctly (wrong 2nd type param)" in testType[Map[String, Long], Map[String, Int]]("m", Map("asdf" -> 10L), Map("fdsa" -> -10L))
+  // for the moment, createTable does not work because the nested type needs to be frozen, which is currently not possible with the library.
+  // this is a low-use case, and will eventually be fixed by introducing a `Frozen` case class that will add that in
+  "map<varchar, set<int>>" should "be extracted correctly" in testType[Map[String, Set[Int]], Map[String, Int]]("nest", Map("asdf" -> Set(1)), Map("fdsa" -> Set(2)), false)
   "set" should "be extracted correctly (wrong basic)" in testType[Set[Double], String]("s", Set(123.4), Set(987.6))
   "set" should "be extracted correctly (wrong type param)" in testType[Set[Double], Set[String]]("s", Set(123.4), Set(987.6))
   "uuid" should "be extracted correctly" in testType[java.util.UUID, String]("id", java.util.UUID.randomUUID, java.util.UUID.randomUUID)
