@@ -9,7 +9,7 @@ jdk:
 
 before_script: sh .travis_script.sh
 
-sudo: required
+#sudo: required
 
 notifications:
   webhooks:
