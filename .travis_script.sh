@@ -1,29 +1,22 @@
 #!/usr/bin/env sh
 
-mkdir lib
-wget https://github.com/Ichoran/thyme/raw/master/Thyme.jar -O lib/Thyme.jar
+function prepare_thyme() {
+    mkdir lib
+    wget https://github.com/Ichoran/thyme/raw/master/Thyme.jar -O lib/Thyme.jar
+}
 
-sudo rm /etc/init.d/cassandra /etc/security/limits.d/cassandra.conf
-cassVersion=""
-if java -version 2>&1 | egrep "java version \"1.7" > /dev/null; then
-    cassVersion="2.2.7"
-else
-    cassVersion="3.0.8"
-fi
-#echo "deb http://www.apache.org/dist/cassandra/debian $cassVersion main" | sudo tee -a /etc/apt/sources.list.d/cassandra.sources.list
-#echo "deb-src http://www.apache.org/dist/cassandra/debian $cassVersion main" | sudo tee -a /etc/apt/sources.list.d/cassandra.sources.list
+function prepare_cassandra() {
+    sudo rm /etc/init.d/cassandra /etc/security/limits.d/cassandra.conf
+    cassVersion=""
+    if java -version 2>&1 | egrep "java version \"1.7" > /dev/null; then
+        cassVersion="2.2.7"
+    else
+        cassVersion="3.0.8"
+    fi
 
-#gpg --keyserver hkp://pgp.mit.edu:80 --recv-keys F758CE318D77295D
-#gpg --export --armor F758CE318D77295D | sudo apt-key add -
+    wget "http://www.us.apache.org/dist/cassandra/$cassVersion/apache-cassandra-$cassVersion-bin.tar.gz" && tar -xvzf "apache-cassandra-$cassVersion-bin.tar.gz"
+    export PATH="apache-cassandra-$cassVersion/bin:$PATH"
+}
 
-#gpg --keyserver hkp://pgp.mit.edu:80 --recv-keys 2B5C1B00
-#gpg --export --armor 2B5C1B00 | sudo apt-key add -
-
-#gpg --keyserver hkp://pgp.mit.edu:80 --recv-keys 0353B12C
-#gpg --export --armor 0353B12C | sudo apt-key add -
-
-#sudo apt-get update -qq
-#sudo apt-get install cassandra
-
-wget "http://www.us.apache.org/dist/cassandra/$cassVersion/apache-cassandra-$cassVersion-bin.tar.gz" && tar -xvzf "apache-cassandra-$cassVersion-bin.tar.gz"
-export PATH="apache-cassandra-$cassVersion/bin:$PATH"
+prepare_thyme
+#prepare_cassandra()
