@@ -1,3 +1,6 @@
+# use containers
+sudo: false
+
 language: scala
 scala:
   - 2.11.8
@@ -7,21 +10,21 @@ jdk:
   - oraclejdk8
   - oraclejdk7
 
-before_script: sh .travis_script.sh
+before_cache:
+  # Tricks to avoid unnecessary cache updates
+  - find $HOME/.ivy2 -name "ivydata-*.properties" -delete
+  - find $HOME/.sbt -name "*.lock" -delete
 
-#sudo: required
+cache:
+  directories:
+    - $HOME/.ivy2/cache
+    - $HOME/.sbt/boot/
+
+before_script: 
+  - mkdir lib
+  - wget https://github.com/Ichoran/thyme/raw/master/Thyme.jar -O lib/Thyme.jar
 
 notifications:
   webhooks:
     urls:
       - https://webhooks.gitter.im/e/b37d78d8e7cb1d34adb3
-
-#services:
-#  - docker
-
-#env:
-#  - DOCKER_HOST=unix:///var/run/docker.sock
-
-#addons:
-#  hosts:
-#    - dockerhost
