@@ -1,11 +1,11 @@
 #!/usr/bin/env sh
 
-function prepare_thyme() {
+function prepare_thyme {
     mkdir lib
     wget https://github.com/Ichoran/thyme/raw/master/Thyme.jar -O lib/Thyme.jar
 }
 
-function prepare_cassandra() {
+function prepare_cassandra {
     sudo rm /etc/init.d/cassandra /etc/security/limits.d/cassandra.conf
     cassVersion=""
     if java -version 2>&1 | egrep "java version \"1.7" > /dev/null; then
