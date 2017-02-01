@@ -6,7 +6,7 @@ section: "cthree"
 # Creating a Table
 
 Like creating a keyspace, this is likely only going to be useful to those who are writing tests. Table creation uses a 
-case class for the table columns' names and type definitions (see [Type Mappings](/cass3/type-mappings.html) to compare 
+case class for the table columns' names and type definitions (see [Type Mappings](/docs/cass3/type-mappings.html) to compare 
 Scala and Cassandra types).
 
 ## Characteristics

@@ -146,11 +146,6 @@ lazy val micrositeSettings = Seq(
 
 val javaVersion = sys.props("java.specification.version")
 
-lazy val testing = Seq(
-  Def.sequential(microsite)
-)
-
-
 lazy val `scala-cass` = {
   lazy val `scala-cass` = project.in(file("."))
     .settings(moduleName := "scala-cass")
@@ -162,21 +157,21 @@ lazy val `scala-cass` = {
   }
 }
 
-lazy val `tut-cass3` = project.in(file("cass3"))
+lazy val `tut-cass3` = project.in(file("docs/cass3"))
   .enablePlugins(MicrositesPlugin)
   .settings(commonSettings: _*)
   .settings(micrositeSettings: _*)
   .settings(noPublishSettings: _*)
   .dependsOn(`scala-cass` % "test")
 
-lazy val `tut-cass21`=  project.in(file("cass21"))
+lazy val `tut-cass21`=  project.in(file("docs/cass21"))
   .enablePlugins(MicrositesPlugin)
   .settings(commonSettings: _*)
   .settings(micrositeSettings: _*)
   .settings(noPublishSettings: _*)
   .dependsOn(`scala-cass` % "test")
 
-lazy val docs = project.in(file("docs"))
+lazy val docs = project.in(file("docs/root"))
   .enablePlugins(MicrositesPlugin)
   .settings(micrositeSettings: _*)
   .settings(noPublishSettings: _*)

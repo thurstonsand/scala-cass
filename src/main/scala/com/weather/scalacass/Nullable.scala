@@ -47,7 +47,7 @@ object Nullable {
 
   implicit def decoder[A](implicit underlying: CassFormatDecoder[A]): CassFormatDecoder[Nullable[A]] = new CassFormatDecoder[Nullable[A]] {
     type From = underlying.From
-    val clazz = underlying.clazz
+    val typeToken = underlying.typeToken
     def f2t(f: From): Result[Nullable[A]] = underlying.f2t(f).right.map(Is.apply)
     def extract(r: Row, name: String): From = underlying.extract(r, name)
 

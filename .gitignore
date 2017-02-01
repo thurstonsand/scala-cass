@@ -5,3 +5,6 @@ target
 cassandra.logdir*
 docs/src/main/tut/cass3
 docs/src/main/tut/cass21
+cassandra-docs
+_site
+lib
