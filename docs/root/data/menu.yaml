@@ -4,19 +4,19 @@ options:
 
   - title: Cassandra 3.0+
     url: cassandra-30.html
-    menu_type: cthree
+    menu_type: c3
 
   - title: Date Codecs
     url: cass3/date-codecs.html
-    menu_type: cthree
+    menu_type: c3
 
   - title: Type Mappings
     url: cass3/type-mappings.html
-    menu_type: cthree
+    menu_type: c3
 
   - title: ScalaSession
     url: cass3/scalasession/getting-started.html
-    menu_type: cthree
+    menu_type: c3
     menu_section: ss
 
     nested_options:
@@ -30,17 +30,15 @@ options:
 
   # C* 2.1
 
-#  - title: Cassandra 2.1
-#    url: cass21/cassandra-21.html
-#    menu_type: c21
-#    menu_section: c21
+  - title: Cassandra 2.1
+    url: cassandra-21.html
+    menu_type: c21
+    menu_type: c21
 
-#  - title: Date Codecs
-#    url: cass21/date-codecs.html
-#    menu_type: c21
-#    menu_section: c21
+  - title: Date Codecs
+    url: cass21/date-codecs.html
+    menu_type: c21
 
-#  - title: Type Mappings
-#    url: cass21/type-mappings.html
-#    menu_type: c21
-#    menu_section: c21
+  - title: Type Mappings
+    url: cass21/type-mappings.html
+    menu_type: c21

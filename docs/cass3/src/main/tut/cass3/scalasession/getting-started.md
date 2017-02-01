@@ -1,7 +1,7 @@
 ---
 layout: docs
 title: "Getting Started"
-section: "cthree"
+section: "c3"
 ---
 # Getting Started with ScalaSession
 

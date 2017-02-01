@@ -1,7 +1,7 @@
 ---
 layout: docs
 title: "Date Codecs"
-section: "cthree"
+section: "c3"
 ---
 ```tut:invisible
 import com.datastax.driver.core.Cluster

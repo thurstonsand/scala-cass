@@ -1,7 +1,7 @@
 ---
 layout: docs
 title: "Type Mappings"
-section: "cthree"
+section: "c3"
 ---
 
 # Type Mappings

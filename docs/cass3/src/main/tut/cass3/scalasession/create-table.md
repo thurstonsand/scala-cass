@@ -1,7 +1,7 @@
 ---
 layout: docs
 title: "Creating a Table"
-section: "cthree"
+section: "c3"
 ---
 # Creating a Table
 
