@@ -1,6 +1,63 @@
 #!/bin/sh
 set -ue
 
+enable_cassandra_2=-1
+enable_cassandra_3=-1
+
+function help {
+  echo "how to use:"
+  echo "must be run from project home (same level as build.sbt file)."
+  echo "first time running will download cassandra binaries. This will require an internet connection"
+  echo "options:"
+  echo "no option: compile cassandra 2 and cassandra 3 docs, then combine them"
+  echo "-0 -- only combine existing docs"
+  echo "-2 -- only compile cassandra 2 and combine with old cassandra 3 docs"
+  echo "-3 -- only compile cassandra 3 and combine with old cassandra 2 docs"
+  echo "-h -- print out this message"
+  exit 1
+}
+
+function in_right_location {
+  if [[ ! -f build.sbt || ! -n $(cat build.sbt | grep 'com.github.thurstonsand') ]]; then
+    echo "not in root project folder!"
+    echo
+    help
+  fi
+}
+function parse_inputs {
+	while getopts ":023h" opt; do
+  	case $opt in
+    	0)
+      	enable_cassandra_2=0
+        enable_cassandra_3=0
+      	;;
+      2)
+        enable_cassandra_2=1
+        enable_cassandra_3=0
+        ;;
+      3)
+        enable_cassandra_2=0
+        enable_cassandra_3=1
+        ;;
+      h)
+        help
+        ;;
+    	\?)
+      	echo "Invalid option: -$OPTARG" >&2
+        help
+      	;;
+      :)
+        echo "Option -$OPTARG requires an argument." >&2
+        help
+        ;;
+  	esac
+	done
+  if [[ enable_cassandra_2 -eq -1 || enable_cassandra_3 -eq -1 ]]; then
+    enable_cassandra_2=1
+    enable_cassandra_3=1
+  fi
+}
+
 function setup_cassandra {
   version=$1
   cassandra_path="cassandra-docs/cassandra-$version"
@@ -75,15 +132,22 @@ function run_jekyll {
 
 mkdir -p cassandra-docs
 
-setup_cassandra "2.1.9"
-clear_cassandra
+in_right_location
+parse_inputs $@
 
-run_cassandra_21
+if [[ enable_cassandra_2 -gt 0 ]]; then
+  setup_cassandra "2.1.9"
+  clear_cassandra
 
-setup_cassandra "3.0.9"
-clear_cassandra
+  run_cassandra_21
+fi
 
-run_cassandra_30
+if [[ enable_cassandra_3 -gt 0 ]]; then
+  setup_cassandra "3.0.9"
+  clear_cassandra
+
+  run_cassandra_30
+fi
 
 compile_results
 run_jekyll
