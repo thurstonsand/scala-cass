@@ -58,7 +58,6 @@ the keyspace is created again
 ```tut
 sSession.dropKeyspace.execute()
 ```
-
 ```tut:invisible
 sSession.close()
 cluster.close()

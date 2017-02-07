@@ -31,7 +31,7 @@ section: "c3"
 
 * Time is a type specific to this library so as not to conflict with `bigint` and `Long`. it is defined as
   
-```scala
+```tut:silent
 final case class Time(millis: Long)
 ```
 

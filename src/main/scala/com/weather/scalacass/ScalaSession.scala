@@ -61,7 +61,7 @@ object ScalaSession {
 }
 
 final case class ScalaSession(keyspace: String)(implicit val session: Session) {
-  import ScalaSession.{Fn02Callable, Star}
+  import ScalaSession.{Fn02Callable, Star, NoQuery}
 
   //  private[this] val queryCache = new LRUCache[Set[String], PreparedStatement](100)
   private[this] val queryCache = CacheBuilder.newBuilder().maximumSize(1000).build[String, PreparedStatement]()
@@ -87,7 +87,7 @@ final case class ScalaSession(keyspace: String)(implicit val session: Session) {
     SCUpdateStatement(keyspace, table, updateable, query, this)
 
   def delete[D] = dh.asInstanceOf[DeleteHelper[D]]
-  def deleteStar = dh.asInstanceOf[DeleteHelper[Star]]
+  def deleteRow = dh.asInstanceOf[DeleteHelper[NoQuery]]
   private[this] val dh = new DeleteHelper[Nothing]
 
   final class DeleteHelper[D] {

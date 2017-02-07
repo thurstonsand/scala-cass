@@ -3,6 +3,16 @@ layout: docs
 title: "Creating a Table"
 section: "c3"
 ---
+```tut:invisible
+import com.datastax.driver.core.{Cluster, Session}
+import com.weather.scalacass.ScalaSession
+
+implicit val cluster = Cluster.builder.addContactPoint("localhost").build()
+implicit val session: Session = cluster.connect()
+
+val sSession: ScalaSession = ScalaSession("mykeyspace")
+sSession.createKeyspace("replication = {'class':'SimpleStrategy', 'replication_factor' : 1}").execute()
+```
 # Creating a Table
 
 Like creating a keyspace, this is likely only going to be useful to those who are writing tests. Table creation uses a 
@@ -21,17 +31,6 @@ Scala and Cassandra types).
 * you must have at least 1 partition key
 * the number of partition keys + clustering keys must be less than the number of fields in the case class
 * any rules associated with cassandra semantics for data types must be followed (eg no counters in the primary key)
-
-```tut:invisible
-import com.datastax.driver.core.{Cluster, Session}
-import com.weather.scalacass.ScalaSession
-
-implicit val cluster = Cluster.builder.addContactPoint("localhost").build()
-implicit val session: Session = cluster.connect()
-
-val sSession: ScalaSession = ScalaSession("mykeyspace")
-sSession.createKeyspace("replication = {'class':'SimpleStrategy', 'replication_factor' : 3}").execute()
-```
 
 ```tut
 case class MyTable(s: String, i: Int, l: Long)
@@ -61,7 +60,6 @@ truncateStatement.execute()
 val dropStatement = sSession.dropTable("mytable")
 dropStatement.execute()
 ```
-
 ```tut:invisible
 sSession.dropKeyspace.execute()
 sSession.close()

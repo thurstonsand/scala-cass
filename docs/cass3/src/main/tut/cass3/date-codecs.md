@@ -86,7 +86,6 @@ r.as[java.time.ZonedDateTime]("mydt") // cassandra "tuple<timestamp,varchar>"
 
 [See here](https://datastax.github.io/java-driver/manual/custom_codecs/extras/#jdk-8) for information about the format 
 of `ZonedDateTime`
-
 ```tut:invisible
 session.dropKeyspace.execute()
 session.close()

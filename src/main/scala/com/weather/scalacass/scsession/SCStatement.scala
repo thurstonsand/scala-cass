@@ -55,7 +55,8 @@ trait SCStatement[Response] {
       prepared.bind(anyrefArgs: _*)
   }
 
-  override def toString: String = getStringRepr.fold("problem generating statement: " + _, repr => s"${getClass.getSimpleName}($repr)")
+  private def replaceqWithValue(repr: String, values: List[AnyRef]): String = values.foldLeft(repr) { case (r, v) => r.replaceFirst("\\?", v.toString) }
+  override def toString: String = buildQuery.fold("problem generating statement: " + _, query => s"${getClass.getSimpleName}(${(replaceqWithValue _).tupled(query)})")
 }
 
 final case class SCInsertStatement private (
@@ -117,6 +118,7 @@ final case class SCDeleteStatement private (
   protected def queryBuildingBlocks: Seq[QueryBuildingBlock] = Seq(deleteBlock, usingBlock, whereBlock, ifBlock)
 
   def usingTimestamp(ts: Long): SCDeleteStatement = copy(usingBlock = TTLTimestamp.Timestamp(Some(ts)))
+  def usingTimestampNow: SCDeleteStatement = copy(usingBlock = TTLTimestamp.Timestamp(Option.empty[Long]))
   def noTimestamp: SCDeleteStatement = copy(usingBlock = TTLTimestamp.Neither)
 
   def ifExists: SCDeleteStatement = copy(ifBlock = If.IfExists)
