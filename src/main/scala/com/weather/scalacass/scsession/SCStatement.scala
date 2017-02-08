@@ -130,23 +130,41 @@ object SCDeleteStatement {
     new SCDeleteStatement(CCBlockDelete[D](Preamble("DELETE", keyspace, table)), CCBlockWhere(where))(sSession)
 }
 
-final case class SCSelectStatement[F[_]](
+abstract class SCSelectStatement[F[_]](
     private val _mkResponse: ResultSet => F[Row],
-    private val selectBlock: QueryBuildingBlock,
-    private val whereBlock: QueryBuildingBlock,
-    private val limitBlock: Limit = Limit.NoLimit,
-    private val filteringBlock: Filtering = Filtering.NoFiltering
-)(implicit protected val sSession: ScalaSession) extends SCStatement[F[Row]] {
+    private val limitBlock: Limit = Limit.NoLimit
+) extends SCStatement[F[Row]] {
+  implicit protected def sSession: ScalaSession
+  protected def selectBlock: QueryBuildingBlock
+  protected def whereBlock: QueryBuildingBlock
+  protected def filteringBlock: Filtering
 
   protected def queryBuildingBlocks: Seq[QueryBuildingBlock] = Seq(selectBlock, whereBlock, limitBlock, filteringBlock)
-
   protected def mkResponse(rs: ResultSet): F[Row] = _mkResponse(rs)
-  def limit(n: Int): SCSelectStatement[F] = copy(limitBlock = Limit.LimitN(n))
-  def noLimit: SCSelectStatement[F] = copy(limitBlock = Limit.NoLimit)
-
-  def allowFiltering: SCSelectStatement[F] = copy(filteringBlock = Filtering.AllowFiltering)
-  def noAllowFiltering: SCSelectStatement[F] = copy(filteringBlock = Filtering.NoFiltering)
 }
+
+final case class SCSelectOneStatement(
+    protected val selectBlock: QueryBuildingBlock,
+    protected val whereBlock: QueryBuildingBlock,
+    protected val filteringBlock: Filtering = Filtering.NoFiltering
+)(implicit protected val sSession: ScalaSession) extends SCSelectStatement[Option](SCSelectStatement.mkOptionResponse, Limit.LimitN(1)) {
+  def allowFiltering: SCSelectOneStatement = copy(filteringBlock = Filtering.AllowFiltering)
+  def noAllowFiltering: SCSelectOneStatement = copy(filteringBlock = Filtering.NoFiltering)
+}
+
+final case class SCSelectItStatement(
+    protected val selectBlock: QueryBuildingBlock,
+    protected val whereBlock: QueryBuildingBlock,
+    protected val filteringBlock: Filtering = Filtering.NoFiltering,
+    private val limitBlock: Limit = Limit.NoLimit
+)(implicit protected val sSession: ScalaSession) extends SCSelectStatement[Iterator](SCSelectStatement.mkIteratorResponse, limitBlock) {
+  def limit(n: Int): SCSelectItStatement = copy(limitBlock = Limit.LimitN(n))
+  def noLimit: SCSelectItStatement = copy(limitBlock = Limit.NoLimit)
+
+  def allowFiltering: SCSelectItStatement = copy(filteringBlock = Filtering.AllowFiltering)
+  def noAllowFiltering: SCSelectItStatement = copy(filteringBlock = Filtering.NoFiltering)
+}
+
 object SCSelectStatement {
   def mkIteratorResponse(rs: ResultSet): Iterator[Row] = {
     import scala.collection.JavaConverters._
@@ -155,10 +173,10 @@ object SCSelectStatement {
   def mkOptionResponse(rs: ResultSet): Option[Row] = Option(rs.one())
 
   def apply[S: CCCassFormatEncoder, Q: CCCassFormatEncoder](keyspace: String, table: String, where: Q, sSession: ScalaSession) =
-    new SCSelectStatement[Iterator](mkIteratorResponse, CCBlockSelect[S](Preamble("SELECT", keyspace, table)), CCBlockWhere(where))(sSession)
+    SCSelectItStatement(CCBlockSelect[S](Preamble("SELECT", keyspace, table)), CCBlockWhere(where))(sSession)
 
   def applyOne[S: CCCassFormatEncoder, Q: CCCassFormatEncoder](keyspace: String, table: String, where: Q, sSession: ScalaSession) =
-    new SCSelectStatement[Option](mkOptionResponse, CCBlockSelect[S](Preamble("SELECT", keyspace, table)), CCBlockWhere(where))(sSession)
+    SCSelectOneStatement(CCBlockSelect[S](Preamble("SELECT", keyspace, table)), CCBlockWhere(where))(sSession)
 }
 
 trait SCRaw[Response] extends SCStatement[Response] {

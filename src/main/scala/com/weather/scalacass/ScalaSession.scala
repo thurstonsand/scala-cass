@@ -103,7 +103,7 @@ final case class ScalaSession(keyspace: String)(implicit val session: Session) {
   private[this] val sh = new SelectHelper[Nothing]
 
   final class SelectHelper[S] {
-    def apply[Q: CCCassFormatEncoder](table: String, where: Q)(implicit sEncoder: CCCassFormatEncoder[S]): SCSelectStatement[Iterator] =
+    def apply[Q: CCCassFormatEncoder](table: String, where: Q)(implicit sEncoder: CCCassFormatEncoder[S]): SCSelectItStatement =
       SCSelectStatement.apply[S, Q](keyspace, table, where, ScalaSession.this)
   }
 
@@ -112,7 +112,7 @@ final case class ScalaSession(keyspace: String)(implicit val session: Session) {
   private[this] val soh = new SelectOneHelper[Nothing]
 
   final class SelectOneHelper[S] {
-    def apply[Q: CCCassFormatEncoder](table: String, where: Q)(implicit sEncoder: CCCassFormatEncoder[S]): SCSelectStatement[Option] =
+    def apply[Q: CCCassFormatEncoder](table: String, where: Q)(implicit sEncoder: CCCassFormatEncoder[S]): SCSelectOneStatement =
       SCSelectStatement.applyOne[S, Q](keyspace, table, where, ScalaSession.this)
   }
 

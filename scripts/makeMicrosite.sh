@@ -3,6 +3,7 @@ set -ue
 
 enable_cassandra_2=-1
 enable_cassandra_3=-1
+enable_jekyll=1
 
 function help {
   echo "how to use:"
@@ -10,10 +11,12 @@ function help {
   echo "first time running will download cassandra binaries. This will require an internet connection"
   echo "options:"
   echo "no option: compile cassandra 2 and cassandra 3 docs, then combine them"
-  echo "-0 -- only combine existing docs"
-  echo "-2 -- only compile cassandra 2 and combine with old cassandra 3 docs"
-  echo "-3 -- only compile cassandra 3 and combine with old cassandra 2 docs"
+  echo "-x -- disable start up of jekyll at the end of the script"
   echo "-h -- print out this message"
+  echo "use one of:"
+  echo "  -0 -- only combine existing docs"
+  echo "  -2 -- only compile cassandra 2 and combine with old cassandra 3 docs"
+  echo "  -3 -- only compile cassandra 3 and combine with old cassandra 2 docs"
   exit 1
 }
 
@@ -25,7 +28,7 @@ function in_right_location {
   fi
 }
 function parse_inputs {
-	while getopts ":023h" opt; do
+	while getopts ":023xh" opt; do
   	case $opt in
     	0)
       	enable_cassandra_2=0
@@ -38,6 +41,9 @@ function parse_inputs {
       3)
         enable_cassandra_2=0
         enable_cassandra_3=1
+        ;;
+      x)
+        enable_jekyll=0
         ;;
       h)
         help
@@ -150,4 +156,7 @@ if [[ enable_cassandra_3 -gt 0 ]]; then
 fi
 
 compile_results
-run_jekyll
+
+if [[ enable_jekyll -gt 0 ]]; then
+  run_jekyll
+fi

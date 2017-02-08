@@ -35,15 +35,16 @@ options:
       - title: Delete
         url: cass3/scalasession/delete.html
         menu_section: ss
-#      - title: Select
-#        url: cass3/scalasession/select.html
+      - title: Select
+        url: cass3/scalasession/select.html
+        menu_section: ss
 #      - title: Batch Statements
 #        url: cass3/scalasession/batch.html
 #      - title: Raw Statements
 #        url: cass3/scalasession/raw.html
 
 
-    # include performance info here
+    # include performance info here?
 #    - title: Row Extraction
 #      url: cass3/row-extraction.html
 #      menu_type: c3
