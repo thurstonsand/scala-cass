@@ -28,7 +28,7 @@ class CreateTableUnitTests extends CassandraUnitTester {
   }
 
   def getpk[T: CCCassFormatDecoder: CCCassFormatEncoder](tname: String, pkCount: Int, clustCount: Int) = {
-    ssFixture.ss.createTable[T](tname, pkCount, clustCount).execute
+    ssFixture.ss.createTable[T](tname, pkCount, clustCount).execute()
     val table = cluster.getMetadata.getKeyspace(dbName).getTable(tname)
     val parts = table.getPartitionKey.asScala.map(_.getName)
     val clust = table.getClusteringColumns.asScala.map(_.getName)
@@ -44,7 +44,7 @@ class CreateTableUnitTests extends CassandraUnitTester {
 
     clust shouldBe empty
 
-    f.ss.dropTable(f.tname).execute
+    f.ss.dropTable(f.tname).execute()
   }
   "createTable11" should "create a table" in {
     val f = ssFixture
@@ -58,7 +58,7 @@ class CreateTableUnitTests extends CassandraUnitTester {
     clust should contain("str2")
     clust should not contain "i"
 
-    f.ss.dropTable(f.tname).execute
+    f.ss.dropTable(f.tname).execute()
   }
   "createTable20" should "create a table" in {
     val f = ssFixture
@@ -70,7 +70,7 @@ class CreateTableUnitTests extends CassandraUnitTester {
 
     clust shouldBe empty
 
-    f.ss.dropTable(f.tname).execute
+    f.ss.dropTable(f.tname).execute()
   }
   "createTable21" should "create a table" in {
     val f = ssFixture
@@ -84,7 +84,7 @@ class CreateTableUnitTests extends CassandraUnitTester {
     clust should not contain "str2"
     clust should contain("i")
 
-    f.ss.dropTable(f.tname).execute
+    f.ss.dropTable(f.tname).execute()
   }
   "createTable12" should "create a table" in {
     val f = ssFixture
@@ -98,6 +98,6 @@ class CreateTableUnitTests extends CassandraUnitTester {
     clust should contain("str2")
     clust should contain("i")
 
-    f.ss.dropTable(f.tname).execute
+    f.ss.dropTable(f.tname).execute()
   }
 }

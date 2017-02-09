@@ -42,8 +42,6 @@ trait CassFormatDecoder[T] { self =>
     case Right(v)  => v
     case Left(exc) => throw exc
   }
-  final def getAs(r: Row)(name: String): Option[T] = decode(r, name).right.toOption
-  final def getOrElse(r: Row)(name: String, default: => T): T = decode(r, name).right.getOrElse(default)
   final def attemptAs(r: Row)(name: String): Result[T] = decode(r, name)
 }
 
@@ -209,8 +207,8 @@ object CassFormatDecoder extends CassFormatDecoderVersionSpecific {
     def f2t(f: From): Result[Option[A]] = underlying.f2t(f).right.map(Option(_))
     def extract(r: Row, name: String) = underlying.extract(r, name)
     override def decode(r: Row, name: String): Result[Option[A]] = super.decode(r, name) match {
-      case Left(_: ValueNotDefinedException) => Right(None)
-      case other                             => other
+      case Left(Recoverable(_)) => Right(None)
+      case other                => other
     }
     def tupleExtract(tup: TupleValue, pos: Int) = underlying.tupleExtract(tup, pos)
     override def tupleDecode(tup: TupleValue, pos: Int): Result[Option[A]] = super.tupleDecode(tup, pos) match {

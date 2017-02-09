@@ -16,3 +16,12 @@ object NotRecoverable extends NotRecoverableVersionSpecific {
     }
   }
 }
+
+object Recoverable {
+  def unapply(t: Throwable): Option[Throwable] = if (apply(t)) Some(t) else None
+
+  def apply(t: Throwable) = t match {
+    case _: ValueNotDefinedException => true
+    case _                           => false
+  }
+}

@@ -30,7 +30,7 @@ class UpdateUnitTests extends ActionUnitTests {
   }
   it should "combine all of them" in {
     val query = ss.update(table, Update(123, None), Query("asdf")).usingTTL(1234).`if`(IfS(123L)).usingTimestamp(12345L)
-    an[UncheckedExecutionException] should be thrownBy query.execute
+    an[UncheckedExecutionException] should be thrownBy query.execute()
     println(s"broke: ${query.getStringRepr}")
     val fixedQuery = query.noTimestamp
     println(fixedQuery.getStringRepr)

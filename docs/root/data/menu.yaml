@@ -44,10 +44,10 @@ options:
 #        url: cass3/scalasession/raw.html
 
 
-    # include performance info here?
-#    - title: Row Extraction
-#      url: cass3/row-extraction.html
-#      menu_type: c3
+  # include performance info here?
+  - title: Row Extraction
+    url: cass3/row-extraction.html
+    menu_type: c3
 #
 #    - title: Custom Encoders/Decoders
 #      url: cass3/custom-encoders-decoders.html

@@ -38,7 +38,6 @@ trait CCCassFormatDecoder[T] { self =>
     case Right(v)  => v
     case Left(exc) => throw exc
   }
-  final def getAs(r: Row): Option[T] = decode(r).right.toOption
   final def getOrElse(r: Row)(default: => T): T = decode(r).right.getOrElse(default)
   final def attemptAs(r: Row): Result[T] = decode(r)
 }
@@ -46,4 +45,12 @@ trait CCCassFormatDecoder[T] { self =>
 object CCCassFormatDecoder {
   implicit def derive[T](implicit derived: Lazy[DerivedCCCassFormatDecoder[T]]): CCCassFormatDecoder[T] = derived.value
   def apply[T](implicit decoder: CCCassFormatDecoder[T]) = decoder
+
+  implicit def optionalCodec[T](implicit decoder: CCCassFormatDecoder[T]): CCCassFormatDecoder[Option[T]] =
+    new CCCassFormatDecoder[Option[T]] {
+      private[scalacass] def decode(r: Row): Result[Option[T]] = decoder.decode(r) match {
+        case Left(Recoverable(_)) => Right(None)
+        case other                => other.right.map(Option.apply)
+      }
+    }
 }

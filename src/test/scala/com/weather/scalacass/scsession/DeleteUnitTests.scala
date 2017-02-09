@@ -35,7 +35,7 @@ class DeleteUnitTests extends ActionUnitTests {
   }
   it should "use everything" in {
     val query = ss.delete[SelectiveDelete](table, Query("asdf")).`if`(IfS(1234L)).usingTimestamp(12345L)
-    an[UncheckedExecutionException] should be thrownBy query.execute
+    an[UncheckedExecutionException] should be thrownBy query.execute()
     println(s"broke: ${query.getStringRepr}")
     val fixedQuery = query.noTimestamp
     println(fixedQuery.getStringRepr)

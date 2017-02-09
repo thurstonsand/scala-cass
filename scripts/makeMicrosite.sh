@@ -98,29 +98,52 @@ function wait_for_cassandra {
   return -1
 }
 
-function run_cassandra_21 {
-  jenv local 1.7
+function run_cassandra {
+  local j_version=$1
+  local folder_ext=$2
+
+  jenv local $j_version
+
   echo "starting cassandra $version"
-  trap 'kill $!' INT TERM EXIT
+  trap 'if [[ -n "$cass_pid" ]]; then kill $cass_pid; fi' INT TERM EXIT
   ./$cassandra_path/bin/cassandra -f 2&>/dev/null &
+  cass_pid=$!
   wait_for_cassandra "./$cassandra_path/bin"
-  echo "compiling cassandra 2.1 docs"
-  sbt "tut-cass21/clean" "tut-cass21/tut"
-  kill $!
+
+  echo "compiling cassandra $folder_ext docs"
+  sbt "tut-cass$folder_ext/clean" "tut-cass$folder_ext/tut"
+  kill $cass_pid
+
+  unset cass_pid
   trap - INT TERM EXIT
 }
 
-function run_cassandra_30 {
-  jenv local 1.8
-  echo "starting cassandra $version"
-  trap 'kill $!' INT TERM EXIT
-  ./$cassandra_path/bin/cassandra -f 2&>/dev/null &
-  wait_for_cassandra "./$cassandra_path/bin"
-  echo "compiling cassandra 3.0 docs"
-  sbt "tut-cass3/clean" "tut-cass3/tut"
-  kill $!
-  trap - INT TERM EXIT
-}
+#function run_cassandra_21 {
+#  jenv local 1.7
+#  echo "starting cassandra $version"
+#  trap 'if [[ -n "$cass_pid" ]]; then kill $cass_pid; fi' INT TERM EXIT
+#  ./$cassandra_path/bin/cassandra -f 2&>/dev/null &
+#  cass_pid=$!
+
+#  echo "compiling cassandra 2.1 docs"
+#  sbt "tut-cass21/clean" "tut-cass21/compile"
+#  wait_for_cassandra "./$cassandra_path/bin"
+#  sbt "tut-cass21/tut"
+#  kill $cass_pid
+#  trap - INT TERM EXIT
+#}
+
+#function run_cassandra_30 {
+#  jenv local 1.8
+#  echo "starting cassandra $version"
+#  trap 'kill $!' INT TERM EXIT
+#  ./$cassandra_path/bin/cassandra -f 2&>/dev/null &
+#  wait_for_cassandra "./$cassandra_path/bin"
+#  echo "compiling cassandra 3.0 docs"
+#  sbt "tut-cass3/clean" "tut-cass3/tut"
+#  kill $!
+#  trap - INT TERM EXIT
+#}
 
 function compile_results {
   rm -rf docs/root/src/main/tut/cass3 docs/root/src/main/tut/cass21
@@ -136,6 +159,9 @@ function run_jekyll {
   jekyll serve -s docs/root/target/jekyll/
 }
 
+old_j_version=$(jenv local) 2>/dev/null
+old_j_version=${old_j_version:-$(jenv global)}
+
 mkdir -p cassandra-docs
 
 in_right_location
@@ -145,14 +171,15 @@ if [[ enable_cassandra_2 -gt 0 ]]; then
   setup_cassandra "2.1.9"
   clear_cassandra
 
-  run_cassandra_21
+  run_cassandra 1.7 21
 fi
 
 if [[ enable_cassandra_3 -gt 0 ]]; then
   setup_cassandra "3.0.9"
   clear_cassandra
 
-  run_cassandra_30
+  run_cassandra 1.8 3
+#  run_cassandra_30
 fi
 
 compile_results
@@ -160,3 +187,4 @@ compile_results
 if [[ enable_jekyll -gt 0 ]]; then
   run_jekyll
 fi
+jenv local $old_j_version

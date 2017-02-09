@@ -19,14 +19,14 @@ class UpdateBehaviorTests extends CassandraWithTableTester(UpdateBehaviorTests.d
   val baseStr = "some item"
   val base = Insert(baseStr, List("asdf"), Set(1.0))
   val baseQuery = Query(baseStr)
-  def insertOne(i: Insert = base) = ss.insert(table, i).execute
+  def insertOne(i: Insert = base) = ss.insert(table, i).execute()
 
   "explicit replacement" should "act as before" in {
     case class Replacing(l: UpdateBehavior.Replace[List, String], s: UpdateBehavior.Replace[Set, Double])
     val instance = Replacing(List("fdsa"), Set(2.0))
 
     insertOne()
-    ss.update(table, instance, baseQuery).execute
+    ss.update(table, instance, baseQuery).execute()
 
     val res = ss.selectOneStar(table, baseQuery).execute.right.toOption.flatten.value.as[Insert]
     res.str shouldBe baseStr
@@ -39,7 +39,7 @@ class UpdateBehaviorTests extends CassandraWithTableTester(UpdateBehaviorTests.d
     val instance = ReplacingImplicit(List("fafa"), Set(3.0))
 
     insertOne()
-    ss.update(table, instance, baseQuery).execute
+    ss.update(table, instance, baseQuery).execute()
 
     val res = ss.selectOneStar(table, baseQuery).execute.right.toOption.flatten.value.as[Insert]
     res.str shouldBe baseStr
@@ -52,7 +52,7 @@ class UpdateBehaviorTests extends CassandraWithTableTester(UpdateBehaviorTests.d
     val instance = Adding(List("afaf"), Set(4.0))
 
     insertOne()
-    ss.update(table, instance, baseQuery).execute
+    ss.update(table, instance, baseQuery).execute()
 
     val res = ss.selectOneStar(table, baseQuery).execute.right.toOption.flatten.value.as[Insert]
     res.str shouldBe baseStr
@@ -72,7 +72,7 @@ class UpdateBehaviorTests extends CassandraWithTableTester(UpdateBehaviorTests.d
     preres.l should contain theSameElementsAs expandedBase.l
     preres.s should contain theSameElementsAs expandedBase.s
 
-    ss.update(table, instance, baseQuery).execute
+    ss.update(table, instance, baseQuery).execute()
 
     val res = ss.selectOneStar(table, baseQuery).execute.right.toOption.flatten.value.as[Insert]
     res.str shouldBe baseStr
