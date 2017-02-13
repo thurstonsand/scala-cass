@@ -30,12 +30,14 @@ object SCStatement {
       case Left(_) =>
     }
     def getOrElse[BB >: B](or: => BB): BB = e.right.getOrElse(or)
+    def valueOr[BB >: B](orFn: A => BB): BB = e.fold(orFn, identity)
   }
   type SCResultSetStatement = SCStatement[ResultSet]
   type SCIteratorStatement = SCStatement[Iterator[Row]]
   type SCOptionStatement = SCStatement[Option[Row]]
+  type SCBatchableStatement = SCResultSetStatement with Batchable
 }
-trait SCStatement[Response] {
+trait SCStatement[Response] extends Product with Serializable {
   import SCStatement.{RightBiasedEither, resultSetFutureToScalaFuture}
 
   protected def sSession: ScalaSession
@@ -45,7 +47,7 @@ trait SCStatement[Response] {
   def executeAsync(): Result[Future[Response]] = prepare.map(p => sSession.session.executeAsync(p).map(mkResponse)(scala.concurrent.ExecutionContext.global))
 
   protected def queryBuildingBlocks: Seq[QueryBuildingBlock]
-  private[this] def buildQuery: Result[(String, List[AnyRef])] = QueryBuildingBlock.build(queryBuildingBlocks)
+  private[scsession] def buildQuery: Result[(String, List[AnyRef])] = QueryBuildingBlock.build(queryBuildingBlocks)
 
   def getStringRepr: Result[String] = buildQuery.map(_._1)
 
@@ -55,7 +57,7 @@ trait SCStatement[Response] {
       prepared.bind(anyrefArgs: _*)
   }
 
-  private def replaceqWithValue(repr: String, values: List[AnyRef]): String = values.foldLeft(repr) { case (r, v) => r.replaceFirst("\\?", v.toString) }
+  protected def replaceqWithValue(repr: String, values: List[AnyRef]): String = values.foldLeft(repr) { case (r, v) => r.replaceFirst("\\?", v.toString) }
   override def toString: String = buildQuery.fold("problem generating statement: " + _, query => s"${getClass.getSimpleName}(${(replaceqWithValue _).tupled(query)})")
 }
 
@@ -263,32 +265,44 @@ object SCDropTableStatement {
 }
 
 final case class SCBatchStatement private (
-    private val statements: Seq[SCBatchStatement.Batchable],
+    private val statements: List[SCStatement.SCBatchableStatement],
+    private val usingBlock: TTLTimestamp = TTLTimestamp.Neither,
     private val batchType: BatchStatement.Type = BatchStatement.Type.LOGGED
-)(
-    implicit
-    protected val sSession: ScalaSession
-) extends SCStatement[ResultSet] {
-  import SCStatement.{RightBiasedEither, resultSetFutureToScalaFuture}
+)(implicit protected val sSession: ScalaSession) extends SCStatement[ResultSet] {
+  import SCStatement.{RightBiasedEither, resultSetFutureToScalaFuture, SCBatchableStatement}
+  import SCBatchStatement.ListEitherTraverse
 
   protected def mkResponse(rs: ResultSet): ResultSet = throw new NotImplementedError("implementing execute/executeAsync directly -- not needed")
 
   protected def queryBuildingBlocks: Seq[QueryBuildingBlock] = throw new NotImplementedError("batch uses the cassandra session directly -- don't use me!")
 
-  private def mkBatch: Result[BatchStatement] = statements.foldLeft[Result[BatchStatement]](Right(new BatchStatement(batchType))) {
-    case (bs, s) =>
-      for {
-        _bs <- bs
-        b <- s.asBatch
-      } yield { _bs.add(b); _bs }
+  override def toString: String = (for {
+    tup <- statements.traverseU(_.buildQuery)
+    queryStatements = tup.map(t => s"    ${t._1};").mkString("\n")
+    fullQuery = s"""
+     |  BEGIN $batchType BATCH
+     |$queryStatements
+     |  APPLY BATCH;
+     |""".stripMargin
+    values = tup.flatMap(_._2)
+  } yield s"${getClass.getSimpleName}(${replaceqWithValue(fullQuery, values)})")
+    .valueOr("problem generating statement: " + _)
+
+  private def mkBatch: Result[BatchStatement] = statements.traverseU(_.asBatch).map { ss =>
+    import scala.collection.JavaConverters._
+
+    val bs = new BatchStatement(batchType)
+    bs.addAll(ss.asJava)
+    bs
   }
   override def execute(): Result[ResultSet] = mkBatch.map(sSession.session.execute)
 
   override def executeAsync(): Result[Future[ResultSet]] = mkBatch.map(sSession.session.executeAsync(_))
 
-  def +(batchable: Batchable): SCBatchStatement = copy(statements = batchable +: statements)
-  def ++(batchables: Seq[Batchable]): SCBatchStatement = copy(statements = batchables ++ statements)
-  def and(batchables: Batchable*): SCBatchStatement = copy(statements = batchables ++ statements)
+  def +(batchable: SCBatchableStatement): SCBatchStatement = copy(statements = statements :+ batchable)
+  def ++(batchables: List[SCBatchableStatement]): SCBatchStatement = copy(statements = statements ++ batchables)
+  def ++(otherStatement: SCBatchStatement): SCBatchStatement = copy(statements = statements ++ otherStatement.statements)
+  def and(batchables: SCBatchableStatement*): SCBatchStatement = copy(statements = statements ++ batchables)
 
   def withBatchType(batchType: BatchStatement.Type): SCBatchStatement = copy(batchType = batchType)
 }
@@ -297,5 +311,22 @@ object SCBatchStatement {
     def asBatch: Result[BoundStatement] = prepare
   }
 
-  def apply(statements: Seq[Batchable], sSession: ScalaSession): SCBatchStatement = new SCBatchStatement(statements)(sSession)
+  def apply(statements: List[SCStatement.SCBatchableStatement], sSession: ScalaSession): SCBatchStatement = new SCBatchStatement(statements)(sSession)
+
+  // should be `private`, but the compiler thinks this is not being used (which it is), so setting to `protected` to work around bug
+  protected implicit class ListEitherTraverse[LV](val list: List[LV]) extends AnyVal {
+    def traverseU[L, R](f: LV => Either[L, R]): Either[L, List[R]] = {
+      val builder = List.newBuilder[R]
+
+      @scala.annotation.tailrec
+      def trav(l: List[LV]): Either[L, List[R]] = l.headOption.map(f) match {
+        case Some(Left(f)) => Left(f)
+        case Some(Right(r)) =>
+          builder += r; trav(l.tail)
+        case None => Right(builder.result)
+      }
+      trav(list)
+    }
+  }
+
 }

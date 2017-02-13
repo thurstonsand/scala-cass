@@ -4,6 +4,7 @@ set -ue
 enable_cassandra_2=-1
 enable_cassandra_3=-1
 enable_jekyll=1
+clean_workspace=0
 
 function help {
   echo "how to use:"
@@ -12,6 +13,7 @@ function help {
   echo "options:"
   echo "no option: compile cassandra 2 and cassandra 3 docs, then combine them"
   echo "-x -- disable start up of jekyll at the end of the script"
+  echo "-c -- clean the workspace first"
   echo "-h -- print out this message"
   echo "use one of:"
   echo "  -0 -- only combine existing docs"
@@ -28,12 +30,12 @@ function in_right_location {
   fi
 }
 function parse_inputs {
-	while getopts ":023xh" opt; do
-  	case $opt in
-    	0)
-      	enable_cassandra_2=0
+  while getopts ":023xch" opt; do
+    case $opt in
+      0)
+        enable_cassandra_2=0
         enable_cassandra_3=0
-      	;;
+        ;;
       2)
         enable_cassandra_2=1
         enable_cassandra_3=0
@@ -45,19 +47,22 @@ function parse_inputs {
       x)
         enable_jekyll=0
         ;;
+      c)
+        clean_workspace=1
+        ;;
       h)
         help
         ;;
-    	\?)
-      	echo "Invalid option: -$OPTARG" >&2
+      \?)
+        echo "Invalid option: -$OPTARG" >&2
         help
-      	;;
+        ;;
       :)
         echo "Option -$OPTARG requires an argument." >&2
         help
         ;;
-  	esac
-	done
+    esac
+  done
   if [[ enable_cassandra_2 -eq -1 || enable_cassandra_3 -eq -1 ]]; then
     enable_cassandra_2=1
     enable_cassandra_3=1
@@ -104,52 +109,32 @@ function run_cassandra {
 
   jenv local $j_version
 
+  if ./$cassandra_path/bin/nodetool status 2>/dev/null | grep "^UN" >/dev/null; then
+    echo "a version of cassandra is already running. you must stop that instance first"
+    exit 1
+  fi
   echo "starting cassandra $version"
   trap 'if [[ -n "$cass_pid" ]]; then kill $cass_pid; fi' INT TERM EXIT
   ./$cassandra_path/bin/cassandra -f 2&>/dev/null &
   cass_pid=$!
   wait_for_cassandra "./$cassandra_path/bin"
 
-  echo "compiling cassandra $folder_ext docs"
-  sbt "tut-cass$folder_ext/clean" "tut-cass$folder_ext/tut"
+  if [[ clean_workspace -gt 0 ]]; then
+    echo "cleaning and compiling cassandra $folder_ext docs"
+    sbt "tut-cass$folder_ext/clean" "tut-cass$folder_ext/tut"
+  else
+    echo "compiling cassandra $folder_ext docs"
+    sbt "tut-cass$folder_ext/tut"
+  fi
   kill $cass_pid
 
   unset cass_pid
   trap - INT TERM EXIT
+  rm -rf docs/root/src/main/tut/cass$folder_ext
+  cp -r "docs/cass$folder_ext/target/scala-2.11/resource_managed/main/jekyll/cass$folder_ext" docs/root/src/main/tut/
 }
 
-#function run_cassandra_21 {
-#  jenv local 1.7
-#  echo "starting cassandra $version"
-#  trap 'if [[ -n "$cass_pid" ]]; then kill $cass_pid; fi' INT TERM EXIT
-#  ./$cassandra_path/bin/cassandra -f 2&>/dev/null &
-#  cass_pid=$!
-
-#  echo "compiling cassandra 2.1 docs"
-#  sbt "tut-cass21/clean" "tut-cass21/compile"
-#  wait_for_cassandra "./$cassandra_path/bin"
-#  sbt "tut-cass21/tut"
-#  kill $cass_pid
-#  trap - INT TERM EXIT
-#}
-
-#function run_cassandra_30 {
-#  jenv local 1.8
-#  echo "starting cassandra $version"
-#  trap 'kill $!' INT TERM EXIT
-#  ./$cassandra_path/bin/cassandra -f 2&>/dev/null &
-#  wait_for_cassandra "./$cassandra_path/bin"
-#  echo "compiling cassandra 3.0 docs"
-#  sbt "tut-cass3/clean" "tut-cass3/tut"
-#  kill $!
-#  trap - INT TERM EXIT
-#}
-
 function compile_results {
-  rm -rf docs/root/src/main/tut/cass3 docs/root/src/main/tut/cass21
-  cp -r "docs/cass3/target/scala-2.11/resource_managed/main/jekyll/cass3" docs/root/src/main/tut/
-  cp -r "docs/cass21/target/scala-2.11/resource_managed/main/jekyll/cass21" docs/root/src/main/tut/
-
   echo "compiling docs"
   sbt "docs/clean" "docs/makeMicrosite"
 }

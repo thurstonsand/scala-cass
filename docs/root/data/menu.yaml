@@ -38,8 +38,9 @@ options:
       - title: Select
         url: cass3/scalasession/select.html
         menu_section: ss
-#      - title: Batch Statements
-#        url: cass3/scalasession/batch.html
+      - title: Batch
+        url: cass3/scalasession/batch.html
+        menu_section: ss
 #      - title: Raw Statements
 #        url: cass3/scalasession/raw.html
 

@@ -59,7 +59,7 @@ val scalaCassDerivedRow = MyRow(row.as[String]("s"), row.as[Int]("i"), row.as[Li
 ```
 
 All we need to specify is the type that we 
-want[*](#For-a-full-list-of-type-mappings-between-the-cassandra-types-and-scala-types), and the library handles the rest.
+want[*](#type-mappings), and the library handles the rest.
 If one of these values came back null, the driver will throw an exception since we do not want to introduce null values
 into our code.
 
@@ -110,10 +110,7 @@ Note that no arguments (aside from the type parameter) are passed when extractin
  
 ##### For performance characteristics of these extractions, [see the performance page](/cass3/performance.html)
 
-##### For a full list of type mappings between the Cassandra types and Scala types, 
-[see the type mappings page](/cass3/type-mappings.html)
-
-
+##### <a name="type-mappings"></a>For a full list of type mappings between the Cassandra types and Scala types, [see the type mappings page](/cass3/type-mappings.html)
 ```tut:invisible
 sSession.dropKeyspace.execute()
 sSession.close()

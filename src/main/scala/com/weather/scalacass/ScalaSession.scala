@@ -5,7 +5,6 @@ import java.util.concurrent.Callable
 import com.datastax.driver.core._
 import com.google.common.cache.CacheBuilder
 import com.weather.scalacass.scsession._
-import com.weather.scalacass.scsession.SCBatchStatement.Batchable
 
 object ScalaSession {
   private implicit def Fn02Callable[V](f: => V): Callable[V] = new Callable[V] {
@@ -95,8 +94,9 @@ final case class ScalaSession(keyspace: String)(implicit val session: Session) {
       SCDeleteStatement[D, Q](keyspace, table, where, ScalaSession.this)
   }
 
-  def batch(batches: Seq[Batchable]): SCBatchStatement = SCBatchStatement(batches, this)
-  def batchOf(batch: Batchable, batches: Batchable*): SCBatchStatement = SCBatchStatement(batch +: batches, this)
+  def batch(batches: List[SCStatement.SCBatchableStatement]): SCBatchStatement = SCBatchStatement(batches, this)
+  def batchOf(batch: SCStatement.SCBatchableStatement, batches: SCStatement.SCBatchableStatement*): SCBatchStatement =
+    SCBatchStatement((batch +: batches).toList, this)
 
   def select[S] = sh.asInstanceOf[SelectHelper[S]]
   def selectStar = sh.asInstanceOf[SelectHelper[Star]]

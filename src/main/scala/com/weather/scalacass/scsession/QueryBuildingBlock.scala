@@ -154,10 +154,10 @@ private[scalacass] object QueryBuildingBlock {
     def valueRepr: Result[List[AnyRef]] = Right(Nil)
   }
 
-  final case class CCBlockInsert[T: CCCassFormatEncoder](protected val cc: T) extends CCBlockWithNamedValue(true, " (", ", ", ")") with QueryBuildingBlock {
+  final case class CCBlockInsert[T: CCCassFormatEncoder](protected val cc: T) extends CCBlockWithNamedValue(true, "(", ", ", ")") with QueryBuildingBlock {
     override def strRepr: Result[String] = strList.map { ns =>
       if (ns.isEmpty) ""
-      else s"${ns.mkString(prefix, infix, suffix)} VALUES ${List.fill(ns.length)("?").mkString(prefix, infix, suffix)}"
+      else s" ${ns.mkString(prefix, infix, suffix)} VALUES ${List.fill(ns.length)("?").mkString(prefix, infix, suffix)}"
     }
   }
   final case class CCBlockDelete[T](protected val preamble: Preamble)(implicit encoder: CCCassFormatEncoder[T]) extends CCBlockWithNoValue[T](false, "FROM") with QueryBuildingBlock
