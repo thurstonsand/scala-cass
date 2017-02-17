@@ -66,6 +66,7 @@ function parse_inputs {
   if [[ enable_cassandra_2 -eq -1 || enable_cassandra_3 -eq -1 ]]; then
     enable_cassandra_2=1
     enable_cassandra_3=1
+    clean_workspace=1
   fi
 }
 
@@ -108,6 +109,11 @@ function run_cassandra {
   local folder_ext=$2
 
   jenv local $j_version
+  if [[ -z $(java -version 2>&1 | grep $j_version) ]]; then
+    echo "java version was not set successfully. Must have jenv installed and working correctly" $(java -version 2>1 | grep $j_version)
+    jenv local $old_j_version
+    exit 1
+  fi
 
   if ./$cassandra_path/bin/nodetool status 2>/dev/null | grep "^UN" >/dev/null; then
     echo "a version of cassandra is already running. you must stop that instance first"

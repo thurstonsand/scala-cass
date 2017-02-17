@@ -98,7 +98,7 @@ object CassFormatDecoder extends CassFormatDecoderVersionSpecific {
   implicit val bigIntegerFormat = safeConvertCassFormatDecoder[BigInt, java.math.BigInteger](TypeToken.of(classOf[java.math.BigInteger]), BigInt.javaBigInteger2bigInt, _ getVarint _, _ getVarint _)
   implicit val bigDecimalFormat = safeConvertCassFormatDecoder[BigDecimal, java.math.BigDecimal](TypeToken.of(classOf[java.math.BigDecimal]), BigDecimal.javaBigDecimal2bigDecimal, _ getDecimal _, _ getDecimal _)
 
-  private def listOf[T](eltType: TypeToken[T]): TypeToken[java.util.List[T]] =
+  def listOf[T](eltType: TypeToken[T]): TypeToken[java.util.List[T]] =
     new TypeToken[java.util.List[T]]() {}.where(new TypeParameter[T]() {}, eltType)
 
   implicit def listFormat[T](implicit underlying: CassFormatDecoder[T]) = new CassFormatDecoder[List[T]] {
@@ -121,7 +121,7 @@ object CassFormatDecoder extends CassFormatDecoderVersionSpecific {
     def tupleExtract(tup: TupleValue, pos: Int) = tup getList (pos, underlying.typeToken)
   }
 
-  private def setOf[T](eltType: TypeToken[T]): TypeToken[java.util.Set[T]] =
+  def setOf[T](eltType: TypeToken[T]): TypeToken[java.util.Set[T]] =
     new TypeToken[java.util.Set[T]]() {}.where(new TypeParameter[T]() {}, eltType)
 
   implicit def setFormat[T](implicit underlying: CassFormatDecoder[T]) = new CassFormatDecoder[Set[T]] {
@@ -144,7 +144,7 @@ object CassFormatDecoder extends CassFormatDecoderVersionSpecific {
     def tupleExtract(tup: TupleValue, pos: Int) = tup getSet (pos, underlying.typeToken)
   }
 
-  private def mapOf[K, V](keyType: TypeToken[K], valueType: TypeToken[V]): TypeToken[java.util.Map[K, V]] =
+  def mapOf[K, V](keyType: TypeToken[K], valueType: TypeToken[V]): TypeToken[java.util.Map[K, V]] =
     new TypeToken[java.util.Map[K, V]]() {}
       .where(new TypeParameter[K]() {}, keyType)
       .where(new TypeParameter[V]() {}, valueType)

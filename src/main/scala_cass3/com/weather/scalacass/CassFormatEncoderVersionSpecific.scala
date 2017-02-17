@@ -4,9 +4,9 @@ import com.datastax.driver.core.{Cluster, DataType, TupleValue}
 
 trait LowPriorityCassFormatEncoderVersionSpecific {
   implicit def tupleFormat[TUP <: Product](implicit cluster: Cluster, underlying: TupleCassFormatEncoder[TUP]) = new CassFormatEncoder[TUP] {
-    type To = TupleValue
+    type From = TupleValue
     val cassDataType = cluster.getMetadata.newTupleType(underlying.dataTypes: _*)
-    def encode(f: TUP): Result[To] = underlying.encode(f).right.map(ar => cassDataType.newValue(ar: _*))
+    def encode(f: TUP): Result[From] = underlying.encode(f).right.map(ar => cassDataType.newValue(ar: _*))
   }
 }
 trait CassFormatEncoderVersionSpecific extends LowPriorityCassFormatEncoderVersionSpecific {

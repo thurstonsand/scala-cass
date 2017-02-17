@@ -10,3 +10,4 @@ _site
 lib
 docs/root/src/main/tut/cass3/*
 docs/root/src/main/tut/cass21/*
+.java-version

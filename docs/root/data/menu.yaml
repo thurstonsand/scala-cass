@@ -41,18 +41,19 @@ options:
       - title: Batch
         url: cass3/scalasession/batch.html
         menu_section: ss
-#      - title: Raw Statements
-#        url: cass3/scalasession/raw.html
+      - title: Raw Statements
+        url: cass3/scalasession/raw.html
+        menu_section: ss
 
 
   # include performance info here?
   - title: Row Extraction
     url: cass3/row-extraction.html
     menu_type: c3
-#
-#    - title: Custom Encoders/Decoders
-#      url: cass3/custom-encoders-decoders.html
-#      menu_type: c3
+
+  - title: Custom Encoders/Decoders
+    url: cass3/custom-encoders-decoders.html
+    menu_type: c3
 #
 #    - title: Caching Implicits
 #      url: cass3/caching-implicits.html

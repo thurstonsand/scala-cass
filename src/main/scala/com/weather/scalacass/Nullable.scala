@@ -28,11 +28,11 @@ object Nullable {
   implicit def nullable2option[A](nullable: Nullable[A]): Option[A] = nullable.toOption
 
   implicit def encoder[A](implicit underlying: CassFormatEncoder[A]): CassFormatEncoder[Nullable[A]] = new CassFormatEncoder[Nullable[A]] {
-    type To = Nullable[underlying.To]
+    type From = Nullable[underlying.From]
 
     def cassDataType: DataType = underlying.cassDataType
 
-    def encode(f: Nullable[A]): Result[Nullable[underlying.To]] = f match {
+    def encode(f: Nullable[A]): Result[Nullable[underlying.From]] = f match {
       case Is(x)     => underlying.encode(x).right.map(Is.apply)
       case IsNotNull => Right(IsNotNull)
       case IsNull    => Right(IsNull)
