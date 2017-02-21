@@ -76,6 +76,14 @@ object CassFormatDecoder extends CassFormatDecoderVersionSpecific {
 
   class ValueNotDefinedException(m: String) extends QueryExecutionException(m)
 
+  // in cassandra, empty collection == NULL, so null check is not helpful
+  trait CollectionCassFormatDecoder[T] extends CassFormatDecoder[T] {
+    override private[scalacass] def decode(r: Row, name: String): Either[Throwable, T] =
+      Try[Either[Throwable, T]](f2t(extract(r, name))).unwrap[T]
+    override private[scalacass] def tupleDecode(tup: TupleValue, pos: Int): Either[Throwable, T] =
+      Try[Either[Throwable, T]](f2t(tupleExtract(tup, pos))).unwrap[T]
+  }
+
   private[scalacass] def sameTypeCassFormatDecoder[T <: AnyRef](_typeToken: TypeToken[T], _extract: (Row, String) => T, _tupExtract: (TupleValue, Int) => T) = new CassFormatDecoder[T] {
     type From = T
     val typeToken = _typeToken
@@ -109,7 +117,7 @@ object CassFormatDecoder extends CassFormatDecoderVersionSpecific {
   private def listOf[T](eltType: TypeToken[T]): TypeToken[java.util.List[T]] =
     new TypeToken[java.util.List[T]]() {}.where(new TypeParameter[T]() {}, eltType)
 
-  implicit def listFormat[T](implicit underlying: CassFormatDecoder[T]) = new CassFormatDecoder[List[T]] {
+  implicit def listFormat[T](implicit underlying: CassFormatDecoder[T]) = new CollectionCassFormatDecoder[List[T]] {
     type From = java.util.List[underlying.From]
     val typeToken = listOf(underlying.typeToken)
     def f2t(f: From): Either[Throwable, List[T]] = {
@@ -132,7 +140,7 @@ object CassFormatDecoder extends CassFormatDecoderVersionSpecific {
   private def setOf[T](eltType: TypeToken[T]): TypeToken[java.util.Set[T]] =
     new TypeToken[java.util.Set[T]]() {}.where(new TypeParameter[T]() {}, eltType)
 
-  implicit def setFormat[T](implicit underlying: CassFormatDecoder[T]) = new CassFormatDecoder[Set[T]] {
+  implicit def setFormat[T](implicit underlying: CassFormatDecoder[T]) = new CollectionCassFormatDecoder[Set[T]] {
     type From = java.util.Set[underlying.From]
     val typeToken: TypeToken[java.util.Set[underlying.From]] = setOf(underlying.typeToken)
     def f2t(f: From): Either[Throwable, Set[T]] = {
@@ -158,7 +166,7 @@ object CassFormatDecoder extends CassFormatDecoderVersionSpecific {
       .where(new TypeParameter[V]() {}, valueType)
 
   implicit def mapFormat[K, V](implicit underlyingK: CassFormatDecoder[K], underlyingV: CassFormatDecoder[V]) =
-    new CassFormatDecoder[Map[K, V]] {
+    new CollectionCassFormatDecoder[Map[K, V]] {
       type From = java.util.Map[underlyingK.From, underlyingV.From]
       val typeToken = mapOf(underlyingK.typeToken, underlyingV.typeToken)
       def f2t(f: From): Either[Throwable, Map[K, V]] = {
