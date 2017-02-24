@@ -46,7 +46,6 @@ options:
         menu_section: ss
 
 
-  # include performance info here?
   - title: Row Extraction
     url: cass3/row-extraction.html
     menu_type: c3
@@ -54,10 +53,13 @@ options:
   - title: Custom Encoders/Decoders
     url: cass3/custom-encoders-decoders.html
     menu_type: c3
-#
-#    - title: Caching Implicits
-#      url: cass3/caching-implicits.html
-#      menu_type: c3
+
+  - title: Caching Implicits
+    url: cass3/caching-implicits.html
+    menu_type: c3
+#  - title: Performance
+#    url: cass3/performance.html
+#    menu_type: c3
 
 
 
