@@ -19,7 +19,7 @@ version := {
     case (`cassV21`, "1.7") => "5"
     case (cv, jv) => throw new RuntimeException("invalid cassandra/java version combination: " + cv + "/" + jv + ". use either cass \"" + cassV3 + "\" with java 8 or cass \"" + cassV21 + "\" with java 7")
   }
-  s"0.$majorVersion.15"
+  s"0.$majorVersion.16"
 }
 
 scalaVersion := "2.11.8"
@@ -91,6 +91,8 @@ def addSourceFilesTo(conf: Configuration) =
   }
 addSourceFilesTo(Compile)
 addSourceFilesTo(Test)
+
+sourceGenerators in Compile += (sourceManaged in Compile).map(Boilerplate.gen).taskValue
 
 import scalariform.formatter.preferences._
 import com.typesafe.sbt.SbtScalariform, SbtScalariform.ScalariformKeys
