@@ -148,7 +148,8 @@ val javaVersion = sys.props("java.specification.version")
 
 lazy val `scala-cass` = {
   lazy val `scala-cass` = project.in(file("."))
-    .settings(moduleName := "scala-cass")
+    .settings(moduleName := "scala-cass",
+              sourceGenerators in Compile += (sourceManaged in Compile).map(Boilerplate.gen).taskValue)
     .settings(commonSettings: _*)
     .settings(publishSettings: _*)
   javaVersion match {
