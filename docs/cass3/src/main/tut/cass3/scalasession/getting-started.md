@@ -24,6 +24,7 @@ implicit val cluster = Cluster.builder.addContactPoint("localhost").build()
 * acts on a single keyspace
 * can optionally create a keyspace on instantiation
 * can pick up Java `Session` implicitly
+* provides an `execute`, which blocks for the result, and `executeAsync`, which returns a `Future` of the result
 
 The `ScalaSession` itself is a class that you must keep around, much like you would a Cassandra Java `Session`. This is 
 because the ScalaSession caches PreparedStatements from every executed command, so if you are calling the same command 
