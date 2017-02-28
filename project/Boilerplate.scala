@@ -3,11 +3,12 @@ import sbt._
 /** Generate boiletplate classes for TupleXX
   *
   * Copied, with some modifications, from
+  * [[https://github.com/circe/circe/blob/master/project/Boilerplate.scala Circe]], who in turn copied it from
   * [[https://github.com/milessabin/shapeless/blob/master/project/Boilerplate.scala Shapeless]]
   *
+  * @author Travis Brown
   * @author Miles Sabin
   * @author Kevin Wright
-  * @author Travis Brown
   */
 object Boilerplate {
   import scala.StringContext._
