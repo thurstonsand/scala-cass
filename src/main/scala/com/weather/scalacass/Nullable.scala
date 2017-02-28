@@ -52,13 +52,13 @@ object Nullable {
     def extract(r: Row, name: String): From = underlying.extract(r, name)
 
     override def decode(r: Row, name: String): Result[Nullable[A]] = super.decode(r, name) match {
-      case Left(_: ValueNotDefinedException) => Right(IsNull)
+      case Left(Recoverable(_)) => Right(IsNull)
       case other                             => other
     }
     def tupleExtract(tup: TupleValue, pos: Int): From = underlying.tupleExtract(tup, pos)
 
     override def tupleDecode(tup: TupleValue, pos: Int): Result[Nullable[A]] = super.tupleDecode(tup, pos) match {
-      case Left(_: ValueNotDefinedException) => Right(IsNull)
+      case Left(Recoverable(_)) => Right(IsNull)
       case other                             => other
     }
   }
