@@ -58,7 +58,7 @@ trait CCCassFormatEncoder[F] { self =>
   }
 }
 
-object CCCassFormatEncoder {
+object CCCassFormatEncoder extends ProductCCCassFormatEncoders {
   implicit def derive[T](implicit derived: Lazy[DerivedCCCassFormatEncoder[T]]): CCCassFormatEncoder[T] = derived.value
   def apply[T](implicit instance: CCCassFormatEncoder[T]): CCCassFormatEncoder[T] = instance
 }

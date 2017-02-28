@@ -43,7 +43,7 @@ trait CCCassFormatDecoder[T] { self =>
   final def attemptAs(r: Row): Either[Throwable, T] = decode(r)
 }
 
-object CCCassFormatDecoder {
+object CCCassFormatDecoder extends ProductCCCassFormatDecoders {
   implicit def derive[T](implicit derived: Lazy[DerivedCCCassFormatDecoder[T]]): CCCassFormatDecoder[T] = derived.value
   def apply[T](implicit decoder: CCCassFormatDecoder[T]) = decoder
 }
