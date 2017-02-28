@@ -1,0 +1,128 @@
+<html><head><meta charset="utf-8" /><meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" /><title>scala-cass</title><meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="description" content="Java Cassandra Driver Bindings for Friendlier Scala" /><meta name="author" content="Thurston Sandberg" /><meta name="og:image" content="/scala-cass/img/poster.png" /><meta name="og:title" content="scala-cass" /><meta name="og:site_name" content="scala-cass" /><meta name="og:url" content="" /><meta name="og:type" content="website" /><meta name="og:description" content="Java Cassandra Driver Bindings for Friendlier Scala" /><meta name="twitter:image" content="/scala-cass/img/poster.png" /><meta name="twitter:card" content="summary_large_image" /><meta name="twitter:site" content="" /><link rel="icon" type="image/png" href="/scala-cass/img/favicon.png" /><link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" /><link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.5.0/css/font-awesome.min.css" /><link rel="stylesheet" href="/scala-cass/highlight/styles/docco.css" /><link rel="stylesheet" href="/scala-cass/css/style.css" /><link rel="stylesheet" href="/scala-cass/css/palette.css" /><link rel="stylesheet" href="/scala-cass/css/override.css" /></head><body class="docs"><div id="wrapper"><div id="sidebar-wrapper"><ul id="sidebar" class="sidebar-nav"><li class="sidebar-brand"><a href="/scala-cass/" class="brand"><div class="brand-wrapper" style="background:url('/scala-cass/img/sidebar_brand.png') no-repeat"><span>scala-cass</span></div></a></li> <li><a href="/scala-cass/cassandra-30.html" class="">Cassandra 3.0+</a></li> <li><a href="/scala-cass/cass3/date-codecs.html" class="">Date Codecs</a></li> <li><a href="/scala-cass/cass3/type-mappings.html" class="">Type Mappings</a></li> <li><a href="/scala-cass/cass3/scalasession/getting-started.html" class="">ScalaSession</a> <ul class="sub_section"> <li><a href="/scala-cass/cass3/scalasession/getting-started.html" class="">Getting Started</a></li> <li><a href="/scala-cass/cass3/scalasession/create-table.html" class="">Creating a Table</a></li> <li><a href="/scala-cass/cass3/scalasession/insert.html" class="">Insert</a></li> <li><a href="/scala-cass/cass3/scalasession/update.html" class="">Update</a></li> <li><a href="/scala-cass/cass3/scalasession/delete.html" class="">Delete</a></li> <li><a href="/scala-cass/cass3/scalasession/select.html" class=" active ">Select</a></li> <li><a href="/scala-cass/cass3/scalasession/batch.html" class="">Batch</a></li> <li><a href="/scala-cass/cass3/scalasession/raw.html" class="">Raw Statements</a></li></ul></li> <li><a href="/scala-cass/cass3/row-extraction.html" class="">Row Extraction</a></li> <li><a href="/scala-cass/cass3/custom-encoders-decoders.html" class="">Custom Encoders/Decoders</a></li> <li><a href="/scala-cass/cass3/caching-implicits.html" class="">Caching Implicits</a></li>   </ul></div><div id="page-content-wrapper"><div class="nav"><div class="container-fluid"><div class="row"><div class="col-lg-12"><div class="action-menu pull-left clearfix"><a href="#menu-toggle" id="menu-toggle"><i class="fa fa-bars" aria-hidden="true"></i></a></div><ul class="pull-right"><li class="hidden-xs"><a href="https://github.com/thurstonsand/scala-cass"><i class="fa fa-eye"></i><span>WATCH<span id="eyes" class="label label-default">--</span></span></a></li><li class="hidden-xs"><a href="https://github.com/thurstonsand/scala-cass"><i class="fa fa-star-o"></i><span>STARS<span id="stars" class="label label-default">--</span></span></a></li><li><a href="#" onclick="shareSiteTwitter('scala-cass Java Cassandra Driver Bindings for Friendlier Scala');"><i class="fa fa-twitter"></i></a></li><li><a href="#" onclick="shareSiteFacebook('scala-cass Java Cassandra Driver Bindings for Friendlier Scala');"><i class="fa fa-facebook"></i></a></li><li><a href="#" onclick="shareSiteGoogle();"><i class="fa fa-google-plus"></i></a></li></ul></div></div></div></div><div id="content" data-github-owner="thurstonsand" data-github-repo="scala-cass"><div class="content-wrapper"><section><h1 id="select">Select</h1>
+
+<p>Selects can retrieve the entire row, or only specific columns of the row. The query and the column specifier, if needed,
+are both represented via case classes.</p>
+
+<p>In addition, you can choose to retrieve only a single row from Cassandra, represented by an <code class="highlighter-rouge">Option[Row]</code> response, 
+where the Option will be <code class="highlighter-rouge">None</code> if no values were found that matched the query.</p>
+
+<h2 id="select-whole-row">Select Whole Row</h2>
+
+<p>For selects that will return the entire row:</p>
+
+<div class="language-scala highlighter-rouge"><pre class="highlight"><code><span class="n">scala</span><span class="o">&gt;</span> <span class="k">case</span> <span class="k">class</span> <span class="nc">Query</span><span class="o">(</span><span class="n">s</span><span class="k">:</span> <span class="kt">String</span><span class="o">)</span>
+<span class="n">defined</span> <span class="k">class</span> <span class="nc">Query</span>
+</code></pre>
+</div>
+<h5 id="retrieve-all-rows-matching-the-query">Retrieve all rows matching the query</h5>
+<div class="language-scala highlighter-rouge"><pre class="highlight"><code><span class="n">scala</span><span class="o">&gt;</span> <span class="k">val</span> <span class="n">selectStatement</span> <span class="k">=</span> <span class="n">sSession</span><span class="o">.</span><span class="n">selectStar</span><span class="o">(</span><span class="s">"mytable"</span><span class="o">,</span> <span class="nc">Query</span><span class="o">(</span><span class="s">"a str"</span><span class="o">))</span>
+<span class="n">selectStatement</span><span class="k">:</span> <span class="kt">com.weather.scalacass.scsession.SCSelectItStatement</span> <span class="o">=</span> <span class="nc">SCSelectItStatement</span><span class="o">(</span><span class="nc">SELECT</span> <span class="o">*</span> <span class="nc">FROM</span> <span class="n">mykeyspace</span><span class="o">.</span><span class="n">mytable</span> <span class="nc">WHERE</span> <span class="n">s</span><span class="k">=</span><span class="n">a</span> <span class="n">str</span><span class="o">)</span>
+
+<span class="n">scala</span><span class="o">&gt;</span> <span class="n">selectStatement</span><span class="o">.</span><span class="n">execute</span><span class="o">()</span>
+<span class="n">res3</span><span class="k">:</span> <span class="kt">com.weather.scalacass.Result</span><span class="o">[</span><span class="kt">Iterator</span><span class="o">[</span><span class="kt">com.datastax.driver.core.Row</span><span class="o">]]</span> <span class="k">=</span> <span class="nc">Right</span><span class="o">(</span><span class="n">non</span><span class="o">-</span><span class="n">empty</span> <span class="n">iterator</span><span class="o">)</span>
+</code></pre>
+</div>
+<h5 id="retrieve-a-single-row-matching-the-query">Retrieve a single row matching the query</h5>
+<div class="language-scala highlighter-rouge"><pre class="highlight"><code><span class="n">scala</span><span class="o">&gt;</span> <span class="k">val</span> <span class="n">selectOneStatement</span> <span class="k">=</span> <span class="n">sSession</span><span class="o">.</span><span class="n">selectOneStar</span><span class="o">(</span><span class="s">"mytable"</span><span class="o">,</span> <span class="nc">Query</span><span class="o">(</span><span class="s">"a str"</span><span class="o">))</span>
+<span class="n">selectOneStatement</span><span class="k">:</span> <span class="kt">com.weather.scalacass.scsession.SCSelectOneStatement</span> <span class="o">=</span> <span class="nc">SCSelectOneStatement</span><span class="o">(</span><span class="nc">SELECT</span> <span class="o">*</span> <span class="nc">FROM</span> <span class="n">mykeyspace</span><span class="o">.</span><span class="n">mytable</span> <span class="nc">WHERE</span> <span class="n">s</span><span class="k">=</span><span class="n">a</span> <span class="n">str</span> <span class="nc">LIMIT</span> <span class="mi">1</span><span class="o">)</span>
+
+<span class="n">scala</span><span class="o">&gt;</span> <span class="n">selectOneStatement</span><span class="o">.</span><span class="n">execute</span><span class="o">()</span>
+<span class="n">res4</span><span class="k">:</span> <span class="kt">com.weather.scalacass.Result</span><span class="o">[</span><span class="kt">Option</span><span class="o">[</span><span class="kt">com.datastax.driver.core.Row</span><span class="o">]]</span> <span class="k">=</span> <span class="nc">Right</span><span class="o">(</span><span class="nc">Some</span><span class="o">(</span><span class="nc">Row</span><span class="o">[</span><span class="kt">a</span> <span class="kt">str</span>, <span class="err">1234</span>, <span class="err">5678</span><span class="o">]))</span>
+</code></pre>
+</div>
+
+<h2 id="select-columns">Select Columns</h2>
+
+<p>For selects that only retrieve certain columns of that row, specify the columns as a case class. However, you will not
+actually use an instance of the case class in the statement, just pass it in as type parameter:</p>
+
+<div class="language-scala highlighter-rouge"><pre class="highlight"><code><span class="n">scala</span><span class="o">&gt;</span> <span class="k">case</span> <span class="k">class</span> <span class="nc">ColumnsToRetrieve</span><span class="o">(</span><span class="n">s</span><span class="k">:</span> <span class="kt">String</span><span class="o">,</span> <span class="n">l</span><span class="k">:</span> <span class="kt">Long</span><span class="o">)</span>
+<span class="n">defined</span> <span class="k">class</span> <span class="nc">ColumnsToRetrieve</span>
+</code></pre>
+</div>
+<div class="language-scala highlighter-rouge"><pre class="highlight"><code><span class="n">scala</span><span class="o">&gt;</span> <span class="k">val</span> <span class="n">selectColumnsStatement</span> <span class="k">=</span> <span class="n">sSession</span><span class="o">.</span><span class="n">select</span><span class="o">[</span><span class="kt">ColumnsToRetrieve</span><span class="o">](</span><span class="s">"mytable"</span><span class="o">,</span> <span class="nc">Query</span><span class="o">(</span><span class="s">"a str"</span><span class="o">))</span>
+<span class="n">selectColumnsStatement</span><span class="k">:</span> <span class="kt">com.weather.scalacass.scsession.SCSelectItStatement</span> <span class="o">=</span> <span class="nc">SCSelectItStatement</span><span class="o">(</span><span class="nc">SELECT</span> <span class="n">s</span><span class="o">,</span> <span class="n">l</span> <span class="nc">FROM</span> <span class="n">mykeyspace</span><span class="o">.</span><span class="n">mytable</span> <span class="nc">WHERE</span> <span class="n">s</span><span class="k">=</span><span class="n">a</span> <span class="n">str</span><span class="o">)</span>
+
+<span class="n">scala</span><span class="o">&gt;</span> <span class="n">selectColumnsStatement</span><span class="o">.</span><span class="n">execute</span><span class="o">()</span>
+<span class="n">res5</span><span class="k">:</span> <span class="kt">com.weather.scalacass.Result</span><span class="o">[</span><span class="kt">Iterator</span><span class="o">[</span><span class="kt">com.datastax.driver.core.Row</span><span class="o">]]</span> <span class="k">=</span> <span class="nc">Right</span><span class="o">(</span><span class="n">non</span><span class="o">-</span><span class="n">empty</span> <span class="n">iterator</span><span class="o">)</span>
+
+<span class="n">scala</span><span class="o">&gt;</span> <span class="k">val</span> <span class="n">selectColumnsOneStatement</span> <span class="k">=</span> <span class="n">sSession</span><span class="o">.</span><span class="n">selectOne</span><span class="o">[</span><span class="kt">ColumnsToRetrieve</span><span class="o">](</span><span class="s">"mytable"</span><span class="o">,</span> <span class="nc">Query</span><span class="o">(</span><span class="s">"a str"</span><span class="o">))</span>
+<span class="n">selectColumnsOneStatement</span><span class="k">:</span> <span class="kt">com.weather.scalacass.scsession.SCSelectOneStatement</span> <span class="o">=</span> <span class="nc">SCSelectOneStatement</span><span class="o">(</span><span class="nc">SELECT</span> <span class="n">s</span><span class="o">,</span> <span class="n">l</span> <span class="nc">FROM</span> <span class="n">mykeyspace</span><span class="o">.</span><span class="n">mytable</span> <span class="nc">WHERE</span> <span class="n">s</span><span class="k">=</span><span class="n">a</span> <span class="n">str</span> <span class="nc">LIMIT</span> <span class="mi">1</span><span class="o">)</span>
+
+<span class="n">scala</span><span class="o">&gt;</span> <span class="n">selectColumnsOneStatement</span><span class="o">.</span><span class="n">execute</span><span class="o">()</span>
+<span class="n">res6</span><span class="k">:</span> <span class="kt">com.weather.scalacass.Result</span><span class="o">[</span><span class="kt">Option</span><span class="o">[</span><span class="kt">com.datastax.driver.core.Row</span><span class="o">]]</span> <span class="k">=</span> <span class="nc">Right</span><span class="o">(</span><span class="nc">Some</span><span class="o">(</span><span class="nc">Row</span><span class="o">[</span><span class="kt">a</span> <span class="kt">str</span>, <span class="err">5678</span><span class="o">]))</span>
+</code></pre>
+</div>
+
+<h2 id="allow-filtering">Allow Filtering</h2>
+
+<p>You can <code class="highlighter-rouge">ALLOW FILTERING</code> on the request (read more about <a href="https://www.datastax.com/dev/blog/allow-filtering-explained-2">“allow filtering” here</a>)</p>
+
+<div class="language-scala highlighter-rouge"><pre class="highlight"><code><span class="n">scala</span><span class="o">&gt;</span> <span class="k">val</span> <span class="n">selectAllowFiltering</span> <span class="k">=</span> <span class="n">selectStatement</span><span class="o">.</span><span class="n">allowFiltering</span>
+<span class="n">selectAllowFiltering</span><span class="k">:</span> <span class="kt">com.weather.scalacass.scsession.SCSelectItStatement</span> <span class="o">=</span> <span class="nc">SCSelectItStatement</span><span class="o">(</span><span class="nc">SELECT</span> <span class="o">*</span> <span class="nc">FROM</span> <span class="n">mykeyspace</span><span class="o">.</span><span class="n">mytable</span> <span class="nc">WHERE</span> <span class="n">s</span><span class="k">=</span><span class="n">a</span> <span class="n">str</span> <span class="nc">ALLOW</span> <span class="nc">FILTERING</span><span class="o">)</span>
+
+<span class="n">scala</span><span class="o">&gt;</span> <span class="n">selectAllowFiltering</span><span class="o">.</span><span class="n">execute</span><span class="o">()</span>
+<span class="n">res7</span><span class="k">:</span> <span class="kt">com.weather.scalacass.Result</span><span class="o">[</span><span class="kt">Iterator</span><span class="o">[</span><span class="kt">com.datastax.driver.core.Row</span><span class="o">]]</span> <span class="k">=</span> <span class="nc">Right</span><span class="o">(</span><span class="n">non</span><span class="o">-</span><span class="n">empty</span> <span class="n">iterator</span><span class="o">)</span>
+
+<span class="n">scala</span><span class="o">&gt;</span> <span class="k">val</span> <span class="n">selectOneAllowFiltering</span> <span class="k">=</span> <span class="n">selectOneStatement</span><span class="o">.</span><span class="n">allowFiltering</span>
+<span class="n">selectOneAllowFiltering</span><span class="k">:</span> <span class="kt">com.weather.scalacass.scsession.SCSelectOneStatement</span> <span class="o">=</span> <span class="nc">SCSelectOneStatement</span><span class="o">(</span><span class="nc">SELECT</span> <span class="o">*</span> <span class="nc">FROM</span> <span class="n">mykeyspace</span><span class="o">.</span><span class="n">mytable</span> <span class="nc">WHERE</span> <span class="n">s</span><span class="k">=</span><span class="n">a</span> <span class="n">str</span> <span class="nc">LIMIT</span> <span class="mi">1</span> <span class="nc">ALLOW</span> <span class="nc">FILTERING</span><span class="o">)</span>
+
+<span class="n">scala</span><span class="o">&gt;</span> <span class="n">selectOneAllowFiltering</span><span class="o">.</span><span class="n">execute</span><span class="o">()</span>
+<span class="n">res8</span><span class="k">:</span> <span class="kt">com.weather.scalacass.Result</span><span class="o">[</span><span class="kt">Option</span><span class="o">[</span><span class="kt">com.datastax.driver.core.Row</span><span class="o">]]</span> <span class="k">=</span> <span class="nc">Right</span><span class="o">(</span><span class="nc">Some</span><span class="o">(</span><span class="nc">Row</span><span class="o">[</span><span class="kt">a</span> <span class="kt">str</span>, <span class="err">1234</span>, <span class="err">5678</span><span class="o">]))</span>
+</code></pre>
+</div>
+
+<p>You can remove the allow filtering option:</p>
+
+<div class="language-scala highlighter-rouge"><pre class="highlight"><code><span class="n">scala</span><span class="o">&gt;</span> <span class="k">val</span> <span class="n">selectNoAllowFiltering</span> <span class="k">=</span> <span class="n">selectAllowFiltering</span><span class="o">.</span><span class="n">noAllowFiltering</span>
+<span class="n">selectNoAllowFiltering</span><span class="k">:</span> <span class="kt">com.weather.scalacass.scsession.SCSelectItStatement</span> <span class="o">=</span> <span class="nc">SCSelectItStatement</span><span class="o">(</span><span class="nc">SELECT</span> <span class="o">*</span> <span class="nc">FROM</span> <span class="n">mykeyspace</span><span class="o">.</span><span class="n">mytable</span> <span class="nc">WHERE</span> <span class="n">s</span><span class="k">=</span><span class="n">a</span> <span class="n">str</span><span class="o">)</span>
+
+<span class="n">scala</span><span class="o">&gt;</span> <span class="n">selectNoAllowFiltering</span><span class="o">.</span><span class="n">execute</span><span class="o">()</span>
+<span class="n">res9</span><span class="k">:</span> <span class="kt">com.weather.scalacass.Result</span><span class="o">[</span><span class="kt">Iterator</span><span class="o">[</span><span class="kt">com.datastax.driver.core.Row</span><span class="o">]]</span> <span class="k">=</span> <span class="nc">Right</span><span class="o">(</span><span class="n">non</span><span class="o">-</span><span class="n">empty</span> <span class="n">iterator</span><span class="o">)</span>
+
+<span class="n">scala</span><span class="o">&gt;</span> <span class="k">val</span> <span class="n">selectOneNoAllowFiltering</span> <span class="k">=</span> <span class="n">selectOneAllowFiltering</span><span class="o">.</span><span class="n">noAllowFiltering</span>
+<span class="n">selectOneNoAllowFiltering</span><span class="k">:</span> <span class="kt">com.weather.scalacass.scsession.SCSelectOneStatement</span> <span class="o">=</span> <span class="nc">SCSelectOneStatement</span><span class="o">(</span><span class="nc">SELECT</span> <span class="o">*</span> <span class="nc">FROM</span> <span class="n">mykeyspace</span><span class="o">.</span><span class="n">mytable</span> <span class="nc">WHERE</span> <span class="n">s</span><span class="k">=</span><span class="n">a</span> <span class="n">str</span> <span class="nc">LIMIT</span> <span class="mi">1</span><span class="o">)</span>
+
+<span class="n">scala</span><span class="o">&gt;</span> <span class="n">selectOneNoAllowFiltering</span><span class="o">.</span><span class="n">execute</span><span class="o">()</span>
+<span class="n">res10</span><span class="k">:</span> <span class="kt">com.weather.scalacass.Result</span><span class="o">[</span><span class="kt">Option</span><span class="o">[</span><span class="kt">com.datastax.driver.core.Row</span><span class="o">]]</span> <span class="k">=</span> <span class="nc">Right</span><span class="o">(</span><span class="nc">Some</span><span class="o">(</span><span class="nc">Row</span><span class="o">[</span><span class="kt">a</span> <span class="kt">str</span>, <span class="err">1234</span>, <span class="err">5678</span><span class="o">]))</span>
+</code></pre>
+</div>
+
+<h2 id="limit">Limit</h2>
+
+<p>For queries that will return an iterator of responses (ie, not <code class="highlighter-rouge">selectOne</code> statements), you can impose a limit on the
+number of responses:</p>
+
+<div class="language-scala highlighter-rouge"><pre class="highlight"><code><span class="n">scala</span><span class="o">&gt;</span> <span class="k">val</span> <span class="n">selectLimit</span> <span class="k">=</span> <span class="n">selectStatement</span><span class="o">.</span><span class="n">limit</span><span class="o">(</span><span class="mi">100</span><span class="o">)</span>
+<span class="n">selectLimit</span><span class="k">:</span> <span class="kt">com.weather.scalacass.scsession.SCSelectItStatement</span> <span class="o">=</span> <span class="nc">SCSelectItStatement</span><span class="o">(</span><span class="nc">SELECT</span> <span class="o">*</span> <span class="nc">FROM</span> <span class="n">mykeyspace</span><span class="o">.</span><span class="n">mytable</span> <span class="nc">WHERE</span> <span class="n">s</span><span class="k">=</span><span class="n">a</span> <span class="n">str</span> <span class="nc">LIMIT</span> <span class="mi">100</span><span class="o">)</span>
+
+<span class="n">scala</span><span class="o">&gt;</span> <span class="n">selectLimit</span><span class="o">.</span><span class="n">execute</span><span class="o">()</span>
+<span class="n">res11</span><span class="k">:</span> <span class="kt">com.weather.scalacass.Result</span><span class="o">[</span><span class="kt">Iterator</span><span class="o">[</span><span class="kt">com.datastax.driver.core.Row</span><span class="o">]]</span> <span class="k">=</span> <span class="nc">Right</span><span class="o">(</span><span class="n">non</span><span class="o">-</span><span class="n">empty</span> <span class="n">iterator</span><span class="o">)</span>
+</code></pre>
+</div>
+
+<p>Finally, you can disable the imposed limit:</p>
+
+<div class="language-scala highlighter-rouge"><pre class="highlight"><code><span class="n">scala</span><span class="o">&gt;</span> <span class="k">val</span> <span class="n">selectNoLimit</span> <span class="k">=</span> <span class="n">selectLimit</span><span class="o">.</span><span class="n">noLimit</span>
+<span class="n">selectNoLimit</span><span class="k">:</span> <span class="kt">com.weather.scalacass.scsession.SCSelectItStatement</span> <span class="o">=</span> <span class="nc">SCSelectItStatement</span><span class="o">(</span><span class="nc">SELECT</span> <span class="o">*</span> <span class="nc">FROM</span> <span class="n">mykeyspace</span><span class="o">.</span><span class="n">mytable</span> <span class="nc">WHERE</span> <span class="n">s</span><span class="k">=</span><span class="n">a</span> <span class="n">str</span><span class="o">)</span>
+
+<span class="n">scala</span><span class="o">&gt;</span> <span class="n">selectNoLimit</span><span class="o">.</span><span class="n">execute</span><span class="o">()</span>
+<span class="n">res12</span><span class="k">:</span> <span class="kt">com.weather.scalacass.Result</span><span class="o">[</span><span class="kt">Iterator</span><span class="o">[</span><span class="kt">com.datastax.driver.core.Row</span><span class="o">]]</span> <span class="k">=</span> <span class="nc">Right</span><span class="o">(</span><span class="n">non</span><span class="o">-</span><span class="n">empty</span> <span class="n">iterator</span><span class="o">)</span>
+</code></pre>
+</div>
+
+<h2 id="reading-from-the-rows">Reading from the <code class="highlighter-rouge">Row</code>s</h2>
+
+<p>Scala-Cass provides a Scala-style method of extraction for <code class="highlighter-rouge">Row</code>, either into Scala values, or directly into case 
+classes.</p>
+
+<ul>
+  <li><a href="/cass3/row-extraction.html">Click here</a> for a tutorial on how to extract values from <code class="highlighter-rouge">Row</code></li>
+  <li><a href="/cass3/type-mappings.html">Click here</a> for a mapping of Cassandra types to Scala types</li>
+</ul>
+
+</section></div></div></div></div><script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/1.11.3/jquery.min.js"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/3.3.7/js/bootstrap.min.js"></script><script src="/scala-cass/highlight/highlight.pack.js"></script><script>hljs.configure({
+languages:['scala','java','bash']
+});
+hljs.initHighlighting();
+             </script><script src="/scala-cass/js/main.js"></script></body></html>
