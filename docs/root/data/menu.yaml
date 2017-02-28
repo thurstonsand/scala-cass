@@ -1,0 +1,79 @@
+options:
+
+  # C* 3.0
+
+  - title: Cassandra 3.0+
+    url: cassandra-30.html
+    menu_type: c3
+
+  - title: Date Codecs
+    url: cass3/date-codecs.html
+    menu_type: c3
+
+  - title: Type Mappings
+    url: cass3/type-mappings.html
+    menu_type: c3
+
+  - title: ScalaSession
+    url: cass3/scalasession/getting-started.html
+    menu_type: c3
+    menu_section: ss
+
+    nested_options:
+      - title: Getting Started
+        url: cass3/scalasession/getting-started.html
+        menu_section: ss
+      - title: Creating a Table
+        url: cass3/scalasession/create-table.html
+        menu_section: ss
+      - title: Insert
+        url: cass3/scalasession/insert.html
+        menu_section: ss
+      - title: Update
+        url: cass3/scalasession/update.html
+        menu_section: ss
+      - title: Delete
+        url: cass3/scalasession/delete.html
+        menu_section: ss
+      - title: Select
+        url: cass3/scalasession/select.html
+        menu_section: ss
+      - title: Batch
+        url: cass3/scalasession/batch.html
+        menu_section: ss
+      - title: Raw Statements
+        url: cass3/scalasession/raw.html
+        menu_section: ss
+
+
+  - title: Row Extraction
+    url: cass3/row-extraction.html
+    menu_type: c3
+
+  - title: Custom Encoders/Decoders
+    url: cass3/custom-encoders-decoders.html
+    menu_type: c3
+
+  - title: Caching Implicits
+    url: cass3/caching-implicits.html
+    menu_type: c3
+#  - title: Performance
+#    url: cass3/performance.html
+#    menu_type: c3
+
+
+
+  # C* 2.1
+
+  - title: Cassandra 2.1
+    url: cassandra-21.html
+    menu_type: c21
+    menu_type: c21
+
+  - title: Date Codecs
+    url: cass21/date-codecs.html
+    menu_type: c21
+
+  - title: Type Mappings
+    url: cass21/type-mappings.html
+    menu_type: c21

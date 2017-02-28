@@ -14,7 +14,7 @@ object DerivedTupleCassFormatEncoder {
 
   implicit def hConsEncoder[H, T <: HList](implicit tdH: CassFormatEncoder[H], tdT: DerivedTupleCassFormatEncoder[T]): DerivedTupleCassFormatEncoder[H :: T] =
     new DerivedTupleCassFormatEncoder[H :: T] {
-      def encode(tup: H :: T): Either[Throwable, List[AnyRef]] = for {
+      def encode(tup: H :: T): Result[List[AnyRef]] = for {
         h <- tdH.encode(tup.head).right
         t <- tdT.encode(tup.tail).right
       } yield h :: t
@@ -24,14 +24,14 @@ object DerivedTupleCassFormatEncoder {
 
   implicit def tupleEncoder[T <: Product, Repr <: HList](implicit gen: Generic.Aux[T, Repr], hListEncoder: DerivedTupleCassFormatEncoder[Repr]): DerivedTupleCassFormatEncoder[T] =
     new DerivedTupleCassFormatEncoder[T] {
-      def encode(tup: T): Either[Throwable, List[AnyRef]] = hListEncoder.encode(gen.to(tup))
+      def encode(tup: T): Result[List[AnyRef]] = hListEncoder.encode(gen.to(tup))
       def types = hListEncoder.types
       def dataTypes = hListEncoder.dataTypes
     }
 }
 
 trait TupleCassFormatEncoder[T] {
-  def encode(tup: T): Either[Throwable, List[AnyRef]]
+  def encode(tup: T): Result[List[AnyRef]]
   def types: List[String]
   def dataTypes: List[DataType]
 }

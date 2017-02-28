@@ -26,14 +26,14 @@ object DerivedTupleCassFormatDecoder {
 
   implicit def tupleDecoder[T <: Product, Repr <: HList](implicit gen: Generic.Aux[T, Repr], hListDecoder: DerivedTupleCassFormatDecoder[Repr]): DerivedTupleCassFormatDecoder[T] =
     new DerivedTupleCassFormatDecoder[T] {
-      def decode(tup: TupleValue, n: Int): Either[Throwable, T] = {
+      def decode(tup: TupleValue, n: Int): Result[T] = {
         hListDecoder.decode(tup, n).right.map(gen.from)
       }
     }
 }
 
 trait TupleCassFormatDecoder[T] {
-  def decode(tup: TupleValue, n: Int): Either[Throwable, T]
+  def decode(tup: TupleValue, n: Int): Result[T]
 }
 
 object TupleCassFormatDecoder {

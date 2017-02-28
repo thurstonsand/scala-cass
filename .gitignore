@@ -3,3 +3,11 @@ target
 .ensime
 .ensime_cache
 cassandra.logdir*
+docs/src/main/tut/cass3
+docs/src/main/tut/cass21
+cassandra-docs
+_site
+lib
+docs/root/src/main/tut/cass3/*
+docs/root/src/main/tut/cass21/*
+.java-version

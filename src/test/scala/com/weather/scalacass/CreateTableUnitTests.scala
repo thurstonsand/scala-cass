@@ -1,35 +1,35 @@
 package com.weather.scalacass
 
 import com.weather.scalacass.util.CassandraUnitTester
-import com.weather.scalacass.ScalaSession.WrongPrimaryKeySizeException
 
 import scala.collection.JavaConverters._
 import scala.language.reflectiveCalls
 
 class CreateTableUnitTests extends CassandraUnitTester {
   val dbName = "testDB"
-  val tableName = "testTable"
   val tableColumns = List("str varchar, str2 varchar, i int")
   val primaryKeys = List("str")
 
-  before {
+  override def beforeAll(): Unit = {
+    super.beforeAll()
     client.session.execute(s"CREATE KEYSPACE $dbName WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1};")
-    client.session.execute(s"CREATE TABLE $dbName.$tableName ${tableColumns.mkString("(", ", ", ",")} PRIMARY KEY ${primaryKeys.mkString("((", ", ", "))")})")
+    ()
   }
+
   def ssFixture = new {
     val ss = new ScalaSession(dbName)(client.session)
-    val tname = "createTableTest"
+    val tname = s"createTableTest${java.util.UUID.randomUUID.toString.take(5)}"
   }
   case class A(str: String, str2: String, i: Int)
 
   "createTable" should "reject a table without primary key" in {
     case class AA(str: String, str2: String, i: Int)
-    a[WrongPrimaryKeySizeException] should be thrownBy ssFixture.ss.createTable[AA]("createTableTest", 0, 0)(implicitly[CCCassFormatEncoder[AA]])
+    ssFixture.ss.createTable[AA]("createTableTest", 0, 0).execute.left.toOption.value shouldBe a[WrongPrimaryKeySizeException]
   }
 
   def getpk[T: CCCassFormatDecoder: CCCassFormatEncoder](tname: String, pkCount: Int, clustCount: Int) = {
-    ssFixture.ss.createTable[T](tname, pkCount, clustCount)
-    val table = client.cluster.getMetadata.getKeyspace(dbName).getTable(tname)
+    ssFixture.ss.createTable[T](tname, pkCount, clustCount).execute()
+    val table = cluster.getMetadata.getKeyspace(dbName).getTable(tname)
     val parts = table.getPartitionKey.asScala.map(_.getName)
     val clust = table.getClusteringColumns.asScala.map(_.getName)
     (parts, clust)
@@ -44,7 +44,7 @@ class CreateTableUnitTests extends CassandraUnitTester {
 
     clust shouldBe empty
 
-    f.ss.dropTable(f.tname)
+    f.ss.dropTable(f.tname).execute()
   }
   "createTable11" should "create a table" in {
     val f = ssFixture
@@ -58,7 +58,7 @@ class CreateTableUnitTests extends CassandraUnitTester {
     clust should contain("str2")
     clust should not contain "i"
 
-    f.ss.dropTable(f.tname)
+    f.ss.dropTable(f.tname).execute()
   }
   "createTable20" should "create a table" in {
     val f = ssFixture
@@ -70,7 +70,7 @@ class CreateTableUnitTests extends CassandraUnitTester {
 
     clust shouldBe empty
 
-    f.ss.dropTable(f.tname)
+    f.ss.dropTable(f.tname).execute()
   }
   "createTable21" should "create a table" in {
     val f = ssFixture
@@ -84,7 +84,7 @@ class CreateTableUnitTests extends CassandraUnitTester {
     clust should not contain "str2"
     clust should contain("i")
 
-    f.ss.dropTable(f.tname)
+    f.ss.dropTable(f.tname).execute()
   }
   "createTable12" should "create a table" in {
     val f = ssFixture
@@ -98,6 +98,6 @@ class CreateTableUnitTests extends CassandraUnitTester {
     clust should contain("str2")
     clust should contain("i")
 
-    f.ss.dropTable(f.tname)
+    f.ss.dropTable(f.tname).execute()
   }
 }

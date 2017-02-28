@@ -23,14 +23,14 @@ abstract class ScalaCassUnitTests extends CassandraWithTableTester("testDB", "te
         res.getAs[GoodType](k).map(_.asInstanceOf[Iterable[Array[Byte]]].head).value should contain theSameElementsInOrderAs known
 
         res.getOrElse(k, default).asInstanceOf[Iterable[Array[Byte]]].head should contain theSameElementsInOrderAs known
-        res.getOrElse(s"not$k", default).asInstanceOf[Iterable[Array[Byte]]].head shouldBe default.asInstanceOf[Iterable[Array[Byte]]].head
+        an[IllegalArgumentException] should be thrownBy res.getOrElse(s"not$k", default).asInstanceOf[Iterable[Array[Byte]]].head
 
         res.attemptAs[GoodType](k).right.toOption.map(_.asInstanceOf[Iterable[Array[Byte]]].head).value should contain theSameElementsInOrderAs known
       case _ =>
         res.as[GoodType](k) shouldBe v
         res.getAs[GoodType](k).value shouldBe v
         res.getOrElse(k, default) shouldBe v
-        res.getOrElse(s"not$k", default) shouldBe default
+        an[IllegalArgumentException] should be thrownBy res.getOrElse(s"not$k", default)
         res.attemptAs[GoodType](k).right.toOption.value shouldBe v
     }
 
@@ -38,9 +38,9 @@ abstract class ScalaCassUnitTests extends CassandraWithTableTester("testDB", "te
     a[BadTypeException] should be thrownBy res.as[BadType](k)
     an[IllegalArgumentException] should be thrownBy res.as[BadType](s"not$k")
 
-    res.getAs[GoodType](s"not$k") shouldBe None
-    res.getAs[BadType](k) shouldBe None
-    res.getAs[BadType](s"not$k") shouldBe None
+    an[IllegalArgumentException] should be thrownBy res.getAs[GoodType](s"not$k")
+    a[BadTypeException] should be thrownBy res.getAs[BadType](k)
+    an[IllegalArgumentException] should be thrownBy res.getAs[BadType](s"not$k")
 
     res.attemptAs[GoodType](s"not$k").left.toOption.value shouldBe an[IllegalArgumentException]
     res.attemptAs[BadType](k).left.toOption.value shouldBe a[BadTypeException]
@@ -51,21 +51,21 @@ abstract class ScalaCassUnitTests extends CassandraWithTableTester("testDB", "te
       case class QueryCC(pkField: String)
       val ss = new ScalaSession(dbName)
       val tname = s"testdb${scala.util.Random.alphanumeric.take(12).mkString}"
-      ss.createTable[TestCC](tname, 1, 0)(CCCassFormatEncoder[TestCC])
+      ss.createTable[TestCC](tname, 1, 0)(CCCassFormatEncoder[TestCC]).execute()
       val t1 = TestCC("t1", v)
       val q1 = QueryCC(t1.pkField)
-      ss.insert(tname, t1)(CCCassFormatEncoder[TestCC])
+      ss.insert(tname, t1)(CCCassFormatEncoder[TestCC]).execute()
       k match {
         case "b" =>
-          ss.selectOne(tname, ScalaSession.NoQuery()).flatMap(_.getAs[TestCC]).map(_.refField.asInstanceOf[Array[Byte]]).value should contain theSameElementsInOrderAs t1.refField.asInstanceOf[Array[Byte]]
+          ss.selectOneStar(tname, ScalaSession.NoQuery()).execute.right.toOption.flatten.flatMap(_.getAs[TestCC]).map(_.refField.asInstanceOf[Array[Byte]]).value should contain theSameElementsInOrderAs t1.refField.asInstanceOf[Array[Byte]]
         case "sblob" =>
-          ss.selectOne(tname, ScalaSession.NoQuery()).flatMap(_.getAs[TestCC]).flatMap(_.refField.asInstanceOf[Set[Array[Byte]]].headOption).value should contain theSameElementsInOrderAs t1.refField.asInstanceOf[Set[Array[Byte]]].head
+          ss.selectOneStar(tname, ScalaSession.NoQuery()).execute.right.toOption.flatten.flatMap(_.getAs[TestCC]).flatMap(_.refField.asInstanceOf[Set[Array[Byte]]].headOption).value should contain theSameElementsInOrderAs t1.refField.asInstanceOf[Set[Array[Byte]]].head
         case _ =>
-          ss.selectOne(tname, q1).flatMap(_.getAs[TestCC]).value shouldBe t1
+          ss.selectOneStar(tname, q1).execute.right.toOption.flatten.flatMap(_.getAs[TestCC]).value shouldBe t1
       }
-      ss.delete(tname, q1)
-      ss.select(tname, q1).toList.map(_.as[TestCC]) shouldBe empty
-      ss.dropTable(tname)
+      ss.delete[ScalaSession.NoQuery](tname, q1).execute()
+      ss.select[ScalaSession.Star](tname, q1).execute.right.toOption.value.toList.map(_.as[TestCC]) shouldBe empty
+      ss.dropTable(tname).execute()
     }
   }
 }
@@ -103,7 +103,7 @@ class ScalaCassUnitTestsAll extends ScalaCassUnitTests with ScalaCassUnitTestsVe
     res.as[(Int, String)]("tup") shouldBe goodValue
     res.getAs[(Int, String)]("tup").value shouldBe goodValue
     res.getOrElse("tup", (5, "qqwe")) shouldBe goodValue
-    res.getOrElse("nottup", (5, "qqwe")) shouldBe ((5, "qqwe"))
+    an[IllegalArgumentException] should be thrownBy res.getOrElse("nottup", (5, "qqwe"))
 
     an[IllegalArgumentException] should be thrownBy res.as[(Int, String)]("nottup")
     an[InvalidTypeException] should be thrownBy res.as[(Int, String, String)]("tup")
@@ -124,20 +124,20 @@ class ScalaCassUnitTestsAll extends ScalaCassUnitTests with ScalaCassUnitTestsVe
     an[IllegalArgumentException] should be thrownBy res.as[String](s"not$k")
 
     res.getAs[Long](k).value shouldBe 1
-    res.getAs[Long](s"not$k") shouldBe None
-    res.getAs[String](k) shouldBe None
-    res.getAs[String](s"not$k") shouldBe None
+    an[IllegalArgumentException] should be thrownBy res.getAs[Long](s"not$k")
+    a[BadTypeException] should be thrownBy res.getAs[String](k)
+    an[IllegalArgumentException] should be thrownBy res.getAs[String](s"not$k")
 
     case class CounterCC(str: String, count: Long)
     case class QueryCC(str: String)
     val tname = "derivedtable"
     val ss = ScalaSession(dbName)
-    ss.createTable[CounterCC](tname, 1, 0)
+    ss.createTable[CounterCC](tname, 1, 0).execute()
     val t1 = CounterCC("t1", 1)
     val q1 = QueryCC(t1.str)
-    ss.insert(tname, t1)
-    ss.selectOne(tname, q1).value.as[CounterCC] shouldBe t1
-    ss.delete(tname, q1)
-    ss.select(tname, q1).toList shouldBe empty
+    ss.insert(tname, t1).execute()
+    ss.selectOneStar(tname, q1).execute().right.toOption.flatten.value.as[CounterCC] shouldBe t1
+    ss.delete[ScalaSession.NoQuery](tname, q1).execute()
+    ss.select[ScalaSession.Star](tname, q1).execute().right.toOption.value.toList shouldBe empty
   }
 }

@@ -3,12 +3,11 @@ import sbt._
 /** Generate boiletplate classes for TupleXX
   *
   * Copied, with some modifications, from
-  * [[https://github.com/circe/circe/blob/master/project/Boilerplate.scala Circe]], who in turn copied it from
   * [[https://github.com/milessabin/shapeless/blob/master/project/Boilerplate.scala Shapeless]]
   *
-  * @author Travis Brown
   * @author Miles Sabin
   * @author Kevin Wright
+  * @author Travis Brown
   */
 object Boilerplate {
   import scala.StringContext._
@@ -42,7 +41,7 @@ object Boilerplate {
     * - The contents of the `header` val is output first
     * - Then the first block of lines beginning with '|'
     * - Then the block of lines beginning with '-' is replicated once for each arity,
-    *   with the `templateVals` already pre-populated with relevant relevant vals for that arity
+    *   with the `templateVals` already pre-populated with relevant vals for that arity
     * - Then the last block of lines prefixed with '|'
     *
     * The block otherwise behaves as a standard interpolated string with regards to variable
@@ -75,13 +74,14 @@ object Boilerplate {
       val instanceMembers = synTypes.map(tpe => s"decode$tpe: CassFormatDecoder[$tpe]").mkString(", ")
       val names = synTypes.map(tpe => s"name$tpe")
       val memberNames = names.map(n => s"$n: String").mkString(", ")
-      val results = (synVals zip instances zip names).map { case ((v, i), name) => s"$v <- $i.decode(r, $name).right" }.mkString("; ")
+      val results = (synVals zip instances zip names).map { case ((v, i), name) => s"$v <- $i.decode(r, $name)" }.mkString("; ")
       val fnCombine = s"f(${`a..n`})"
 
       block"""
         |package com.weather.scalacass
         |
         |import com.datastax.driver.core.Row
+        |import scsession.SCStatement.RightBiasedEither
         |
         |private[scalacass] trait ProductCCCassFormatDecoders {
         -  /**
@@ -89,7 +89,7 @@ object Boilerplate {
         -    */
         -  final def forProduct$arity[${`A..N`}, Target]($memberNames)(f: (${`A..N`}) => Target)(implicit $instanceMembers): CCCassFormatDecoder[Target] =
         -    new CCCassFormatDecoder[Target] {
-        -      def decode(r: Row): Either[Throwable, Target] = for {
+        -      def decode(r: Row): Result[Target] = for {
         -        $results
         -      } yield $fnCombine
         -    }
@@ -113,12 +113,14 @@ object Boilerplate {
       val memberNames = names.map(n => s"$n: String").mkString(", ")
       val instanceMembers = synTypes.map(tpe => s"encode$tpe: CassFormatEncoder[$tpe]").mkString(", ")
       val cassTypes = instances.map(i => s"$i.cassType").mkString(", ")
-      val results = (encodedTypes zip instances zip synVals).map { case ((encodedTpe, i), v) => s"$encodedTpe <- $i.encode($v).right"}.mkString("; ")
+      val results = (encodedTypes zip instances zip synVals).map { case ((encodedTpe, i), v) => s"$encodedTpe <- $i.encode($v)"}.mkString("; ")
       val namesCombined = (names zip encodedTypes).map { case (n, encodedTpe) => s"($n, $encodedTpe)"}.mkString(", ")
       val queryCombined = (instances zip synVals zip names zip encodedTypes).map { case (((i, v), name), encodedTpe) => s"($i.withQuery($v, $name), $encodedTpe)"}.mkString(", ")
 
       block"""
         |package com.weather.scalacass
+        |
+        |import scsession.SCStatement.RightBiasedEither
         |
         |private[scalacass] trait ProductCCCassFormatEncoders {
         -  /**
@@ -129,14 +131,14 @@ object Boilerplate {
         -      val names = List($memberNames)
         -      val types = List($cassTypes)
         -      @SuppressWarnings(Array("org.brianmckenna.wartremover.warts.Any"))
-        -      def encodeWithName(from: Source): Either[Throwable, List[(String, AnyRef)]] = {
+        -      def encodeWithName(from: Source): Result[List[(String, AnyRef)]] = {
         -        val (${`a..n`}) = f(from)
         -        for {
         -          $results
         -        } yield List($namesCombined)
         -      }
         -      @SuppressWarnings(Array("org.brianmckenna.wartremover.warts.Any"))
-        -      def encodeWithQuery(from: Source): Either[Throwable, List[(String, AnyRef)]] = {
+        -      def encodeWithQuery(from: Source): Result[List[(String, AnyRef)]] = {
         -        val (${`a..n`}) = f(from)
         -        for {
         -          $results

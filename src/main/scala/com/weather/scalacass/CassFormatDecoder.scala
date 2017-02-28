@@ -3,39 +3,37 @@ package com.weather.scalacass
 import java.nio.ByteBuffer
 
 import com.datastax.driver.core.{DataType, Row, TupleValue}
-import com.datastax.driver.core.exceptions.{InvalidTypeException, QueryExecutionException}
+import com.datastax.driver.core.exceptions.InvalidTypeException
 import NotRecoverable.Try2Either
 import com.google.common.reflect.{TypeParameter, TypeToken}
 
 import scala.util.Try
 
 trait CassFormatDecoder[T] { self =>
-  import CassFormatDecoder.ValueNotDefinedException
-
   private[scalacass]type From <: AnyRef
   private[scalacass] def typeToken: TypeToken[From]
-  private[scalacass] def f2t(f: From): Either[Throwable, T]
+  private[scalacass] def f2t(f: From): Result[T]
   private[scalacass] def extract(r: Row, name: String): From
-  private[scalacass] def decode(r: Row, name: String): Either[Throwable, T] = Try[Either[Throwable, T]](
+  private[scalacass] def decode(r: Row, name: String): Result[T] = Try[Result[T]](
     if (r.isNull(name)) Left(new ValueNotDefinedException(s""""$name" was not defined in ${r.getColumnDefinitions.getTable(name)}"""))
     else f2t(extract(r, name))
   ).unwrap[T]
   private[scalacass] def tupleExtract(tup: TupleValue, pos: Int): From
-  private[scalacass] def tupleDecode(tup: TupleValue, pos: Int): Either[Throwable, T] = Try[Either[Throwable, T]](
+  private[scalacass] def tupleDecode(tup: TupleValue, pos: Int): Result[T] = Try[Result[T]](
     if (tup.isNull(pos)) Left(new ValueNotDefinedException(s"""position $pos was not defined in tuple $tup"""))
     else f2t(tupleExtract(tup, pos))
   ).unwrap[T]
   final def map[U](fn: T => U): CassFormatDecoder[U] = new CassFormatDecoder[U] {
     type From = self.From
     val typeToken = self.typeToken
-    def f2t(f: From): Either[Throwable, U] = self.f2t(f).right.map(fn)
+    def f2t(f: From): Result[U] = self.f2t(f).right.map(fn)
     def extract(r: Row, name: String): From = self.extract(r, name)
     def tupleExtract(tup: TupleValue, pos: Int): From = self.tupleExtract(tup, pos)
   }
-  final def flatMap[U](fn: T => Either[Throwable, U]): CassFormatDecoder[U] = new CassFormatDecoder[U] {
+  final def flatMap[U](fn: T => Result[U]): CassFormatDecoder[U] = new CassFormatDecoder[U] {
     type From = self.From
     val typeToken = self.typeToken
-    def f2t(f: From): Either[Throwable, U] = self.f2t(f).right.flatMap(fn)
+    def f2t(f: From): Result[U] = self.f2t(f).right.flatMap(fn)
     def extract(r: Row, name: String): From = self.extract(r, name)
     def tupleExtract(tup: TupleValue, pos: Int): From = self.tupleExtract(tup, pos)
   }
@@ -44,9 +42,7 @@ trait CassFormatDecoder[T] { self =>
     case Right(v)  => v
     case Left(exc) => throw exc
   }
-  final def getAs(r: Row)(name: String): Option[T] = decode(r, name).right.toOption
-  final def getOrElse(r: Row)(name: String, default: => T): T = decode(r, name).right.getOrElse(default)
-  final def attemptAs(r: Row)(name: String): Either[Throwable, T] = decode(r, name)
+  final def attemptAs(r: Row)(name: String): Result[T] = decode(r, name)
 }
 
 // extended by CassFormatDecoderVersionSpecific
@@ -57,13 +53,11 @@ trait LowPriorityCassFormatDecoder {
     def f2t(f: From) = underlying.decode(f, 0)
     def extract(r: Row, name: String) = r getTupleValue name
     def tupleExtract(tup: TupleValue, pos: Int) = tup getTupleValue pos
-    @SuppressWarnings(Array("org.brianmckenna.wartremover.warts.AsInstanceOf", "org.brianmckenna.wartremover.warts.IsInstanceOf"))
-    override def decode(r: Row, name: String): Either[Throwable, TUP] = super.decode(r, name) match {
+    override def decode(r: Row, name: String): Result[TUP] = super.decode(r, name) match {
       case Left(f: java.lang.ArrayIndexOutOfBoundsException) => Left(new InvalidTypeException("tuple of wrong arity", f))
       case other => other
     }
-    @SuppressWarnings(Array("org.brianmckenna.wartremover.warts.AsInstanceOf", "org.brianmckenna.wartremover.warts.IsInstanceOf"))
-    override def tupleDecode(tup: TupleValue, pos: Int): Either[Throwable, TUP] = super.tupleDecode(tup, pos) match {
+    override def tupleDecode(tup: TupleValue, pos: Int): Result[TUP] = super.tupleDecode(tup, pos) match {
       case Left(f: java.lang.ArrayIndexOutOfBoundsException) => Left(new InvalidTypeException("tuple of wrong arity", f))
       case other => other
     }
@@ -73,8 +67,6 @@ trait LowPriorityCassFormatDecoder {
 object CassFormatDecoder extends CassFormatDecoderVersionSpecific {
   type Aux[T, From0] = CassFormatDecoder[T] { type From = From0 }
   def apply[T](implicit decoder: CassFormatDecoder[T]): CassFormatDecoder[T] = decoder
-
-  class ValueNotDefinedException(m: String) extends QueryExecutionException(m)
 
   // in cassandra, empty collection == NULL, so null check is not helpful
   trait CollectionCassFormatDecoder[T] extends CassFormatDecoder[T] {
@@ -114,16 +106,16 @@ object CassFormatDecoder extends CassFormatDecoderVersionSpecific {
   implicit val bigIntegerFormat = safeConvertCassFormatDecoder[BigInt, java.math.BigInteger](TypeToken.of(classOf[java.math.BigInteger]), BigInt.javaBigInteger2bigInt, _ getVarint _, _ getVarint _)
   implicit val bigDecimalFormat = safeConvertCassFormatDecoder[BigDecimal, java.math.BigDecimal](TypeToken.of(classOf[java.math.BigDecimal]), BigDecimal.javaBigDecimal2bigDecimal, _ getDecimal _, _ getDecimal _)
 
-  private def listOf[T](eltType: TypeToken[T]): TypeToken[java.util.List[T]] =
+  def listOf[T](eltType: TypeToken[T]): TypeToken[java.util.List[T]] =
     new TypeToken[java.util.List[T]]() {}.where(new TypeParameter[T]() {}, eltType)
 
   implicit def listFormat[T](implicit underlying: CassFormatDecoder[T]) = new CollectionCassFormatDecoder[List[T]] {
     type From = java.util.List[underlying.From]
     val typeToken = listOf(underlying.typeToken)
-    def f2t(f: From): Either[Throwable, List[T]] = {
+    def f2t(f: From): Result[List[T]] = {
       val acc = List.newBuilder[T]
       @scala.annotation.tailrec
-      def process(it: java.util.ListIterator[underlying.From]): Either[Throwable, List[T]] = if (!it.hasNext) Right(acc.result)
+      def process(it: java.util.ListIterator[underlying.From]): Result[List[T]] = if (!it.hasNext) Right(acc.result)
       else {
         underlying.f2t(it.next()) match {
           case Right(h) =>
@@ -137,16 +129,16 @@ object CassFormatDecoder extends CassFormatDecoderVersionSpecific {
     def tupleExtract(tup: TupleValue, pos: Int) = tup getList (pos, underlying.typeToken)
   }
 
-  private def setOf[T](eltType: TypeToken[T]): TypeToken[java.util.Set[T]] =
+  def setOf[T](eltType: TypeToken[T]): TypeToken[java.util.Set[T]] =
     new TypeToken[java.util.Set[T]]() {}.where(new TypeParameter[T]() {}, eltType)
 
   implicit def setFormat[T](implicit underlying: CassFormatDecoder[T]) = new CollectionCassFormatDecoder[Set[T]] {
     type From = java.util.Set[underlying.From]
     val typeToken: TypeToken[java.util.Set[underlying.From]] = setOf(underlying.typeToken)
-    def f2t(f: From): Either[Throwable, Set[T]] = {
+    def f2t(f: From): Result[Set[T]] = {
       val acc = Set.newBuilder[T]
       @scala.annotation.tailrec
-      def process(it: java.util.Iterator[underlying.From]): Either[Throwable, Set[T]] = if (!it.hasNext) Right(acc.result)
+      def process(it: java.util.Iterator[underlying.From]): Result[Set[T]] = if (!it.hasNext) Right(acc.result)
       else {
         underlying.f2t(it.next()) match {
           case Right(h) =>
@@ -160,7 +152,7 @@ object CassFormatDecoder extends CassFormatDecoderVersionSpecific {
     def tupleExtract(tup: TupleValue, pos: Int) = tup getSet (pos, underlying.typeToken)
   }
 
-  private def mapOf[K, V](keyType: TypeToken[K], valueType: TypeToken[V]): TypeToken[java.util.Map[K, V]] =
+  def mapOf[K, V](keyType: TypeToken[K], valueType: TypeToken[V]): TypeToken[java.util.Map[K, V]] =
     new TypeToken[java.util.Map[K, V]]() {}
       .where(new TypeParameter[K]() {}, keyType)
       .where(new TypeParameter[V]() {}, valueType)
@@ -169,10 +161,10 @@ object CassFormatDecoder extends CassFormatDecoderVersionSpecific {
     new CollectionCassFormatDecoder[Map[K, V]] {
       type From = java.util.Map[underlyingK.From, underlyingV.From]
       val typeToken = mapOf(underlyingK.typeToken, underlyingV.typeToken)
-      def f2t(f: From): Either[Throwable, Map[K, V]] = {
+      def f2t(f: From): Result[Map[K, V]] = {
         val acc = Map.newBuilder[K, V]
         @scala.annotation.tailrec
-        def process(it: java.util.Iterator[java.util.Map.Entry[underlyingK.From, underlyingV.From]]): Either[Throwable, Map[K, V]] =
+        def process(it: java.util.Iterator[java.util.Map.Entry[underlyingK.From, underlyingV.From]]): Result[Map[K, V]] =
           if (!it.hasNext) Right(acc.result) else {
             val n = it.next()
             (for {
@@ -196,7 +188,7 @@ object CassFormatDecoder extends CassFormatDecoderVersionSpecific {
 
     def f2t(f: From) = Try(com.datastax.driver.core.utils.Bytes.getArray(f).toIndexedSeq.toArray).toEither
     def extract(r: Row, name: String): ByteBuffer = r getBytes name
-    override def decode(r: Row, name: String): Either[Throwable, Array[Byte]] = Try[Either[Throwable, Array[Byte]]](
+    override def decode(r: Row, name: String): Result[Array[Byte]] = Try[Result[Array[Byte]]](
       if (r.isNull(name)) Left(new ValueNotDefinedException(s""""$name" was not defined in ${r.getColumnDefinitions.getTable(name)}"""))
       else {
         val cassName = r.getColumnDefinitions.getType(name).getName
@@ -206,7 +198,7 @@ object CassFormatDecoder extends CassFormatDecoderVersionSpecific {
       }
     ).unwrap[Array[Byte]]
     def tupleExtract(tup: TupleValue, pos: Int): ByteBuffer = tup getBytes pos
-    override def tupleDecode(tup: TupleValue, pos: Int): Either[Throwable, Array[Byte]] = Try[Either[Throwable, Array[Byte]]](
+    override def tupleDecode(tup: TupleValue, pos: Int): Result[Array[Byte]] = Try[Result[Array[Byte]]](
       if (tup.isNull(pos)) Left(new ValueNotDefinedException(s"""position $pos was not defined in tuple $tup"""))
       else {
         val cassName = tup.getType.getComponentTypes.get(pos).getName
@@ -220,15 +212,20 @@ object CassFormatDecoder extends CassFormatDecoderVersionSpecific {
   implicit def optionFormat[A](implicit underlying: CassFormatDecoder[A]): CassFormatDecoder[Option[A]] = new CassFormatDecoder[Option[A]] {
     type From = underlying.From
     val typeToken = underlying.typeToken
-    def f2t(f: From): Either[Throwable, Option[A]] = underlying.f2t(f).right.map(Option(_))
+    def f2t(f: From): Result[Option[A]] = underlying.f2t(f).right.map(Option(_))
     def extract(r: Row, name: String) = underlying.extract(r, name)
-    override def decode(r: Row, name: String): Either[Throwable, Option[A]] = Right(super.decode(r, name).right getOrElse None)
+    override def decode(r: Row, name: String): Result[Option[A]] = super.decode(r, name) match {
+      case Left(Recoverable(_)) => Right(None)
+      case other                => other
+    }
     def tupleExtract(tup: TupleValue, pos: Int) = underlying.tupleExtract(tup, pos)
-    override def tupleDecode(tup: TupleValue, pos: Int): Either[Throwable, Option[A]] =
-      Right(super.tupleDecode(tup, pos).right getOrElse None)
+    override def tupleDecode(tup: TupleValue, pos: Int): Result[Option[A]] = super.tupleDecode(tup, pos) match {
+      case Left(Recoverable(_)) => Right(None)
+      case other                => other
+    }
   }
 
-  implicit def eitherFormat[A](implicit underlying: CassFormatDecoder[A]): CassFormatDecoder[Either[Throwable, A]] = new CassFormatDecoder[Either[Throwable, A]] {
+  implicit def eitherFormat[A](implicit underlying: CassFormatDecoder[A]): CassFormatDecoder[Result[A]] = new CassFormatDecoder[Result[A]] {
     type From = underlying.From
     val typeToken = underlying.typeToken
     def f2t(f: From) = Right(underlying.f2t(f))
