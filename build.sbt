@@ -126,12 +126,12 @@ lazy val cass21Settings = Seq(
 ) ++ addUnmanagedSourceDirsFrom("scala_cass21")
 
 lazy val micrositeSettings = Seq(
-  micrositeName := "ScalaCass",
+  micrositeName := "scala-cass",
   micrositeAuthor := "Thurston Sandberg",
   micrositeDescription := "Java Cassandra Driver Bindings for Friendlier Scala",
   micrositeGithubOwner := "thurstonsand",
   micrositeGithubRepo := "scala-cass",
-  micrositeBaseUrl := "",
+  micrositeBaseUrl := "scala-cass",
   //micrositeHomepage := "https://github.com/thurstonsand",
   micrositeImgDirectory := baseDirectory.value / "imgs",
   micrositeCssDirectory := baseDirectory.value / "css",
