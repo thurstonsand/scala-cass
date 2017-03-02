@@ -3,7 +3,7 @@ package com.weather.scalacass
 import java.util.concurrent.Callable
 
 import com.datastax.driver.core._
-import com.google.common.cache.CacheBuilder
+import com.google.common.cache.{Cache, CacheBuilder}
 import com.weather.scalacass.scsession._
 
 object ScalaSession {
@@ -30,25 +30,25 @@ object ScalaSession {
   }
   object UpdateBehavior {
     final case class Add[F[_], A] private (coll: F[A]) extends UpdateBehavior[F, A] {
-      def withQuery(name: String) = s"$name=$name+?"
+      def withQuery(name: String): String = s"$name=$name+?"
     }
     object Add {
-      def apply[A](coll: List[A]) = new Add(coll)
-      def apply[A](coll: Set[A]) = new Add(coll)
+      def apply[A](coll: List[A]): Add[List, A] = new Add(coll)
+      def apply[A](coll: Set[A]): Add[Set, A] = new Add(coll)
       implicit def liftList[A](l: List[A]): Add[List, A] = apply(l)
       implicit def listSet[A](s: Set[A]): Add[Set, A] = apply(s)
     }
     final case class Subtract[F[_], A] private (coll: F[A]) extends UpdateBehavior[F, A] {
-      def withQuery(name: String) = s"$name=$name-?"
+      def withQuery(name: String): String = s"$name=$name-?"
     }
     object Subtract {
-      def apply[A](coll: List[A]) = new Subtract(coll)
-      def apply[A](coll: Set[A]) = new Subtract(coll)
+      def apply[A](coll: List[A]): Subtract[List, A] = new Subtract(coll)
+      def apply[A](coll: Set[A]): Subtract[Set, A] = new Subtract(coll)
       implicit def liftList[A](l: List[A]): Subtract[List, A] = apply(l)
       implicit def listSet[A](s: Set[A]): Subtract[Set, A] = apply(s)
     }
     final case class Replace[F[_], A] private (coll: F[A]) extends UpdateBehavior[F, A] {
-      def withQuery(name: String) = s"$name=?"
+      def withQuery(name: String): String = s"$name=?"
     }
     object Replace {
       def apply[A](coll: List[A]) = new Replace(coll)
@@ -62,8 +62,7 @@ object ScalaSession {
 final case class ScalaSession(keyspace: String)(implicit val session: Session) {
   import ScalaSession.{Fn02Callable, Star, NoQuery}
 
-  //  private[this] val queryCache = new LRUCache[Set[String], PreparedStatement](100)
-  private[this] val queryCache = CacheBuilder.newBuilder().maximumSize(1000).build[String, PreparedStatement]()
+  private[this] val queryCache: Cache[String, PreparedStatement] = CacheBuilder.newBuilder().maximumSize(1000).build[String, PreparedStatement]()
 
   private[scalacass] def getFromCacheOrElse(key: String, statement: => PreparedStatement) = queryCache.get(key, statement)
   def invalidateCache(): Unit = queryCache.invalidateAll()
@@ -85,7 +84,9 @@ final case class ScalaSession(keyspace: String)(implicit val session: Session) {
   def update[U: CCCassFormatEncoder, Q: CCCassFormatEncoder](table: String, updateable: U, query: Q): SCUpdateStatement =
     SCUpdateStatement(keyspace, table, updateable, query, this)
 
+  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   def delete[D] = dh.asInstanceOf[DeleteHelper[D]]
+  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   def deleteRow = dh.asInstanceOf[DeleteHelper[NoQuery]]
   private[this] val dh = new DeleteHelper[Nothing]
 
@@ -98,7 +99,9 @@ final case class ScalaSession(keyspace: String)(implicit val session: Session) {
   def batchOf(batch: SCStatement.SCBatchableStatement, batches: SCStatement.SCBatchableStatement*): SCBatchStatement =
     SCBatchStatement((batch +: batches).toList, this)
 
+  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   def select[S] = sh.asInstanceOf[SelectHelper[S]]
+  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   def selectStar = sh.asInstanceOf[SelectHelper[Star]]
   private[this] val sh = new SelectHelper[Nothing]
 
@@ -107,7 +110,9 @@ final case class ScalaSession(keyspace: String)(implicit val session: Session) {
       SCSelectStatement.apply[S, Q](keyspace, table, where, ScalaSession.this)
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   def selectOne[S] = soh.asInstanceOf[SelectOneHelper[S]]
+  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   def selectOneStar = soh.asInstanceOf[SelectOneHelper[Star]]
   private[this] val soh = new SelectOneHelper[Nothing]
 

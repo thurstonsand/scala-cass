@@ -93,23 +93,23 @@ object CassFormatDecoder extends CassFormatDecoderVersionSpecific {
 
   // decoders
 
-  implicit val stringFormat = sameTypeCassFormatDecoder(TypeToken.of(classOf[String]), _ getString _, _ getString _)
-  implicit val uuidFormat = sameTypeCassFormatDecoder(TypeToken.of(classOf[java.util.UUID]), _ getUUID _, _ getUUID _)
-  implicit val iNetFormat = sameTypeCassFormatDecoder[java.net.InetAddress](TypeToken.of(classOf[java.net.InetAddress]), _ getInet _, _ getInet _)
+  implicit val stringFormat: CassFormatDecoder[String] = sameTypeCassFormatDecoder(TypeToken.of(classOf[String]), _ getString _, _ getString _)
+  implicit val uuidFormat: CassFormatDecoder[java.util.UUID] = sameTypeCassFormatDecoder(TypeToken.of(classOf[java.util.UUID]), _ getUUID _, _ getUUID _)
+  implicit val iNetFormat: CassFormatDecoder[java.net.InetAddress] = sameTypeCassFormatDecoder[java.net.InetAddress](TypeToken.of(classOf[java.net.InetAddress]), _ getInet _, _ getInet _)
 
-  implicit val intFormat = safeConvertCassFormatDecoder[Int, java.lang.Integer](TypeToken.of(classOf[java.lang.Integer]), Int.unbox, _ getInt _, _ getInt _)
+  implicit val intFormat: CassFormatDecoder[Int] = safeConvertCassFormatDecoder[Int, java.lang.Integer](TypeToken.of(classOf[java.lang.Integer]), Int.unbox, _ getInt _, _ getInt _)
 
-  implicit val longFormat = safeConvertCassFormatDecoder[Long, java.lang.Long](TypeToken.of(classOf[java.lang.Long]), Long.unbox, _ getLong _, _ getLong _)
-  implicit val booleanFormat = safeConvertCassFormatDecoder[Boolean, java.lang.Boolean](TypeToken.of(classOf[java.lang.Boolean]), Boolean.unbox, _ getBool _, _ getBool _)
-  implicit val doubleFormat = safeConvertCassFormatDecoder[Double, java.lang.Double](TypeToken.of(classOf[java.lang.Double]), Double.unbox, _ getDouble _, _ getDouble _)
-  implicit val floatFormat = safeConvertCassFormatDecoder[Float, java.lang.Float](TypeToken.of(classOf[java.lang.Float]), Float.unbox, _ getFloat _, _ getFloat _)
-  implicit val bigIntegerFormat = safeConvertCassFormatDecoder[BigInt, java.math.BigInteger](TypeToken.of(classOf[java.math.BigInteger]), BigInt.javaBigInteger2bigInt, _ getVarint _, _ getVarint _)
-  implicit val bigDecimalFormat = safeConvertCassFormatDecoder[BigDecimal, java.math.BigDecimal](TypeToken.of(classOf[java.math.BigDecimal]), BigDecimal.javaBigDecimal2bigDecimal, _ getDecimal _, _ getDecimal _)
+  implicit val longFormat: CassFormatDecoder[Long] = safeConvertCassFormatDecoder[Long, java.lang.Long](TypeToken.of(classOf[java.lang.Long]), Long.unbox, _ getLong _, _ getLong _)
+  implicit val booleanFormat: CassFormatDecoder[Boolean] = safeConvertCassFormatDecoder[Boolean, java.lang.Boolean](TypeToken.of(classOf[java.lang.Boolean]), Boolean.unbox, _ getBool _, _ getBool _)
+  implicit val doubleFormat: CassFormatDecoder[Double] = safeConvertCassFormatDecoder[Double, java.lang.Double](TypeToken.of(classOf[java.lang.Double]), Double.unbox, _ getDouble _, _ getDouble _)
+  implicit val floatFormat: CassFormatDecoder[Float] = safeConvertCassFormatDecoder[Float, java.lang.Float](TypeToken.of(classOf[java.lang.Float]), Float.unbox, _ getFloat _, _ getFloat _)
+  implicit val bigIntegerFormat: CassFormatDecoder[BigInt] = safeConvertCassFormatDecoder[BigInt, java.math.BigInteger](TypeToken.of(classOf[java.math.BigInteger]), BigInt.javaBigInteger2bigInt, _ getVarint _, _ getVarint _)
+  implicit val bigDecimalFormat: CassFormatDecoder[BigDecimal] = safeConvertCassFormatDecoder[BigDecimal, java.math.BigDecimal](TypeToken.of(classOf[java.math.BigDecimal]), BigDecimal.javaBigDecimal2bigDecimal, _ getDecimal _, _ getDecimal _)
 
   def listOf[T](eltType: TypeToken[T]): TypeToken[java.util.List[T]] =
     new TypeToken[java.util.List[T]]() {}.where(new TypeParameter[T]() {}, eltType)
 
-  implicit def listFormat[T](implicit underlying: CassFormatDecoder[T]) = new CollectionCassFormatDecoder[List[T]] {
+  implicit def listFormat[T](implicit underlying: CassFormatDecoder[T]): CassFormatDecoder[List[T]] = new CollectionCassFormatDecoder[List[T]] {
     type From = java.util.List[underlying.From]
     val typeToken = listOf(underlying.typeToken)
     def f2t(f: From): Result[List[T]] = {
@@ -132,7 +132,7 @@ object CassFormatDecoder extends CassFormatDecoderVersionSpecific {
   def setOf[T](eltType: TypeToken[T]): TypeToken[java.util.Set[T]] =
     new TypeToken[java.util.Set[T]]() {}.where(new TypeParameter[T]() {}, eltType)
 
-  implicit def setFormat[T](implicit underlying: CassFormatDecoder[T]) = new CollectionCassFormatDecoder[Set[T]] {
+  implicit def setFormat[T](implicit underlying: CassFormatDecoder[T]): CassFormatDecoder[Set[T]] = new CollectionCassFormatDecoder[Set[T]] {
     type From = java.util.Set[underlying.From]
     val typeToken: TypeToken[java.util.Set[underlying.From]] = setOf(underlying.typeToken)
     def f2t(f: From): Result[Set[T]] = {
@@ -157,7 +157,7 @@ object CassFormatDecoder extends CassFormatDecoderVersionSpecific {
       .where(new TypeParameter[K]() {}, keyType)
       .where(new TypeParameter[V]() {}, valueType)
 
-  implicit def mapFormat[K, V](implicit underlyingK: CassFormatDecoder[K], underlyingV: CassFormatDecoder[V]) =
+  implicit def mapFormat[K, V](implicit underlyingK: CassFormatDecoder[K], underlyingV: CassFormatDecoder[V]): CassFormatDecoder[Map[K, V]] =
     new CollectionCassFormatDecoder[Map[K, V]] {
       type From = java.util.Map[underlyingK.From, underlyingV.From]
       val typeToken = mapOf(underlyingK.typeToken, underlyingV.typeToken)

@@ -16,8 +16,7 @@ case object IsNull extends Nullable[Nothing] {
 }
 
 object Nullable {
-  @SuppressWarnings(Array("org.brianmckenna.wartremover.warts.Null"))
-  def apply[A](x: A): Nullable[A] = if (x == null) IsNull else Is(x)
+  def apply[A](x: A): Nullable[A] = if (x.isNull) IsNull else Is(x)
   def empty[A]: Nullable[A] = IsNull
   implicit def nullable2iterable[A](xo: Nullable[A]): Iterable[A] = xo.toOption.toList
 
@@ -53,13 +52,13 @@ object Nullable {
 
     override def decode(r: Row, name: String): Result[Nullable[A]] = super.decode(r, name) match {
       case Left(Recoverable(_)) => Right(IsNull)
-      case other                             => other
+      case other                => other
     }
     def tupleExtract(tup: TupleValue, pos: Int): From = underlying.tupleExtract(tup, pos)
 
     override def tupleDecode(tup: TupleValue, pos: Int): Result[Nullable[A]] = super.tupleDecode(tup, pos) match {
       case Left(Recoverable(_)) => Right(IsNull)
-      case other                             => other
+      case other                => other
     }
   }
 }

@@ -40,18 +40,18 @@ object CassFormatEncoder extends CassFormatEncoderVersionSpecific {
 
   // encoders
 
-  implicit val stringFormat = sameTypeCassFormatEncoder[String](DataType.varchar)
-  implicit val uuidFormat = sameTypeCassFormatEncoder[java.util.UUID](DataType.uuid)
-  implicit val iNetFormat = sameTypeCassFormatEncoder[java.net.InetAddress](DataType.inet)
+  implicit val stringFormat: CassFormatEncoder[String] = sameTypeCassFormatEncoder[String](DataType.varchar)
+  implicit val uuidFormat: CassFormatEncoder[java.util.UUID] = sameTypeCassFormatEncoder[java.util.UUID](DataType.uuid)
+  implicit val iNetFormat: CassFormatEncoder[java.net.InetAddress] = sameTypeCassFormatEncoder[java.net.InetAddress](DataType.inet)
 
-  implicit val intFormat = transCassFormatEncoder(DataType.cint, Int.box)
-  implicit val longFormat = transCassFormatEncoder(DataType.bigint, Long.box)
-  implicit val booleanFormat = transCassFormatEncoder(DataType.cboolean, Boolean.box)
-  implicit val doubleFormat = transCassFormatEncoder(DataType.cdouble, Double.box)
-  implicit val bigIntegerFormat = transCassFormatEncoder(DataType.varint, (_: BigInt).underlying)
-  implicit val bigDecimalFormat = transCassFormatEncoder(DataType.decimal, (_: BigDecimal).underlying)
-  implicit val floatFormat = transCassFormatEncoder(DataType.cfloat, Float.box)
-  implicit val blobFormat = transCassFormatEncoder(DataType.blob, java.nio.ByteBuffer.wrap)
+  implicit val intFormat: CassFormatEncoder[Int] = transCassFormatEncoder(DataType.cint, Int.box)
+  implicit val longFormat: CassFormatEncoder[Long] = transCassFormatEncoder(DataType.bigint, Long.box)
+  implicit val booleanFormat: CassFormatEncoder[Boolean] = transCassFormatEncoder(DataType.cboolean, Boolean.box)
+  implicit val doubleFormat: CassFormatEncoder[Double] = transCassFormatEncoder(DataType.cdouble, Double.box)
+  implicit val bigIntegerFormat: CassFormatEncoder[BigInt] = transCassFormatEncoder(DataType.varint, (_: BigInt).underlying)
+  implicit val bigDecimalFormat: CassFormatEncoder[BigDecimal] = transCassFormatEncoder(DataType.decimal, (_: BigDecimal).underlying)
+  implicit val floatFormat: CassFormatEncoder[Float] = transCassFormatEncoder(DataType.cfloat, Float.box)
+  implicit val blobFormat: CassFormatEncoder[Array[Byte]] = transCassFormatEncoder(DataType.blob, java.nio.ByteBuffer.wrap)
 
   def updateBehaviorListEncoder[A, UB <: UpdateBehavior[List, A]](implicit underlying: CassFormatEncoder[A]) = new CassFormatEncoder[UB] {
     type From = java.util.List[underlying.From]
@@ -113,7 +113,7 @@ object CassFormatEncoder extends CassFormatEncoderVersionSpecific {
   implicit def setFormat[A](implicit underlying: CassFormatEncoder[A]): CassFormatEncoder[Set[A]] =
     updateBehaviorSetEncoder[A, UpdateBehavior.Replace[Set, A]](underlying).map[Set[A]](UpdateBehavior.Replace(_))
 
-  implicit def mapFormat[A, B](implicit underlyingA: CassFormatEncoder[A], underlyingB: CassFormatEncoder[B]) =
+  implicit def mapFormat[A, B](implicit underlyingA: CassFormatEncoder[A], underlyingB: CassFormatEncoder[B]): CassFormatEncoder[Map[A, B]] =
     new CassFormatEncoder[Map[A, B]] {
       type From = java.util.Map[underlyingA.From, underlyingB.From]
       val cassDataType = DataType.map(underlyingA.cassDataType, underlyingB.cassDataType)
@@ -136,7 +136,7 @@ object CassFormatEncoder extends CassFormatEncoderVersionSpecific {
       }
     }
 
-  implicit def optionFormat[A](implicit underlying: CassFormatEncoder[A]) = new CassFormatEncoder[Option[A]] {
+  implicit def optionFormat[A](implicit underlying: CassFormatEncoder[A]): CassFormatEncoder[Option[A]] = new CassFormatEncoder[Option[A]] {
     type From = Option[underlying.From]
     val cassDataType = underlying.cassDataType
     def encode(f: Option[A]): Result[Option[underlying.From]] = f.map(underlying.encode(_)) match {
@@ -145,17 +145,16 @@ object CassFormatEncoder extends CassFormatEncoderVersionSpecific {
       case Some(Right(n)) => Right(Some(n))
     }
   }
-  implicit def eitherFormat[A](implicit underlying: CassFormatEncoder[A]) = new CassFormatEncoder[Result[A]] {
+  implicit def eitherFormat[A](implicit underlying: CassFormatEncoder[A]): CassFormatEncoder[Result[A]] = new CassFormatEncoder[Result[A]] {
     type From = Result[underlying.From]
     val cassDataType = underlying.cassDataType
-    @SuppressWarnings(Array("org.brianmckenna.wartremover.warts.Product", "org.brianmckenna.wartremover.warts.Serializable"))
-    def encode(f: Result[A]): Result[Result[underlying.From]] = f.right.map(underlying.encode(_)) match {
+    def encode(f: Result[A]) = f.right.map(underlying.encode(_)) match {
       case Left(ff) => Right(Left(ff))
       case other    => other
     }
   }
 
-  implicit val nothingFormat = new CassFormatEncoder[Nothing] {
+  implicit val nothingFormat: CassFormatEncoder[Nothing] = new CassFormatEncoder[Nothing] {
     type From = Nothing
     def cassDataType = throw new IllegalArgumentException("Nothing isn't a real type!")
     def encode(f: Nothing): Result[From] = throw new IllegalArgumentException("Nothing isn't a real type!")

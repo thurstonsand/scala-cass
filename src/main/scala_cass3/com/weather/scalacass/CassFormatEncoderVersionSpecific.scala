@@ -3,7 +3,7 @@ package com.weather.scalacass
 import com.datastax.driver.core.{Cluster, DataType, TupleValue}
 
 trait LowPriorityCassFormatEncoderVersionSpecific {
-  implicit def tupleFormat[TUP <: Product](implicit cluster: Cluster, underlying: TupleCassFormatEncoder[TUP]) = new CassFormatEncoder[TUP] {
+  implicit def tupleFormat[TUP <: Product](implicit cluster: Cluster, underlying: TupleCassFormatEncoder[TUP]): CassFormatEncoder[TUP] = new CassFormatEncoder[TUP] {
     type From = TupleValue
     val cassDataType = cluster.getMetadata.newTupleType(underlying.dataTypes: _*)
     def encode(f: TUP): Result[From] = underlying.encode(f).right.map(ar => cassDataType.newValue(ar: _*))
