@@ -35,8 +35,6 @@ def usingMajorVersion(mVersion: String) = s"$mVersion.0.0"
 
 lazy val commonSettings = Seq(
   organization := "com.github.thurstonsand",
-  scalaVersion := "2.12.1",
-  crossScalaVersions := Seq("2.12.1", "2.11.8", "2.10.6"),
   scalacOptions ++= Seq(
     "-deprecation",
     "-encoding", "UTF-8",
@@ -107,6 +105,8 @@ lazy val publishSettings = Seq(
 
 lazy val cass3Settings = Seq(
   version := usingMajorVersion("2"),
+  scalaVersion := "2.12.1",
+  crossScalaVersions := Seq("2.12.1", "2.11.8", "2.10.6"),
   libraryDependencies ++= Seq(
     "com.datastax.cassandra" % "cassandra-driver-core" % "3.1.0" classifier "shaded" excludeAll ExclusionRule("com.google.guava", "guava"),
     "com.datastax.cassandra" % "cassandra-driver-extras" % "3.1.0" excludeAll (ExclusionRule("com.datastax.cassandra", "cassandra-driver-core"), ExclusionRule("com.google.guava", "guava")),
@@ -116,6 +116,8 @@ lazy val cass3Settings = Seq(
 
 lazy val cass21Settings = Seq(
   version := usingMajorVersion("1"),
+  scalaVersion := "2.11.8",
+  crossScalaVersions := Seq("2.11.8", "2.10.6"),
   libraryDependencies ++= Seq(
     "com.datastax.cassandra" % "cassandra-driver-core" % "2.1.10.2" classifier "shaded" excludeAll ExclusionRule("com.google.guava", "guava"),
     "org.cassandraunit" % "cassandra-unit" % "2.2.2.1" % "test"
