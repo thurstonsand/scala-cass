@@ -13,9 +13,9 @@ you can read and write data more conveniently.
 
 [you can find it on bintray](https://bintray.com/thurstonsand/maven/scalacass).
 
-Supports **scala 2.10** and **scala 2.11** and
+Supports **Scala 2.10**, **Scala 2.11**, and **Scala 2.12** and
 
-* Cassandra 2.1 on Java 7
+* Cassandra 2.1 on Java 7 (minus Scala 2.12)
 * Cassandra 3.0+ on Java 8
 
 #### SBT
@@ -31,13 +31,13 @@ Add the appropriate version of the library
 ##### Cassandra 3.0+ with Java 8
 
 ```scala
-libraryDependencies += "com.github.thurstonsand" %% "scalacass" % "2.0.0"
+libraryDependencies += "com.github.thurstonsand" %% "scalacass" % "2.1.0"
 ```
 
 ##### Cassandra 2.1 with Java 7
 
 ```scala
-libraryDependencies += "com.github.thurstonsand" %% "scalacass" % "1.0.0"
+libraryDependencies += "com.github.thurstonsand" %% "scalacass" % "1.1.0"
 ```
 
 #### Maven
@@ -60,7 +60,7 @@ Pick a version
 
 ```xml
 <properties>
-    <scalaCass.version>2.0.0</scalaCassVersion>
+    <scalaCass.version>2.1.0</scalaCassVersion>
 </properties>
 ```
 
@@ -68,7 +68,7 @@ Pick a version
 
 ```xml
 <properties>
-    <scalaCass.version>1.0.0</scalaCassVersion>
+    <scalaCass.version>1.1.0</scalaCassVersion>
 </properties>
 ```
 

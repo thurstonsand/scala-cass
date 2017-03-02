@@ -31,7 +31,7 @@ def addUnmanagedSourceDirsFrom(folder: String) = {
   Seq(addSourceFilesTo(Compile), addSourceFilesTo(Test))
 }
 
-def usingMajorVersion(mVersion: String) = s"$mVersion.0.0"
+def usingMajorVersion(mVersion: String) = s"$mVersion.1.0"
 
 lazy val commonSettings = Seq(
   organization := "com.github.thurstonsand",
