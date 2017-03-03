@@ -5,6 +5,7 @@ enable_cassandra_2=-1
 enable_cassandra_3=-1
 enable_jekyll=1
 clean_workspace=0
+publish=0
 
 function help {
   echo "how to use:"
@@ -14,6 +15,7 @@ function help {
   echo "no option: compile cassandra 2 and cassandra 3 docs, then combine them"
   echo "-x -- disable start up of jekyll at the end of the script"
   echo "-c -- clean the workspace first"
+  echo "-p -- publish the microsite instead of opening in local instance"
   echo "-h -- print out this message"
   echo "use one of:"
   echo "  -0 -- only combine existing docs"
@@ -30,7 +32,7 @@ function in_right_location {
   fi
 }
 function parse_inputs {
-  while getopts ":023xch" opt; do
+  while getopts ":023xcph" opt; do
     case $opt in
       0)
         enable_cassandra_2=0
@@ -49,6 +51,10 @@ function parse_inputs {
         ;;
       c)
         clean_workspace=1
+        ;;
+      p)
+        publish=1
+        enable_jekyll=0
         ;;
       h)
         help
@@ -151,6 +157,11 @@ function run_jekyll {
   jekyll serve -s docs/root/target/jekyll/
 }
 
+function publish_site {
+  echo "publishing docs"
+  sbt "docs/clean" "docs/publishMicrosite"
+}
+
 old_j_version=$(jenv local) 2>/dev/null
 old_j_version=${old_j_version:-$(jenv global)}
 
@@ -173,9 +184,13 @@ if [[ enable_cassandra_3 -gt 0 ]]; then
   run_cassandra 1.8 2.12 3
 fi
 
-compile_results
+if [[ publish -gt 0 ]]; then
+  publish_site
+else
+  compile_results
 
-if [[ enable_jekyll -gt 0 ]]; then
-  run_jekyll
+  if [[ enable_jekyll -gt 0 ]]; then
+    run_jekyll
+  fi
 fi
 jenv local $old_j_version

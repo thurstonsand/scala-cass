@@ -11,7 +11,7 @@ you can read and write data more conveniently.
 
 # Getting Scala-Cass
 
-[you can find it on bintray](https://bintray.com/thurstonsand/maven/scalacass).
+[you can find it on bintray](https://bintray.com/thurstonsand/maven/scala-cass).
 
 Supports **Scala 2.10**, **Scala 2.11**, and **Scala 2.12** and
 
