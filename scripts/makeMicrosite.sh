@@ -106,7 +106,8 @@ function wait_for_cassandra {
 
 function run_cassandra {
   local j_version=$1
-  local folder_ext=$2
+  local scala_version=$2
+  local folder_ext=$3
 
   jenv local $j_version
   if [[ -z $(java -version 2>&1 | grep $j_version) ]]; then
@@ -137,7 +138,7 @@ function run_cassandra {
   unset cass_pid
   trap - INT TERM EXIT
   rm -rf docs/root/src/main/tut/cass$folder_ext
-  cp -r "docs/cass$folder_ext/target/scala-2.11/resource_managed/main/jekyll/cass$folder_ext" docs/root/src/main/tut/
+  cp -r "docs/cass$folder_ext/target/scala-$scala_version/resource_managed/main/jekyll/cass$folder_ext" docs/root/src/main/tut/
 }
 
 function compile_results {
@@ -162,15 +163,14 @@ if [[ enable_cassandra_2 -gt 0 ]]; then
   setup_cassandra "2.1.9"
   clear_cassandra
 
-  run_cassandra 1.7 21
+  run_cassandra 1.7 2.11 21
 fi
 
 if [[ enable_cassandra_3 -gt 0 ]]; then
   setup_cassandra "3.0.9"
   clear_cassandra
 
-  run_cassandra 1.8 3
-#  run_cassandra_30
+  run_cassandra 1.8 2.12 3
 fi
 
 compile_results
