@@ -7,15 +7,15 @@ import shapeless.{::, Generic, HList, HNil, Lazy}
 abstract class DerivedTupleCassFormatDecoder[T] extends TupleCassFormatDecoder[T]
 
 object DerivedTupleCassFormatDecoder {
-  implicit val hNilDecoder = new DerivedTupleCassFormatDecoder[HNil] {
+  implicit val hNilDecoder: DerivedTupleCassFormatDecoder[HNil] = new DerivedTupleCassFormatDecoder[HNil] {
     def decode(tup: TupleValue, n: Int) = {
       val arity = tup.getType.getComponentTypes.size
-      if (arity != n) Left(new InvalidTypeException(s"tuple of wrong arity: expecting arity of $n but found $arity"))
+      if (arity !== n) Left(new InvalidTypeException(s"tuple of wrong arity: expecting arity of $n but found $arity"))
       else Right(HNil)
     }
   }
 
-  implicit def hConsDecoder[H, T <: HList](implicit tdH: CassFormatDecoder[H], tdT: DerivedTupleCassFormatDecoder[T]) =
+  implicit def hConsDecoder[H, T <: HList](implicit tdH: CassFormatDecoder[H], tdT: DerivedTupleCassFormatDecoder[T]): DerivedTupleCassFormatDecoder[::[H, T]] =
     new DerivedTupleCassFormatDecoder[H :: T] {
 
       def decode(tup: TupleValue, n: Int) = for {

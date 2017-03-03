@@ -15,7 +15,6 @@ private[scalacass] sealed trait QueryBuildingBlock {
 private[scalacass] object QueryBuildingBlock {
   import SCStatement.RightBiasedEither
 
-  @SuppressWarnings(Array("org.brianmckenna.wartremover.warts.Any"))
   def namedEncode[A](toEncode: A)(implicit encoder: CCCassFormatEncoder[A]): Result[(List[String], List[AnyRef])] =
     encoder.encodeWithName(toEncode).right.map { e =>
       val strList = List.newBuilder[String]
@@ -31,7 +30,6 @@ private[scalacass] object QueryBuildingBlock {
       (strList.result, anyrefList.result)
     }
 
-  @SuppressWarnings(Array("org.brianmckenna.wartremover.warts.Any"))
   def queryEncode[A](toEncode: A)(implicit encoder: CCCassFormatEncoder[A]): Result[(List[String], List[AnyRef])] =
     encoder.encodeWithQuery(toEncode).right.map { e =>
       val strList = List.newBuilder[String]

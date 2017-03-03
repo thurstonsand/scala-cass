@@ -58,14 +58,14 @@ trait SCStatement[Response] extends Product with Serializable {
   }
 
   protected def replaceqWithValue(repr: String, values: List[AnyRef]): String = values.foldLeft(repr) { case (r, v) => r.replaceFirst("\\?", v.toString) }
-  override def toString: String = buildQuery.fold("problem generating statement: " + _, query => s"${getClass.getSimpleName}(${(replaceqWithValue _).tupled(query)})")
+  override def toString: String = buildQuery.fold(ex => s"problem generating statement: $ex", query => s"${getClass.getSimpleName}(${(replaceqWithValue _).tupled(query)})")
 }
 
 final case class SCInsertStatement private (
     private val preableBlock: Preamble,
     private val insertBlock: QueryBuildingBlock,
-    private val ifBlock: If = If.NoConditional,
-    private val usingBlock: TTLTimestamp = TTLTimestamp.Neither
+    private val ifBlock: If,
+    private val usingBlock: TTLTimestamp
 )(implicit protected val sSession: ScalaSession) extends SCStatement[ResultSet] with SCBatchStatement.Batchable {
   def ifNotExists: SCInsertStatement = copy(ifBlock = If.IfNotExists)
   def noConditional: SCInsertStatement = copy(ifBlock = If.NoConditional)
@@ -81,15 +81,15 @@ final case class SCInsertStatement private (
 }
 object SCInsertStatement {
   def apply[I: CCCassFormatEncoder](keyspace: String, table: String, insertable: I, sSession: ScalaSession) =
-    new SCInsertStatement(Preamble("INSERT INTO", keyspace, table), CCBlockInsert(insertable))(sSession)
+    new SCInsertStatement(Preamble("INSERT INTO", keyspace, table), CCBlockInsert(insertable), If.NoConditional, TTLTimestamp.Neither)(sSession)
 }
 
 final case class SCUpdateStatement private (
     private val preamble: Preamble,
     private val updateBlock: QueryBuildingBlock,
     private val whereBlock: QueryBuildingBlock,
-    private val usingBlock: TTLTimestamp = TTLTimestamp.Neither,
-    private val ifBlock: If = If.NoConditional
+    private val usingBlock: TTLTimestamp,
+    private val ifBlock: If
 )(implicit protected val sSession: ScalaSession) extends SCStatement[ResultSet] with SCBatchStatement.Batchable with SCUpdateStatementVersionSpecific {
   def ifExists: SCUpdateStatement = copy(ifBlock = If.IfExists)
   def `if`[A: CCCassFormatEncoder](statement: A): SCUpdateStatement = copy(ifBlock = If.IfStatement(statement))
@@ -106,14 +106,14 @@ final case class SCUpdateStatement private (
 }
 object SCUpdateStatement {
   def apply[U: CCCassFormatEncoder, Q: CCCassFormatEncoder](keyspace: String, table: String, updateable: U, where: Q, sSession: ScalaSession) =
-    new SCUpdateStatement(Preamble("UPDATE", keyspace, table), CCBlockUpdate(updateable), CCBlockWhere(where))(sSession)
+    new SCUpdateStatement(Preamble("UPDATE", keyspace, table), CCBlockUpdate(updateable), CCBlockWhere(where), TTLTimestamp.Neither, If.NoConditional)(sSession)
 }
 
 final case class SCDeleteStatement private (
     private val deleteBlock: QueryBuildingBlock,
     private val whereBlock: QueryBuildingBlock,
-    private val usingBlock: TTLTimestamp = TTLTimestamp.Neither,
-    private val ifBlock: If = If.NoConditional
+    private val usingBlock: TTLTimestamp,
+    private val ifBlock: If
 )(implicit protected val sSession: ScalaSession) extends SCStatement[ResultSet] with SCBatchStatement.Batchable {
   protected def mkResponse(rs: ResultSet): ResultSet = rs
 
@@ -129,12 +129,12 @@ final case class SCDeleteStatement private (
 }
 object SCDeleteStatement {
   def apply[D: CCCassFormatEncoder, Q: CCCassFormatEncoder](keyspace: String, table: String, where: Q, sSession: ScalaSession) =
-    new SCDeleteStatement(CCBlockDelete[D](Preamble("DELETE", keyspace, table)), CCBlockWhere(where))(sSession)
+    new SCDeleteStatement(CCBlockDelete[D](Preamble("DELETE", keyspace, table)), CCBlockWhere(where), TTLTimestamp.Neither, If.NoConditional)(sSession)
 }
 
 abstract class SCSelectStatement[F[_]](
     private val _mkResponse: ResultSet => F[Row],
-    private val limitBlock: Limit = Limit.NoLimit
+    private val limitBlock: Limit
 ) extends SCStatement[F[Row]] {
   implicit protected def sSession: ScalaSession
   protected def selectBlock: QueryBuildingBlock
@@ -148,7 +148,7 @@ abstract class SCSelectStatement[F[_]](
 final case class SCSelectOneStatement(
     protected val selectBlock: QueryBuildingBlock,
     protected val whereBlock: QueryBuildingBlock,
-    protected val filteringBlock: Filtering = Filtering.NoFiltering
+    protected val filteringBlock: Filtering
 )(implicit protected val sSession: ScalaSession) extends SCSelectStatement[Option](SCSelectStatement.mkOptionResponse, Limit.LimitN(1)) {
   def allowFiltering: SCSelectOneStatement = copy(filteringBlock = Filtering.AllowFiltering)
   def noAllowFiltering: SCSelectOneStatement = copy(filteringBlock = Filtering.NoFiltering)
@@ -157,8 +157,8 @@ final case class SCSelectOneStatement(
 final case class SCSelectItStatement(
     protected val selectBlock: QueryBuildingBlock,
     protected val whereBlock: QueryBuildingBlock,
-    protected val filteringBlock: Filtering = Filtering.NoFiltering,
-    private val limitBlock: Limit = Limit.NoLimit
+    protected val filteringBlock: Filtering,
+    private val limitBlock: Limit
 )(implicit protected val sSession: ScalaSession) extends SCSelectStatement[Iterator](SCSelectStatement.mkIteratorResponse, limitBlock) {
   def limit(n: Int): SCSelectItStatement = copy(limitBlock = Limit.LimitN(n))
   def noLimit: SCSelectItStatement = copy(limitBlock = Limit.NoLimit)
@@ -175,10 +175,10 @@ object SCSelectStatement {
   def mkOptionResponse(rs: ResultSet): Option[Row] = Option(rs.one())
 
   def apply[S: CCCassFormatEncoder, Q: CCCassFormatEncoder](keyspace: String, table: String, where: Q, sSession: ScalaSession) =
-    SCSelectItStatement(CCBlockSelect[S](Preamble("SELECT", keyspace, table)), CCBlockWhere(where))(sSession)
+    SCSelectItStatement(CCBlockSelect[S](Preamble("SELECT", keyspace, table)), CCBlockWhere(where), Filtering.NoFiltering, Limit.NoLimit)(sSession)
 
   def applyOne[S: CCCassFormatEncoder, Q: CCCassFormatEncoder](keyspace: String, table: String, where: Q, sSession: ScalaSession) =
-    SCSelectOneStatement(CCBlockSelect[S](Preamble("SELECT", keyspace, table)), CCBlockWhere(where))(sSession)
+    SCSelectOneStatement(CCBlockSelect[S](Preamble("SELECT", keyspace, table)), CCBlockWhere(where), Filtering.NoFiltering)(sSession)
 }
 
 trait SCRaw[Response] extends SCStatement[Response] {
@@ -231,7 +231,7 @@ object SCDropKeyspaceStatement {
 
 final case class SCCreateTableStatement private (
     private val createTable: QueryBuildingBlock,
-    private val tableProperties: TableProperties = TableProperties.NoProperties
+    private val tableProperties: TableProperties
 )(implicit protected val sSession: ScalaSession) extends SCStatement[ResultSet] {
   protected def mkResponse(rs: ResultSet): ResultSet = rs
 
@@ -241,7 +241,7 @@ final case class SCCreateTableStatement private (
 }
 object SCCreateTableStatement {
   def apply[T: CCCassFormatEncoder](keyspace: String, name: String, numPartitionKeys: Int, numClusteringKeys: Int, sSession: ScalaSession): SCCreateTableStatement =
-    new SCCreateTableStatement(CreateTable(keyspace, name, numPartitionKeys, numClusteringKeys))(sSession)
+    new SCCreateTableStatement(CreateTable(keyspace, name, numPartitionKeys, numClusteringKeys), TableProperties.NoProperties)(sSession)
 }
 final case class SCTruncateTableStatement private (
     private val truncateTableBlock: TruncateTable
@@ -266,8 +266,8 @@ object SCDropTableStatement {
 
 final case class SCBatchStatement private (
     private val statements: List[SCStatement.SCBatchableStatement],
-    private val usingBlock: TTLTimestamp = TTLTimestamp.Neither,
-    private val batchType: BatchStatement.Type = BatchStatement.Type.LOGGED
+    private val usingBlock: TTLTimestamp,
+    private val batchType: BatchStatement.Type
 )(implicit protected val sSession: ScalaSession) extends SCStatement[ResultSet] {
   import SCStatement.{RightBiasedEither, resultSetFutureToScalaFuture, SCBatchableStatement}
   import SCBatchStatement.ListEitherTraverse
@@ -286,7 +286,7 @@ final case class SCBatchStatement private (
      |""".stripMargin
     values = tup.flatMap(_._2)
   } yield s"${getClass.getSimpleName}(${replaceqWithValue(fullQuery, values)})")
-    .valueOr("problem generating statement: " + _)
+    .valueOr(ex => s"problem generating statement: $ex")
 
   private def mkBatch: Result[BatchStatement] = statements.traverseU(_.asBatch).map { ss =>
     import scala.collection.JavaConverters._
@@ -311,7 +311,8 @@ object SCBatchStatement {
     def asBatch: Result[BoundStatement] = prepare
   }
 
-  def apply(statements: List[SCStatement.SCBatchableStatement], sSession: ScalaSession): SCBatchStatement = new SCBatchStatement(statements)(sSession)
+  def apply(statements: List[SCStatement.SCBatchableStatement], sSession: ScalaSession): SCBatchStatement =
+    new SCBatchStatement(statements, TTLTimestamp.Neither, BatchStatement.Type.LOGGED)(sSession)
 
   // should be `private`, but the compiler thinks this is not being used (which it is), so setting to `protected` to work around bug
   protected implicit class ListEitherTraverse[LV](val list: List[LV]) extends AnyVal {
@@ -319,10 +320,10 @@ object SCBatchStatement {
       val builder = List.newBuilder[R]
 
       @scala.annotation.tailrec
-      def trav(l: List[LV]): Either[L, List[R]] = l.headOption.map(f) match {
-        case Some(Left(f)) => Left(f)
+      def trav(li: List[LV]): Either[L, List[R]] = li.headOption.map(f) match {
+        case Some(Left(l)) => Left(l)
         case Some(Right(r)) =>
-          builder += r; trav(l.tail)
+          builder += r; trav(li.tail)
         case None => Right(builder.result)
       }
       trav(list)

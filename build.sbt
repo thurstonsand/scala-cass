@@ -12,12 +12,10 @@ lazy val codeLinterSettings = {
 
     wartremoverWarnings in (Compile, compile) := Seq.empty,
     wartremoverWarnings in (Compile, compile) ++= Seq(
-      Wart.Any, Wart.Any2StringAdd,
-      Wart.EitherProjectionPartial, Wart.ListOps,
-      Wart.Null, Wart.OptionPartial,
-      Wart.Product, Wart.Return, Wart.Serializable,
-      Wart.TryPartial, Wart.Var,
-      Wart.Enumeration, Wart.FinalCaseClass, Wart.JavaConversions),
+      Wart.AsInstanceOf, Wart.DefaultArguments, Wart.EitherProjectionPartial, Wart.Enumeration, Wart.Equals,
+      Wart.ExplicitImplicitTypes, Wart.FinalVal, Wart.IsInstanceOf, Wart.JavaConversions, Wart.LeakingSealed,
+      Wart.Null, Wart.OptionPartial, Wart.Product,
+      Wart.Return, Wart.Serializable, Wart.StringPlusAny, Wart.TryPartial, Wart.Var, Wart.While),
     wartremoverWarnings in (Compile, console) := Seq.empty
   )
 }
@@ -33,12 +31,10 @@ def addUnmanagedSourceDirsFrom(folder: String) = {
   Seq(addSourceFilesTo(Compile), addSourceFilesTo(Test))
 }
 
-def usingMajorVersion(mVersion: String) = s"$mVersion.0.0"
+def usingMajorVersion(mVersion: String) = s"$mVersion.1.0"
 
 lazy val commonSettings = Seq(
   organization := "com.github.thurstonsand",
-  scalaVersion := "2.11.8",
-  crossScalaVersions := Seq("2.11.8", "2.10.6"),
   scalacOptions ++= Seq(
     "-deprecation",
     "-encoding", "UTF-8",
@@ -63,10 +59,9 @@ lazy val commonSettings = Seq(
     "org.joda" % "joda-convert" % "1.8.1" % "provided", // Intellij does not like "compile-internal, test-internal", use "provided" instead
     "org.slf4j" % "slf4j-api" % "1.7.21" % "provided", // Intellij does not like "compile-internal, test-internal", use "provided" instead
     "joda-time" % "joda-time" % "2.9.4",
-    "com.chuusai" %% "shapeless" % "2.3.1",
+    "com.chuusai" %% "shapeless" % "2.3.2",
     "com.google.guava" % "guava" % "19.0",
-    "org.scalatest" %% "scalatest" % "3.0.0" % "test",
-    "com.whisk" %% "docker-testkit-scalatest" % "0.9.0-M5" % "test"
+    "org.scalatest" %% "scalatest" % "3.0.0" % "test"
   ),
   initialize := {
     CrossVersion.partialVersion(scalaVersion.value) match {
@@ -110,6 +105,8 @@ lazy val publishSettings = Seq(
 
 lazy val cass3Settings = Seq(
   version := usingMajorVersion("2"),
+  scalaVersion := "2.12.1",
+  crossScalaVersions := Seq("2.12.1", "2.11.8", "2.10.6"),
   libraryDependencies ++= Seq(
     "com.datastax.cassandra" % "cassandra-driver-core" % "3.1.0" classifier "shaded" excludeAll ExclusionRule("com.google.guava", "guava"),
     "com.datastax.cassandra" % "cassandra-driver-extras" % "3.1.0" excludeAll (ExclusionRule("com.datastax.cassandra", "cassandra-driver-core"), ExclusionRule("com.google.guava", "guava")),
@@ -119,6 +116,8 @@ lazy val cass3Settings = Seq(
 
 lazy val cass21Settings = Seq(
   version := usingMajorVersion("1"),
+  scalaVersion := "2.11.8",
+  crossScalaVersions := Seq("2.11.8", "2.10.6"),
   libraryDependencies ++= Seq(
     "com.datastax.cassandra" % "cassandra-driver-core" % "2.1.10.2" classifier "shaded" excludeAll ExclusionRule("com.google.guava", "guava"),
     "org.cassandraunit" % "cassandra-unit" % "2.2.2.1" % "test"

@@ -6,7 +6,7 @@ import shapeless.{::, HList, HNil, LabelledGeneric, Lazy, Witness}
 abstract class DerivedCCCassFormatEncoder[F] extends CCCassFormatEncoder[F]
 
 object DerivedCCCassFormatEncoder {
-  implicit val hNilEncoder = new DerivedCCCassFormatEncoder[HNil] {
+  implicit val hNilEncoder: DerivedCCCassFormatEncoder[HNil] = new DerivedCCCassFormatEncoder[HNil] {
     def encodeWithName(f: HNil) = Right(Nil)
     def encodeWithQuery(f: HNil) = Right(Nil)
 
@@ -14,7 +14,7 @@ object DerivedCCCassFormatEncoder {
     val types = Nil
   }
 
-  implicit def hConsEncoder[K <: Symbol, H, T <: HList](implicit w: Witness.Aux[K], tdH: Lazy[CassFormatEncoder[H]], tdT: Lazy[DerivedCCCassFormatEncoder[T]]) =
+  implicit def hConsEncoder[K <: Symbol, H, T <: HList](implicit w: Witness.Aux[K], tdH: Lazy[CassFormatEncoder[H]], tdT: Lazy[DerivedCCCassFormatEncoder[T]]): DerivedCCCassFormatEncoder[FieldType[K, H] :: T] =
     new DerivedCCCassFormatEncoder[FieldType[K, H] :: T] {
       def encodeWithName(f: FieldType[K, H] :: T) = for {
         h <- tdH.value.encode(f.head).right

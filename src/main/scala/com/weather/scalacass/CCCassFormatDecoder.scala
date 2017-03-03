@@ -7,11 +7,11 @@ import shapeless.{::, HList, HNil, LabelledGeneric, Lazy, Witness}
 abstract class DerivedCCCassFormatDecoder[T] extends CCCassFormatDecoder[T]
 
 object DerivedCCCassFormatDecoder {
-  implicit val hNilDecoder = new DerivedCCCassFormatDecoder[HNil] {
-    def decode(r: Row) = Right(HNil)
+  implicit val hNilDecoder: DerivedCCCassFormatDecoder[HNil] = new DerivedCCCassFormatDecoder[HNil] {
+    def decode(r: Row): Result[HNil] = Right(HNil)
   }
 
-  implicit def hConsDecoder[K <: Symbol, H, T <: HList](implicit w: Witness.Aux[K], tdH: Lazy[CassFormatDecoder[H]], tdT: Lazy[DerivedCCCassFormatDecoder[T]]) =
+  implicit def hConsDecoder[K <: Symbol, H, T <: HList](implicit w: Witness.Aux[K], tdH: Lazy[CassFormatDecoder[H]], tdT: Lazy[DerivedCCCassFormatDecoder[T]]): DerivedCCCassFormatDecoder[FieldType[K, H] :: T] =
     new DerivedCCCassFormatDecoder[FieldType[K, H] :: T] {
       def decode(r: Row) = for {
         h <- tdH.value.decode(r, w.value.name.toString).right
