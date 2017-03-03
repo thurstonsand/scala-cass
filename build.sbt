@@ -31,7 +31,7 @@ def addUnmanagedSourceDirsFrom(folder: String) = {
   Seq(addSourceFilesTo(Compile), addSourceFilesTo(Test))
 }
 
-def usingMajorVersion(mVersion: String) = s"$mVersion.1.0"
+def usingMajorVersion(mVersion: String) = s"$mVersion.1.1"
 
 lazy val commonSettings = Seq(
   organization := "com.github.thurstonsand",
@@ -130,7 +130,7 @@ lazy val micrositeSettings = Seq(
   micrositeDescription := "Java Cassandra Driver Bindings for Friendlier Scala",
   micrositeGithubOwner := "thurstonsand",
   micrositeGithubRepo := "scala-cass",
-  micrositeBaseUrl := "scala-cass",
+  micrositeBaseUrl := sys.props.getOrElse("microsite.baseurl", "scala-cass"),
   //micrositeHomepage := "https://github.com/thurstonsand",
   micrositeImgDirectory := baseDirectory.value / "imgs",
   micrositeCssDirectory := baseDirectory.value / "css",

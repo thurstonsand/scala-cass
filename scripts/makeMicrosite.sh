@@ -149,7 +149,7 @@ function run_cassandra {
 
 function compile_results {
   echo "compiling docs"
-  sbt "docs/clean" "docs/makeMicrosite"
+  sbt -Dmicrosite.baseurl="" "docs/clean" "docs/makeMicrosite"
 }
 
 function run_jekyll {

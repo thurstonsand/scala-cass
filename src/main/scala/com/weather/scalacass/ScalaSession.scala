@@ -84,42 +84,42 @@ final case class ScalaSession(keyspace: String)(implicit val session: Session) {
   def update[U: CCCassFormatEncoder, Q: CCCassFormatEncoder](table: String, updateable: U, query: Q): SCUpdateStatement =
     SCUpdateStatement(keyspace, table, updateable, query, this)
 
-  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
-  def delete[D] = dh.asInstanceOf[DeleteHelper[D]]
-  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
-  def deleteRow = dh.asInstanceOf[DeleteHelper[NoQuery]]
-  private[this] val dh = new DeleteHelper[Nothing]
-
-  final class DeleteHelper[D] {
-    def apply[Q: CCCassFormatEncoder](table: String, where: Q)(implicit dEncoder: CCCassFormatEncoder[D]): SCDeleteStatement =
-      SCDeleteStatement[D, Q](keyspace, table, where, ScalaSession.this)
+  object delete {
+    @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+    def apply[D] = partiallyApplied.asInstanceOf[PartiallyApplied[D]]
+    final class PartiallyApplied[D] {
+      def apply[Q: CCCassFormatEncoder](table: String, where: Q)(implicit dEncoder: CCCassFormatEncoder[D]): SCDeleteStatement =
+        SCDeleteStatement[D, Q](keyspace, table, where, ScalaSession.this)
+    }
+    private val partiallyApplied = new PartiallyApplied[Nothing]
   }
+  def deleteRow = delete[NoQuery]
 
   def batch(batches: List[SCStatement.SCBatchableStatement]): SCBatchStatement = SCBatchStatement(batches, this)
   def batchOf(batch: SCStatement.SCBatchableStatement, batches: SCStatement.SCBatchableStatement*): SCBatchStatement =
     SCBatchStatement((batch +: batches).toList, this)
 
-  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
-  def select[S] = sh.asInstanceOf[SelectHelper[S]]
-  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
-  def selectStar = sh.asInstanceOf[SelectHelper[Star]]
-  private[this] val sh = new SelectHelper[Nothing]
-
-  final class SelectHelper[S] {
-    def apply[Q: CCCassFormatEncoder](table: String, where: Q)(implicit sEncoder: CCCassFormatEncoder[S]): SCSelectItStatement =
-      SCSelectStatement.apply[S, Q](keyspace, table, where, ScalaSession.this)
+  object select {
+    @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+    def apply[S] = partiallyApplied.asInstanceOf[PartiallyApplied[S]]
+    final class PartiallyApplied[S] {
+      def apply[Q: CCCassFormatEncoder](table: String, where: Q)(implicit sEncoder: CCCassFormatEncoder[S]): SCSelectItStatement =
+        SCSelectStatement.apply[S, Q](keyspace, table, where, ScalaSession.this)
+    }
+    private val partiallyApplied = new PartiallyApplied[Nothing]
   }
+  def selectStar = select[Star]
 
-  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
-  def selectOne[S] = soh.asInstanceOf[SelectOneHelper[S]]
-  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
-  def selectOneStar = soh.asInstanceOf[SelectOneHelper[Star]]
-  private[this] val soh = new SelectOneHelper[Nothing]
-
-  final class SelectOneHelper[S] {
-    def apply[Q: CCCassFormatEncoder](table: String, where: Q)(implicit sEncoder: CCCassFormatEncoder[S]): SCSelectOneStatement =
-      SCSelectStatement.applyOne[S, Q](keyspace, table, where, ScalaSession.this)
+  object selectOne {
+    @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+    def apply[S] = partiallyApplied.asInstanceOf[PartiallyApplied[S]]
+    final class PartiallyApplied[S] {
+      def apply[Q: CCCassFormatEncoder](table: String, where: Q)(implicit sEncoder: CCCassFormatEncoder[S]): SCSelectOneStatement =
+        SCSelectStatement.applyOne[S, Q](keyspace, table, where, ScalaSession.this)
+    }
+    private val partiallyApplied = new PartiallyApplied[Nothing]
   }
+  def selectOneStar = selectOne[Star]
 
   def rawStatement(query: String, anyrefArgs: AnyRef*): SCRawStatement =
     SCRaw.apply(query, anyrefArgs.toList, this)
