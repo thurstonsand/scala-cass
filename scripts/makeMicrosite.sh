@@ -11,16 +11,16 @@ function help {
   echo "how to use:"
   echo "must be run from project home (same level as build.sbt file)."
   echo "first time running will download cassandra binaries. This will require an internet connection"
-  echo "options:"
-  echo "no option: compile cassandra 2 and cassandra 3 docs, then combine them"
-  echo "-x -- disable start up of jekyll at the end of the script"
-  echo "-c -- clean the workspace first"
-  echo "-p -- publish the microsite instead of opening in local instance"
-  echo "-h -- print out this message"
-  echo "use one of:"
+  echo "must use one of:"
   echo "  -0 -- only combine existing docs"
-  echo "  -2 -- only compile cassandra 2 and combine with old cassandra 3 docs"
-  echo "  -3 -- only compile cassandra 3 and combine with old cassandra 2 docs"
+  echo "  -2 -- compile cassandra 2 docs"
+  echo "  -3 -- compile cassandra 3 docs"
+  echo "  -23 -- compile cassandra 2 and 3 docs"
+  echo "  -h -- print out this message"
+  echo "may optionally include any of:"
+  echo "  -x -- disable start up of jekyll at the end of the script"
+  echo "  -c -- clean the workspace first"
+  echo "  -p -- publish the microsite instead of starting jekyll"
   exit 1
 }
 
@@ -40,10 +40,8 @@ function parse_inputs {
         ;;
       2)
         enable_cassandra_2=1
-        enable_cassandra_3=0
         ;;
       3)
-        enable_cassandra_2=0
         enable_cassandra_3=1
         ;;
       x)
@@ -69,10 +67,12 @@ function parse_inputs {
         ;;
     esac
   done
-  if [[ enable_cassandra_2 -eq -1 || enable_cassandra_3 -eq -1 ]]; then
-    enable_cassandra_2=1
-    enable_cassandra_3=1
-    clean_workspace=1
+  if [[ $enable_cassandra_2 -ne -1 && $enable_cassandra_3 -eq -1 ]]; then
+    enable_cassandra_3=0
+  elif [[ $enable_cassandra_2 -eq -1 && $enable_cassandra_3 -ne -1 ]]; then
+    enable_cassandra_2=0
+  elif [[ $enable_cassandra_2 -eq -1 && $enable_cassandra_3 -eq -1 ]]; then
+    help
   fi
 }
 
@@ -115,12 +115,7 @@ function run_cassandra {
   local scala_version=$2
   local folder_ext=$3
 
-  jenv local $j_version
-  if [[ -z $(java -version 2>&1 | grep $j_version) ]]; then
-    echo "java version was not set successfully. Must have jenv installed and working correctly" $(java -version 2>1 | grep $j_version)
-    jenv local $old_j_version
-    exit 1
-  fi
+  sh ./scripts/util/change_j_version.sh $j_version
 
   if ./$cassandra_path/bin/nodetool status 2>/dev/null | grep "^UN" >/dev/null; then
     echo "a version of cassandra is already running. you must stop that instance first"
@@ -162,8 +157,7 @@ function publish_site {
   sbt "docs/clean" "docs/publishMicrosite"
 }
 
-old_j_version=$(jenv local) 2>/dev/null
-old_j_version=${old_j_version:-$(jenv global)}
+old_j_version=$(sh ./scripts/util/change_j_version.sh)
 
 mkdir -p cassandra-docs
 
@@ -193,4 +187,4 @@ else
     run_jekyll
   fi
 fi
-jenv local $old_j_version
+sh ./scripts/util/change_j_version.sh $old_j_version

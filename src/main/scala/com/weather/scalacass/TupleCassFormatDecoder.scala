@@ -2,7 +2,7 @@ package com.weather.scalacass
 
 import com.datastax.driver.core.TupleValue
 import com.datastax.driver.core.exceptions.InvalidTypeException
-import shapeless.{::, Generic, HList, HNil, Lazy}
+import shapeless.{::, Generic, HList, HNil, IsTuple, Lazy}
 
 abstract class DerivedTupleCassFormatDecoder[T] extends TupleCassFormatDecoder[T]
 
@@ -24,7 +24,7 @@ object DerivedTupleCassFormatDecoder {
       } yield h :: t
     }
 
-  implicit def tupleDecoder[T <: Product, Repr <: HList](implicit gen: Generic.Aux[T, Repr], hListDecoder: DerivedTupleCassFormatDecoder[Repr]): DerivedTupleCassFormatDecoder[T] =
+  implicit def tupleDecoder[T <: Product: IsTuple, Repr <: HList](implicit gen: Generic.Aux[T, Repr], hListDecoder: DerivedTupleCassFormatDecoder[Repr]): DerivedTupleCassFormatDecoder[T] =
     new DerivedTupleCassFormatDecoder[T] {
       def decode(tup: TupleValue, n: Int): Result[T] = {
         hListDecoder.decode(tup, n).right.map(gen.from)
