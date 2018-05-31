@@ -3,8 +3,8 @@ sudo: false
 
 language: scala
 scala:
-  - 2.12.1
-  - 2.11.8
+  - 2.12.6
+  - 2.11.12
   - 2.10.6
 
 jdk:
@@ -13,7 +13,7 @@ jdk:
 
 matrix:
   exclude:
-    - scala: 2.12.1
+    - scala: 2.12.6
       jdk: oraclejdk7
 
 before_cache:
