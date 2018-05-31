@@ -59,8 +59,8 @@ private[scalacass] object QueryBuildingBlock {
   }
 
   sealed trait TTLTimestamp extends QueryBuildingBlock {
-    def updateWith(ttl: Int): TTLTimestamp = TTLTimestamp(this, ttl)
-    def updateWith(ts: Option[Long]): TTLTimestamp = TTLTimestamp(this, ts)
+    def updateTTLWith(ttl: Int): TTLTimestamp = TTLTimestamp.addTTL(this, ttl)
+    def updateTimestampWith(ts: Long): TTLTimestamp = TTLTimestamp.addTS(this, ts)
     def removeTTL: TTLTimestamp = TTLTimestamp.removeTTL(this)
     def removeTimestamp: TTLTimestamp = TTLTimestamp.removeTimestamp(this)
   }
@@ -73,29 +73,26 @@ private[scalacass] object QueryBuildingBlock {
       def valueRepr: Result[List[AnyRef]] = CassFormatEncoder[Int].encode(ttl).map(_ :: Nil)
     }
 
-    final case class Timestamp(ts: Option[Long]) extends TTLTimestamp {
-      def strRepr: Result[String] = Right(" USING TIMESTAMP" + (if (ts.isEmpty) "" else " ?"))
-      def valueRepr: Result[List[AnyRef]] = ts match {
-        case Some(_ts) => CassFormatEncoder[Long].encode(_ts).map(_ :: Nil)
-        case None      => Right(Nil)
-      }
+    final case class Timestamp(ts: Long) extends TTLTimestamp {
+      def strRepr: Result[String] = Right(" USING TIMESTAMP ?")
+      def valueRepr: Result[List[AnyRef]] = CassFormatEncoder[Long].encode(ts).map(_ :: Nil)
     }
-    final case class TTLAndTimestamp(ttl: Int, ts: Option[Long]) extends TTLTimestamp {
-      def strRepr = Right(" USING TTL ? AND TIMESTAMP" + (if (ts.isEmpty) "" else " ?"))
-      def valueRepr = (ts match {
-        case Some(_ts) => CassFormatEncoder[Long].encode(_ts).right.map(_ :: Nil)
-        case None      => Right(Nil)
-      }).flatMap(ls => CassFormatEncoder[Int].encode(ttl).map(_ :: ls))
+    final case class TTLAndTimestamp(ttl: Int, ts: Long) extends TTLTimestamp {
+      def strRepr = Right(" USING TTL ? AND TIMESTAMP ?")
+      def valueRepr = for {
+        ttlE <- CassFormatEncoder[Int].encode(ttl)
+        tsE <- CassFormatEncoder[Long].encode(ts)
+      } yield ttlE :: tsE :: Nil
     }
 
-    def apply(prev: TTLTimestamp, ts: Option[Long]): TTLTimestamp = prev match {
+    def addTS(prev: TTLTimestamp, ts: Long): TTLTimestamp = prev match {
       case Neither             => Timestamp(ts)
       case TTL(ttl)            => TTLAndTimestamp(ttl, ts)
       case _: Timestamp        => Timestamp(ts)
       case tt: TTLAndTimestamp => tt.copy(ts = ts)
     }
 
-    def apply(prev: TTLTimestamp, ttl: Int): TTLTimestamp = prev match {
+    def addTTL(prev: TTLTimestamp, ttl: Int): TTLTimestamp = prev match {
       case Neither             => TTL(ttl)
       case _: TTL              => TTL(ttl)
       case Timestamp(ts)       => TTLAndTimestamp(ttl, ts)
@@ -125,7 +122,7 @@ private[scalacass] object QueryBuildingBlock {
     def strRepr: Result[String] = strList.map(strs => if (skipIfEmpty && strs.isEmpty) "" else strs.mkString(prefix, infix, suffix))
   }
 
-  abstract class CCBlockWithNamedValue[T: CCCassFormatEncoder](protected val skipIfEmpty: Boolean, protected val prefix: String, protected val infix: String, protected val suffix: String) extends CCBlock { this: QueryBuildingBlock =>
+  abstract class CCBlockWithNamedValue[T : CCCassFormatEncoder](protected val skipIfEmpty: Boolean, protected val prefix: String, protected val infix: String, protected val suffix: String) extends CCBlock { this: QueryBuildingBlock =>
     protected def cc: T
     protected lazy val namedEncoded: Result[(List[String], List[AnyRef])] = namedEncode(cc)
     protected lazy val strList: Result[List[String]] = namedEncoded.map(_._1)
@@ -133,7 +130,7 @@ private[scalacass] object QueryBuildingBlock {
     def valueRepr: Result[List[AnyRef]] = namedEncoded.map(_._2)
   }
 
-  abstract class CCBlockWithQueryValue[T: CCCassFormatEncoder](protected val skipIfEmpty: Boolean, protected val prefix: String, protected val infix: String, protected val suffix: String) extends CCBlock { this: QueryBuildingBlock =>
+  abstract class CCBlockWithQueryValue[T : CCCassFormatEncoder](protected val skipIfEmpty: Boolean, protected val prefix: String, protected val infix: String, protected val suffix: String) extends CCBlock { this: QueryBuildingBlock =>
     protected def cc: T
     protected lazy val queryEncoded: Result[(List[String], List[AnyRef])] = queryEncode(cc)
     protected lazy val strList: Result[List[String]] = queryEncoded.map(_._1)
@@ -152,7 +149,7 @@ private[scalacass] object QueryBuildingBlock {
     def valueRepr: Result[List[AnyRef]] = Right(Nil)
   }
 
-  final case class CCBlockInsert[T: CCCassFormatEncoder](protected val cc: T) extends CCBlockWithNamedValue(true, "(", ", ", ")") with QueryBuildingBlock {
+  final case class CCBlockInsert[T : CCCassFormatEncoder](protected val cc: T) extends CCBlockWithNamedValue(true, "(", ", ", ")") with QueryBuildingBlock {
     override def strRepr: Result[String] = strList.map { ns =>
       if (ns.isEmpty) ""
       else s" ${ns.mkString(prefix, infix, suffix)} VALUES ${List.fill(ns.length)("?").mkString(prefix, infix, suffix)}"
@@ -160,8 +157,8 @@ private[scalacass] object QueryBuildingBlock {
   }
   final case class CCBlockDelete[T](protected val preamble: Preamble)(implicit encoder: CCCassFormatEncoder[T]) extends CCBlockWithNoValue[T](false, "FROM") with QueryBuildingBlock
   final case class CCBlockSelect[T](preamble: Preamble)(implicit encoder: CCCassFormatEncoder[T]) extends CCBlockWithNoValue[T](false, "FROM") with QueryBuildingBlock
-  final case class CCBlockUpdate[T: CCCassFormatEncoder](protected val cc: T) extends CCBlockWithQueryValue(true, " SET ", ", ", "") with QueryBuildingBlock
-  final case class CCBlockWhere[T: CCCassFormatEncoder](protected val cc: T) extends CCBlockWithQueryValue(true, " WHERE ", " AND ", "") with QueryBuildingBlock
+  final case class CCBlockUpdate[T : CCCassFormatEncoder](protected val cc: T) extends CCBlockWithQueryValue(true, " SET ", ", ", "") with QueryBuildingBlock
+  final case class CCBlockWhere[T : CCCassFormatEncoder](protected val cc: T) extends CCBlockWithQueryValue(true, " WHERE ", " AND ", "") with QueryBuildingBlock
 
   sealed trait If extends QueryBuildingBlock
 
@@ -178,7 +175,7 @@ private[scalacass] object QueryBuildingBlock {
       val valueRepr = Right(Nil)
     }
 
-    final case class IfStatement[A: CCCassFormatEncoder](cc: A) extends CCBlockWithQueryValue(false, " IF ", " AND ", "") with If
+    final case class IfStatement[A : CCCassFormatEncoder](cc: A) extends CCBlockWithQueryValue(false, " IF ", " AND ", "") with If
   }
 
   sealed trait Limit extends QueryBuildingBlock

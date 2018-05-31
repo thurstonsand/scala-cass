@@ -27,7 +27,7 @@ class CreateTableUnitTests extends CassandraUnitTester {
     ssFixture.ss.createTable[AA]("createTableTest", 0, 0).execute.left.toOption.value shouldBe a[WrongPrimaryKeySizeException]
   }
 
-  def getpk[T: CCCassFormatDecoder: CCCassFormatEncoder](tname: String, pkCount: Int, clustCount: Int) = {
+  def getpk[T : CCCassFormatDecoder : CCCassFormatEncoder](tname: String, pkCount: Int, clustCount: Int) = {
     ssFixture.ss.createTable[T](tname, pkCount, clustCount).execute()
     val table = cluster.getMetadata.getKeyspace(dbName).getTable(tname)
     val parts = table.getPartitionKey.asScala.map(_.getName)

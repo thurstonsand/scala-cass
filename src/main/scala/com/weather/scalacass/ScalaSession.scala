@@ -3,7 +3,7 @@ package com.weather.scalacass
 import java.util.concurrent.Callable
 
 import com.datastax.driver.core._
-import com.google.common.cache.{Cache, CacheBuilder}
+import com.google.common.cache.{ Cache, CacheBuilder }
 import com.weather.scalacass.scsession._
 
 object ScalaSession {
@@ -60,7 +60,7 @@ object ScalaSession {
 }
 
 final case class ScalaSession(keyspace: String)(implicit val session: Session) {
-  import ScalaSession.{Fn02Callable, Star, NoQuery}
+  import ScalaSession.{ Fn02Callable, Star, NoQuery }
 
   private[this] val queryCache: Cache[String, PreparedStatement] = CacheBuilder.newBuilder().maximumSize(1000).build[String, PreparedStatement]()
 
@@ -73,22 +73,22 @@ final case class ScalaSession(keyspace: String)(implicit val session: Session) {
 
   def dropKeyspace(): SCDropKeyspaceStatement = SCDropKeyspaceStatement(keyspace, this)
 
-  def createTable[T: CCCassFormatEncoder](name: String, numPartitionKeys: Int, numClusteringKeys: Int): SCCreateTableStatement =
+  def createTable[T : CCCassFormatEncoder](name: String, numPartitionKeys: Int, numClusteringKeys: Int): SCCreateTableStatement =
     SCCreateTableStatement[T](keyspace, name, numPartitionKeys, numClusteringKeys, this)
 
   def truncateTable(table: String): SCTruncateTableStatement = SCTruncateTableStatement(keyspace, table, this)
   def dropTable(table: String): SCDropTableStatement = SCDropTableStatement(keyspace, table, this)
 
-  def insert[I: CCCassFormatEncoder](table: String, insertable: I): SCInsertStatement = SCInsertStatement(keyspace, table, insertable, this)
+  def insert[I : CCCassFormatEncoder](table: String, insertable: I): SCInsertStatement = SCInsertStatement(keyspace, table, insertable, this)
 
-  def update[U: CCCassFormatEncoder, Q: CCCassFormatEncoder](table: String, updateable: U, query: Q): SCUpdateStatement =
+  def update[U : CCCassFormatEncoder, Q : CCCassFormatEncoder](table: String, updateable: U, query: Q): SCUpdateStatement =
     SCUpdateStatement(keyspace, table, updateable, query, this)
 
   object delete {
     @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
     def apply[D] = partiallyApplied.asInstanceOf[PartiallyApplied[D]]
     final class PartiallyApplied[D] {
-      def apply[Q: CCCassFormatEncoder](table: String, where: Q)(implicit dEncoder: CCCassFormatEncoder[D]): SCDeleteStatement =
+      def apply[Q : CCCassFormatEncoder](table: String, where: Q)(implicit dEncoder: CCCassFormatEncoder[D]): SCDeleteStatement =
         SCDeleteStatement[D, Q](keyspace, table, where, ScalaSession.this)
     }
     private val partiallyApplied = new PartiallyApplied[Nothing]
@@ -103,7 +103,7 @@ final case class ScalaSession(keyspace: String)(implicit val session: Session) {
     @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
     def apply[S] = partiallyApplied.asInstanceOf[PartiallyApplied[S]]
     final class PartiallyApplied[S] {
-      def apply[Q: CCCassFormatEncoder](table: String, where: Q)(implicit sEncoder: CCCassFormatEncoder[S]): SCSelectItStatement =
+      def apply[Q : CCCassFormatEncoder](table: String, where: Q)(implicit sEncoder: CCCassFormatEncoder[S]): SCSelectItStatement =
         SCSelectStatement.apply[S, Q](keyspace, table, where, ScalaSession.this)
     }
     private val partiallyApplied = new PartiallyApplied[Nothing]
@@ -114,7 +114,7 @@ final case class ScalaSession(keyspace: String)(implicit val session: Session) {
     @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
     def apply[S] = partiallyApplied.asInstanceOf[PartiallyApplied[S]]
     final class PartiallyApplied[S] {
-      def apply[Q: CCCassFormatEncoder](table: String, where: Q)(implicit sEncoder: CCCassFormatEncoder[S]): SCSelectOneStatement =
+      def apply[Q : CCCassFormatEncoder](table: String, where: Q)(implicit sEncoder: CCCassFormatEncoder[S]): SCSelectOneStatement =
         SCSelectStatement.applyOne[S, Q](keyspace, table, where, ScalaSession.this)
     }
     private val partiallyApplied = new PartiallyApplied[Nothing]

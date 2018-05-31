@@ -1,7 +1,7 @@
 package com.weather.scalacass
 
 import shapeless.labelled.FieldType
-import shapeless.{::, HList, HNil, LabelledGeneric, Lazy, Witness}
+import shapeless.{ ::, HList, HNil, LabelledGeneric, Lazy, Witness }
 
 abstract class DerivedCCCassFormatEncoder[F] extends CCCassFormatEncoder[F]
 

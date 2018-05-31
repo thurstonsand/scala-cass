@@ -1,21 +1,12 @@
 lazy val codeLinterSettings = {
-  import scalariform.formatter.preferences._
-  import com.typesafe.sbt.SbtScalariform, SbtScalariform.ScalariformKeys
-
-  SbtScalariform.scalariformSettings ++
   Seq(
-    ScalariformKeys.preferences := ScalariformKeys.preferences.value
-      .setPreference(AlignSingleLineCaseStatements, true)
-      .setPreference(DoubleIndentClassDeclaration, true)
-      .setPreference(DanglingCloseParenthesis, Force)
-      .setPreference(SpacesAroundMultiImports, false),
-
-    wartremoverWarnings in (Compile, compile) := Seq.empty,
+//    wartremoverWarnings in (Compile, compile) := Seq.empty,
     wartremoverWarnings in (Compile, compile) ++= Seq(
-      Wart.AsInstanceOf, Wart.DefaultArguments, Wart.EitherProjectionPartial, Wart.Enumeration, Wart.Equals,
-      Wart.ExplicitImplicitTypes, Wart.FinalVal, Wart.IsInstanceOf, Wart.JavaConversions, Wart.LeakingSealed,
-      Wart.Null, Wart.OptionPartial, Wart.Product,
-      Wart.Return, Wart.Serializable, Wart.StringPlusAny, Wart.TryPartial, Wart.Var, Wart.While),
+      Wart.AsInstanceOf, Wart.DefaultArguments, Wart.EitherProjectionPartial, Wart.Enumeration,
+      Wart.Equals, Wart.ExplicitImplicitTypes, Wart.FinalCaseClass, Wart.FinalVal,
+      Wart.IsInstanceOf, Wart.JavaConversions, Wart.JavaSerializable, Wart.LeakingSealed,
+      Wart.Null, Wart.OptionPartial, Wart.Product, Wart.Recursion, Wart.Return,
+      Wart.Serializable, Wart.StringPlusAny, Wart.TryPartial, Wart.Var, Wart.While),
     wartremoverWarnings in (Compile, console) := Seq.empty
   )
 }
@@ -31,7 +22,7 @@ def addUnmanagedSourceDirsFrom(folder: String) = {
   Seq(addSourceFilesTo(Compile), addSourceFilesTo(Test))
 }
 
-def usingMajorVersion(mVersion: String) = s"$mVersion.1.1"
+def usingMajorVersion(mVersion: String) = s"$mVersion.2.0"
 
 lazy val commonSettings = Seq(
   organization := "com.github.thurstonsand",
@@ -44,24 +35,24 @@ lazy val commonSettings = Seq(
     "-language:implicitConversions",
     "-unchecked",
     "-Xfatal-warnings",
-    "-Xlint",
+    "-Xlint:adapted-args,nullary-unit,inaccessible,nullary-override,infer-any,missing-interpolator,doc-detached,private-shadow,type-parameter-shadow,poly-implicit-overload,option-implicit,delayedinit-select,by-name-right-associative,package-object-classes,unsound-match,stars-align",
     "-Yno-adapted-args",
     "-Ywarn-numeric-widen",
     "-Ywarn-value-discard",
     "-Xfuture"
   ) ++ (CrossVersion.partialVersion(scalaVersion.value) match {
-    case Some((2, 11)) => Seq("-Ywarn-unused", "-Ywarn-unused-import")
-    case _             => Seq.empty
+    case Some((2, 10)) => Seq.empty
+    case _             => Seq("-Ywarn-unused:privates,locals")
   }),
   addCompilerPlugin("org.scalamacros" % "paradise" % "2.1.0" cross CrossVersion.full),
   libraryDependencies ++= Seq(
     "com.google.code.findbugs" % "jsr305" % "3.0.1" % "provided", // Intellij does not like "compile-internal, test-internal", use "provided" instead
     "org.joda" % "joda-convert" % "1.8.1" % "provided", // Intellij does not like "compile-internal, test-internal", use "provided" instead
-    "org.slf4j" % "slf4j-api" % "1.7.21" % "provided", // Intellij does not like "compile-internal, test-internal", use "provided" instead
+    "org.slf4j" % "slf4j-api" % "1.7.25" % "provided", // Intellij does not like "compile-internal, test-internal", use "provided" instead
     "joda-time" % "joda-time" % "2.9.4",
-    "com.chuusai" %% "shapeless" % "2.3.2",
-    "com.google.guava" % "guava" % "19.0",
-    "org.scalatest" %% "scalatest" % "3.0.0" % "test"
+    "com.chuusai" %% "shapeless" % "2.3.3",
+    "com.google.guava" % "guava" % "25.1-jre",
+    "org.scalatest" %% "scalatest" % "3.0.5" % "test"
   ),
   initialize := {
     CrossVersion.partialVersion(scalaVersion.value) match {
@@ -72,13 +63,11 @@ lazy val commonSettings = Seq(
   parallelExecution in Test := false,
   name := "ScalaCass",
   description := "a wrapper for the Java Cassandra driver that uses case classes to simplify and codify creating cached statements in a type-safe manner",
-  scalacOptions in (Compile, console) ~= (_ filterNot (_ == "-Ywarn-unused-import")),
-  scalacOptions in (Test, console) := (scalacOptions in (Compile, console)).value
 ) ++ codeLinterSettings
 
 lazy val noPublishSettings = Seq(
-  publish := (),
-  publishLocal := (),
+  publish := ((): Unit),
+  publishLocal := ((): Unit),
   publishArtifact := false
 )
 
@@ -105,19 +94,19 @@ lazy val publishSettings = Seq(
 
 lazy val cass3Settings = Seq(
   version := usingMajorVersion("2"),
-  scalaVersion := "2.12.1",
-  crossScalaVersions := Seq("2.12.1", "2.11.8", "2.10.6"),
+  scalaVersion := "2.12.6",
+  crossScalaVersions := Seq("2.12.6", "2.11.12", "2.10.6"),
   libraryDependencies ++= Seq(
-    "com.datastax.cassandra" % "cassandra-driver-core" % "3.1.0" classifier "shaded" excludeAll ExclusionRule("com.google.guava", "guava"),
-    "com.datastax.cassandra" % "cassandra-driver-extras" % "3.1.0" excludeAll (ExclusionRule("com.datastax.cassandra", "cassandra-driver-core"), ExclusionRule("com.google.guava", "guava")),
-    "org.cassandraunit" % "cassandra-unit" % "3.0.0.1" % "test"
+    "com.datastax.cassandra" % "cassandra-driver-core" % "3.5.0" classifier "shaded" excludeAll ExclusionRule("com.google.guava", "guava"),
+    "com.datastax.cassandra" % "cassandra-driver-extras" % "3.5.0" excludeAll (ExclusionRule("com.datastax.cassandra", "cassandra-driver-core"), ExclusionRule("com.google.guava", "guava")),
+    "org.cassandraunit" % "cassandra-unit" % "3.3.0.2" % "test"
   )
 ) ++ addUnmanagedSourceDirsFrom("scala_cass3")
 
 lazy val cass21Settings = Seq(
   version := usingMajorVersion("1"),
-  scalaVersion := "2.11.8",
-  crossScalaVersions := Seq("2.11.8", "2.10.6"),
+  scalaVersion := "2.11.12",
+  crossScalaVersions := Seq("2.11.12", "2.10.6"),
   libraryDependencies ++= Seq(
     "com.datastax.cassandra" % "cassandra-driver-core" % "2.1.10.2" classifier "shaded" excludeAll ExclusionRule("com.google.guava", "guava"),
     "org.cassandraunit" % "cassandra-unit" % "2.2.2.1" % "test"
@@ -138,7 +127,7 @@ lazy val micrositeSettings = Seq(
   micrositeExternalIncludesDirectory := baseDirectory.value / "includes",
   micrositeHighlightTheme := "docco",
   includeFilter in makeSite := "*.html" | "*.css" | "*.png" | "*.jpg" | "*.gif" | "*.js" | "*.swf" | "*.yml" | "*.md",
-  com.typesafe.sbt.SbtGhPages.GhPagesKeys.ghpagesNoJekyll := false,
+  ghpagesNoJekyll := false,
   fork in tut := true,
   git.remoteRepo := "git@github.com:thurstonsand/scala-cass.git"
 )
