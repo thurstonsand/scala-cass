@@ -111,14 +111,11 @@ function wait_for_cassandra {
 }
 
 function run_cassandra {
-  local j_version=$1
-  local scala_version=$2
-  local folder_ext=$3
-
-  sh ./scripts/util/change_j_version.sh $j_version
+  local scala_version=$1
+  local folder_ext=$2
 
   if ./$cassandra_path/bin/nodetool status 2>/dev/null | grep "^UN" >/dev/null; then
-    echo "a version of cassandra is already running. you must stop that instance first"
+    echo "cassandra is already running. you must stop that instance first"
     exit 1
   fi
   echo "starting cassandra $version"
@@ -157,25 +154,23 @@ function publish_site {
   sbt "docs/clean" "docs/publishMicrosite"
 }
 
-old_j_version=$(sh ./scripts/util/change_j_version.sh)
-
 mkdir -p cassandra-docs
 
 in_right_location
 parse_inputs $@
 
 if [[ enable_cassandra_2 -gt 0 ]]; then
-  setup_cassandra "2.1.9"
+  setup_cassandra "2.1.20"
   clear_cassandra
 
-  run_cassandra 1.7 2.11 21
+  run_cassandra 2.11 21
 fi
 
 if [[ enable_cassandra_3 -gt 0 ]]; then
-  setup_cassandra "3.0.9"
+  setup_cassandra "3.5"
   clear_cassandra
 
-  run_cassandra 1.8 2.12 3
+  run_cassandra 2.12 3
 fi
 
 if [[ publish -gt 0 ]]; then
@@ -187,4 +182,3 @@ else
     run_jekyll
   fi
 fi
-sh ./scripts/util/change_j_version.sh $old_j_version

@@ -10,12 +10,10 @@ fi
 old_j_version=$(sh ./scripts/util/change_j_version.sh)
 
 function do_test {
-	local j_version=$1
-  sh ./scripts/util/change_j_version.sh $j_version
+  local c_version=$1
 
-	sbt +test
+  sbt -Dcassandra.version=$c_version +test
 }
 
-do_test "1.7"
-do_test "1.8"
-sh ./scripts.util/change_j_version.sh $old_j_version
+do_test "2.1"
+do_test "3.5"

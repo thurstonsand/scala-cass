@@ -9,12 +9,12 @@ scala:
 
 jdk:
   - oraclejdk8
-  - oraclejdk7
 
-matrix:
-  exclude:
-    - scala: 2.12.6
-      jdk: oraclejdk7
+env:
+  - CASSANDRA_DRIVER_VERSION=3.5
+  - CASSANDRA_DRIVER_VERSION=2.1.10.3
+
+sbt_args: -Dcassandra-driver.version=$CASSANDRA_DRIVER_VERSION
 
 before_cache:
   # Tricks to avoid unnecessary cache updates
