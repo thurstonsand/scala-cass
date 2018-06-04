@@ -1,5 +1,5 @@
-// choose "3.5" or "2.1.10.3"
-val cassandraVersion = sys.props.getOrElse("cassandra-driver.version", "3.5")
+// choose "3.5.0" or "2.1.10.3"
+val cassandraVersion = sys.props.getOrElse("cassandra-driver.version", "3.5.0")
 
 lazy val codeLinterSettings = {
   Seq(
@@ -58,9 +58,8 @@ lazy val commonSettings = Seq(
     "org.slf4j" % "slf4j-api" % "1.7.25" % "provided", // Intellij does not like "compile-internal, test-internal", use "provided" instead
     "joda-time" % "joda-time" % "2.9.4",
     "com.chuusai" %% "shapeless" % "2.3.3",
-    "com.google.guava" % "guava" % "25.1-jre",
+    "com.google.guava" % "guava" % "19.0",
     "com.datastax.cassandra" % "cassandra-driver-core" % cassandraVersion classifier "shaded" excludeAll ExclusionRule("com.google.guava", "guava"),
-    "org.cassandraunit" % "cassandra-unit" % (if (cassandraVersion startsWith "2.1.") "2.2.2.1" else "3.3.0.2") % "test",
     "org.scalatest" %% "scalatest" % "3.0.5" % "test"
   )  ++ (if (cassandraVersion startsWith "2.1.") Seq(
     "org.cassandraunit" % "cassandra-unit" % "2.2.2.1" % "test"
