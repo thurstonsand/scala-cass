@@ -62,9 +62,14 @@ object ScalaSession {
 final case class ScalaSession(keyspace: String)(implicit val session: Session) {
   import ScalaSession.{ Fn02Callable, Star, NoQuery }
 
-  private[this] val queryCache: Cache[String, PreparedStatement] = CacheBuilder.newBuilder().maximumSize(1000).build[String, PreparedStatement]()
+  private[this] val queryCache: Cache[String, Either[Throwable, PreparedStatement]] =
+    CacheBuilder.newBuilder().maximumSize(1000).build[String, Either[Throwable, PreparedStatement]]()
 
-  private[scalacass] def getFromCacheOrElse(key: String, statement: => PreparedStatement) = queryCache.get(key, statement)
+  private[scalacass] def getFromCacheOrElse(key: String, statement: => PreparedStatement) = {
+    def genStatement = try Right(statement) catch { case ex: Throwable => Left(ex) }
+    queryCache.get(key, genStatement)
+
+  }
   def invalidateCache(): Unit = queryCache.invalidateAll()
 
   def close(): Unit = session.close()

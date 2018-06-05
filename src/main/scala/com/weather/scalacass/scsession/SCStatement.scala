@@ -26,6 +26,12 @@ object SCStatement {
     p.future
   }
 
+  private[scalacass] implicit class BiMappableFuture[T](val f: Future[T]) {
+    def bimap[LL, RR](lfn: Throwable => LL, rfn: T => RR)(implicit ec: ExecutionContext): Future[Either[LL, RR]] =
+      f.map(res => Right(rfn(res))).recover { case t => Left(lfn(t)) }
+    def attempt(implicit ec: ExecutionContext): Future[Result[T]] = bimap(identity, identity)
+  }
+
   implicit class RightBiasedEither[+A, +B](val e: Either[A, B]) extends AnyVal {
     def map[C](fn: B => C): Either[A, C] = e.right.map(fn)
     def flatMap[AA >: A, C](fn: B => Either[AA, C]): Either[AA, C] = e.right.flatMap(fn)
@@ -43,25 +49,25 @@ object SCStatement {
   type SCBatchableStatement = SCResultSetStatement with Batchable
 }
 trait SCStatement[Response] extends Product with Serializable {
-  import SCStatement.{ RightBiasedEither, resultSetFutureToScalaFuture }
+  import SCStatement.{ RightBiasedEither, BiMappableFuture, resultSetFutureToScalaFuture }
 
   protected def sSession: ScalaSession
 
   protected def mkResponse(rs: ResultSet): Response
   def execute(): Result[Response] = prepare.map(p => mkResponse(sSession.session.execute(p)))
-  def executeAsync(implicit ec: ExecutionContext): Result[Future[Response]] =
-    prepare.map(p => sSession.session.executeAsync(p).map(mkResponse)(ec))
+  def executeAsync()(implicit ec: ExecutionContext): Future[Result[Response]] =
+    prepare.fold(Future.failed, p => (sSession.session.executeAsync(p): Future[ResultSet]).bimap(identity, mkResponse))
 
   protected def queryBuildingBlocks: Seq[QueryBuildingBlock]
   private[scsession] def buildQuery: Result[(String, List[AnyRef])] = QueryBuildingBlock.build(queryBuildingBlocks)
 
   def getStringRepr: Result[String] = buildQuery.map(_._1)
 
-  protected def prepare: Result[BoundStatement] = buildQuery.map {
-    case (queryStr, anyrefArgs) =>
-      val prepared = sSession.getFromCacheOrElse(queryStr, sSession.session.prepare(queryStr))
-      prepared.bind(anyrefArgs: _*)
-  }
+  protected def prepare: Result[BoundStatement] =
+    buildQuery.flatMap { case (queryStr, anyrefArgs) =>
+      sSession.getFromCacheOrElse(queryStr, sSession.session.prepare(queryStr))
+        .map(_.bind(anyrefArgs: _*))
+    }
 
   protected def replaceqWithValue(repr: String, values: List[AnyRef]): String = values.foldLeft(repr) { case (r, v) => r.replaceFirst("\\?", v.toString) }
   override def toString: String = buildQuery.fold(ex => s"problem generating statement: $ex", query => s"${getClass.getSimpleName}(${(replaceqWithValue _).tupled(query)})")
@@ -275,7 +281,7 @@ final case class SCBatchStatement private (
     private val usingBlock: TTLTimestamp,
     private val batchType: BatchStatement.Type
 )(implicit protected val sSession: ScalaSession) extends SCStatement[ResultSet] {
-  import SCStatement.{ RightBiasedEither, resultSetFutureToScalaFuture, SCBatchableStatement }
+  import SCStatement.{ RightBiasedEither, BiMappableFuture, resultSetFutureToScalaFuture, SCBatchableStatement }
   import SCBatchStatement.ListEitherTraverse
 
   protected def mkResponse(rs: ResultSet): ResultSet = throw new NotImplementedError("implementing execute/executeAsync directly -- not needed")
@@ -303,7 +309,8 @@ final case class SCBatchStatement private (
   }
   override def execute(): Result[ResultSet] = mkBatch.map(sSession.session.execute)
 
-  override def executeAsync(implicit ec: ExecutionContext): Result[Future[ResultSet]] = mkBatch.map(sSession.session.executeAsync(_))
+  override def executeAsync()(implicit ec: ExecutionContext): Future[Result[ResultSet]] =
+    mkBatch.fold(Future.failed, bs => (sSession.session.executeAsync(bs): Future[ResultSet]).attempt)
 
   def +(batchable: SCBatchableStatement): SCBatchStatement = copy(statements = statements :+ batchable)
   def ++(batchables: List[SCBatchableStatement]): SCBatchStatement = copy(statements = statements ++ batchables)
