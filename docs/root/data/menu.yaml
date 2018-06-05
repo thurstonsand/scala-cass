@@ -56,9 +56,6 @@ options:
   - title: Caching Implicits
     url: cass3/caching-implicits.html
     menu_type: c3
-#  - title: Performance
-#    url: cass3/performance.html
-#    menu_type: c3
 
 
 
