@@ -1,7 +1,7 @@
 ---
 layout: docs
 title: "Custom Encoders/Decoders"
-section: "c3"
+section: "c21"
 ---
 ```tut:invisible
 import com.datastax.driver.core.{Cluster, Session}

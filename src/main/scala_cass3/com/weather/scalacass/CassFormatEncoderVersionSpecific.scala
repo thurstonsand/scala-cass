@@ -1,6 +1,6 @@
 package com.weather.scalacass
 
-import com.datastax.driver.core.{Cluster, DataType, TupleValue}
+import com.datastax.driver.core.{ Cluster, DataType, TupleValue }
 
 trait LowPriorityCassFormatEncoderVersionSpecific {
   implicit def tupleFormat[TUP <: Product](implicit cluster: Cluster, underlying: TupleCassFormatEncoder[TUP]): CassFormatEncoder[TUP] = new CassFormatEncoder[TUP] {
@@ -10,7 +10,7 @@ trait LowPriorityCassFormatEncoderVersionSpecific {
   }
 }
 trait CassFormatEncoderVersionSpecific extends LowPriorityCassFormatEncoderVersionSpecific {
-  import CassFormatEncoder.{sameTypeCassFormatEncoder, transCassFormatEncoder}
+  import CassFormatEncoder.{ sameTypeCassFormatEncoder, transCassFormatEncoder }
 
   implicit val dateFormat: CassFormatEncoder[java.util.Date] = sameTypeCassFormatEncoder(DataType.timestamp)
   implicit val datastaxLocalDateFormat: CassFormatEncoder[com.datastax.driver.core.LocalDate] =

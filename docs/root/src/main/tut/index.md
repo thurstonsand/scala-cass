@@ -15,7 +15,7 @@ you can read and write data more conveniently.
 
 Supports **Scala 2.10**, **Scala 2.11**, and **Scala 2.12** and
 
-* Cassandra 2.1 on Java 7 (minus Scala 2.12)
+* Cassandra 2.1 on Java 8
 * Cassandra 3.0+ on Java 8
 
 #### SBT
@@ -28,16 +28,16 @@ resolvers += Resolver.jcenterRepo
 
 Add the appropriate version of the library
 
-##### Cassandra 3.0+ with Java 8
+##### Cassandra 3.0+
 
 ```scala
-libraryDependencies += "com.github.thurstonsand" %% "scala-cass" % "2.1.1"
+libraryDependencies += "com.github.thurstonsand" %% "scala-cass" % "3.0.0-3.5.0"
 ```
 
-##### Cassandra 2.1 with Java 7
+##### Cassandra 2.1
 
 ```scala
-libraryDependencies += "com.github.thurstonsand" %% "scala-cass" % "1.1.1"
+libraryDependencies += "com.github.thurstonsand" %% "scala-cass" % "3.0.0-2.1.10.3"
 ```
 
 #### Maven
@@ -56,19 +56,19 @@ Add the jcenter resolver
 
 Pick a version
 
-##### Cassandra 3.0+ with Java 8
+##### Cassandra 3.0+
 
 ```xml
 <properties>
-    <scalaCass.version>2.1.1</scalaCassVersion>
+    <scalaCass.version>3.0.0-3.5.0</scalaCassVersion>
 </properties>
 ```
 
-##### Cassandra 2.1 with Java 7
+##### Cassandra 2.1
 
 ```xml
 <properties>
-    <scalaCass.version>1.1.1</scalaCassVersion>
+    <scalaCass.version>3.0.0-2.1.10.3</scalaCassVersion>
 </properties>
 ```
 

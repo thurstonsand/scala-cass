@@ -1,6 +1,6 @@
 package com.weather.scalacass
 
-import com.datastax.driver.core.{Row, TupleValue}
+import com.datastax.driver.core.{ Row, TupleValue }
 import com.google.common.reflect.TypeToken
 
 object CassFormatDecoderVersionSpecific extends CassFormatDecoderVersionSpecific {
@@ -13,7 +13,7 @@ object CassFormatDecoderVersionSpecific extends CassFormatDecoderVersionSpecific
   }
 }
 trait CassFormatDecoderVersionSpecific extends LowPriorityCassFormatDecoder {
-  import CassFormatDecoder.{sameTypeCassFormatDecoder, safeConvertCassFormatDecoder}
+  import CassFormatDecoder.{ sameTypeCassFormatDecoder, safeConvertCassFormatDecoder }
   implicit val dateFormat: CassFormatDecoder[java.util.Date] =
     sameTypeCassFormatDecoder[java.util.Date](TypeToken.of(classOf[java.util.Date]), _ getTimestamp _, _ getTimestamp _)
   implicit val datastaxLocalDateFormat: CassFormatDecoder[com.datastax.driver.core.LocalDate] =

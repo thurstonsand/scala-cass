@@ -38,4 +38,16 @@ object syntax {
     def getOrElse[T](default: => T)(implicit ccd: CCCassFormatDecoder[Option[T]]): Option[T] = opt.map(r => ccd.as(r).getOrElse(default))
     def attemptAs[T](implicit ccd: CCCassFormatDecoder[T]): Option[Result[T]] = opt.map(r => ccd.attemptAs(r))
   }
+
+  type UpdateBehavior[F[_], A] = ScalaSession.UpdateBehavior[F, A]
+  val UpdateBehavior = ScalaSession.UpdateBehavior
+
+  type Star = ScalaSession.Star
+  val Star = ScalaSession.Star
+
+  type NoQuery = ScalaSession.NoQuery
+  val NoQuery = ScalaSession.NoQuery
+  
+  type NoUpdate = ScalaSession.NoUpdate
+  val NoUpdate = ScalaSession.NoUpdate
 }

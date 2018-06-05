@@ -6,7 +6,7 @@ section: "c3"
 
 # Type Mappings
 
-## Cassandra 3.0+ on Java 8
+## Cassandra 3.0+
 
 | Cassandra Type |             Scala Type                 |
 |:--------------:|:--------------------------------------:|
@@ -35,5 +35,5 @@ section: "c3"
 final case class Time(millis: Long)
 ```
 
-* There are overrides for both the Joda library and Jdk8 Time library that take advantage of Cassandra's new codecs. 
+* There are overrides for both the joda library and jdk8 time library that take advantage of Cassandra's new codecs. 
 These codecs have to be registered with your `Cluster` instance; [See date codecs](/30/date-codecs.html) for more

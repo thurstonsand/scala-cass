@@ -1,8 +1,8 @@
 package com.weather.scalacass
 
 import com.datastax.driver.core.Row
-import shapeless.labelled.{FieldType, field}
-import shapeless.{::, HList, HNil, LabelledGeneric, Lazy, Witness}
+import shapeless.labelled.{ FieldType, field }
+import shapeless.{ ::, HList, HNil, LabelledGeneric, Lazy, Witness }
 
 abstract class DerivedCCCassFormatDecoder[T] extends CCCassFormatDecoder[T]
 

@@ -113,9 +113,9 @@ object Boilerplate {
       val memberNames = names.map(n => s"$n: String").mkString(", ")
       val instanceMembers = synTypes.map(tpe => s"encode$tpe: CassFormatEncoder[$tpe]").mkString(", ")
       val cassTypes = instances.map(i => s"$i.cassType").mkString(", ")
-      val results = (encodedTypes zip instances zip synVals).map { case ((encodedTpe, i), v) => s"$encodedTpe <- $i.encode($v)"}.mkString("; ")
-      val namesCombined = (names zip encodedTypes).map { case (n, encodedTpe) => s"($n, $encodedTpe)"}.mkString(", ")
-      val queryCombined = (instances zip synVals zip names zip encodedTypes).map { case (((i, v), name), encodedTpe) => s"($i.withQuery($v, $name), $encodedTpe)"}.mkString(", ")
+      val results = (encodedTypes zip instances zip synVals).map { case ((encodedTpe, i), v) => s"$encodedTpe <- $i.encode($v)" }.mkString("; ")
+      val namesCombined = (names zip encodedTypes).map { case (n, encodedTpe) => s"($n, $encodedTpe)" }.mkString(", ")
+      val queryCombined = (instances zip synVals zip names zip encodedTypes).map { case (((i, v), name), encodedTpe) => s"($i.withQuery($v, $name), $encodedTpe)" }.mkString(", ")
 
       block"""
         |package com.weather.scalacass

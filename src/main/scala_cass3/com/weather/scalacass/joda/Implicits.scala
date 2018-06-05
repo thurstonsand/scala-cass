@@ -1,11 +1,11 @@
 package com.weather.scalacass.joda
 
-import com.datastax.driver.core.{Cluster, DataType}
+import com.datastax.driver.core.{ Cluster, DataType }
 import com.google.common.reflect.TypeToken
-import com.weather.scalacass.{CassFormatDecoder, CassFormatEncoder}
+import com.weather.scalacass.{ CassFormatDecoder, CassFormatEncoder }
 import com.weather.scalacass.CassFormatEncoder.sameTypeCassFormatEncoder
 import com.weather.scalacass.CassFormatDecoderVersionSpecific.codecCassFormatDecoder
-import org.joda.time.{DateTime, Instant, LocalDate, LocalTime}
+import org.joda.time.{ DateTime, Instant, LocalDate, LocalTime }
 
 object Implicits {
   implicit val timeEncoder: CassFormatEncoder[LocalTime] = sameTypeCassFormatEncoder(DataType.time)
