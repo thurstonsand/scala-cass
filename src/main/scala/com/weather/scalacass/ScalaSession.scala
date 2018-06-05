@@ -66,7 +66,7 @@ final case class ScalaSession(keyspace: String)(implicit val session: Session) {
     CacheBuilder.newBuilder().maximumSize(1000).build[String, Either[Throwable, PreparedStatement]]()
 
   private[scalacass] def getFromCacheOrElse(key: String, statement: => PreparedStatement) = {
-    def genStatement = try Right(statement) catch { case ex: Throwable => Left(ex) }
+    def genStatement: Either[Throwable, PreparedStatement] = try Right(statement) catch { case ex: Throwable => Left(ex) }
     queryCache.get(key, genStatement)
 
   }

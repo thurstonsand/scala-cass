@@ -47,7 +47,7 @@ object syntax {
 
   type NoQuery = ScalaSession.NoQuery
   val NoQuery = ScalaSession.NoQuery
-  
+
   type NoUpdate = ScalaSession.NoUpdate
   val NoUpdate = ScalaSession.NoUpdate
 }

@@ -1,11 +1,10 @@
 package com.weather.scalacass.scsession
 
 import com.datastax.driver.core.exceptions.InvalidQueryException
-import com.google.common.util.concurrent.UncheckedExecutionException
-import com.weather.scalacass.{Result, ScalaSession}
+import com.weather.scalacass.{ Result, ScalaSession }
 
 import concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.{Await, ExecutionContext}
+import scala.concurrent.{ Await, ExecutionContext }
 import scala.concurrent.duration._
 
 class DeleteUnitTests extends ActionUnitTests {
@@ -50,7 +49,7 @@ class DeleteUnitTests extends ActionUnitTests {
     Await.ready(executed, 3.seconds)
     executed.value.value.failed.toOption.value shouldBe an[InvalidQueryException]
     query.execute().left.toOption.value shouldBe an[InvalidQueryException]
-    
+
     println(s"broke: ${query.getStringRepr}")
     val fixedQuery = query.noTimestamp
     println(fixedQuery.getStringRepr)

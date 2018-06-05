@@ -4,7 +4,7 @@ import com.datastax.driver.core.exceptions.InvalidQueryException
 import com.weather.scalacass.Result
 
 import concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.{Await, ExecutionContext}
+import scala.concurrent.{ Await, ExecutionContext }
 import scala.concurrent.duration._
 
 class UpdateUnitTests extends ActionUnitTests {
