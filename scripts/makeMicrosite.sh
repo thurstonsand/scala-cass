@@ -97,7 +97,7 @@ function clear_cassandra {
 }
 
 function wait_for_cassandra {
-  for i in 1 2 3 4 5 6 7 8 9 10; do
+  for i in $(seq 1 60); do
     if $1/nodetool status 2>/dev/null | grep "^UN" >/dev/null; then
       echo "cassandra is running"
       return 0
@@ -111,8 +111,13 @@ function wait_for_cassandra {
 }
 
 function run_cassandra {
-  local scala_version=$1
-  local folder_ext=$2
+  local folder_ext=$1
+  local cassandra_version=""
+  if [[ "$folder_ext" -eq "21" ]]; then
+    cassandra_version="2.1.10.3"
+  else
+    cassandra_version="3.5.0"
+  fi
 
   if ./$cassandra_path/bin/nodetool status 2>/dev/null | grep "^UN" >/dev/null; then
     echo "cassandra is already running. you must stop that instance first"
@@ -126,17 +131,17 @@ function run_cassandra {
 
   if [[ clean_workspace -gt 0 ]]; then
     echo "cleaning and compiling cassandra $folder_ext docs"
-    sbt "tut-cass$folder_ext/clean" "tut-cass$folder_ext/tut"
+    sbt -Dcassandra-driver.version=$cassandra_version "tut-cass$folder_ext/clean" "tut-cass$folder_ext/tut"
   else
     echo "compiling cassandra $folder_ext docs"
-    sbt "tut-cass$folder_ext/tut"
+    sbt -Dcassandra-driver.version=$cassandra_version "tut-cass$folder_ext/tut"
   fi
   kill $cass_pid
 
   unset cass_pid
   trap - INT TERM EXIT
   rm -rf docs/root/src/main/tut/cass$folder_ext
-  cp -r "docs/cass$folder_ext/target/scala-$scala_version/resource_managed/main/jekyll/cass$folder_ext" docs/root/src/main/tut/
+  cp -r "docs/cass$folder_ext/target/scala-2.12/resource_managed/main/jekyll/cass$folder_ext" docs/root/src/main/tut/
 }
 
 function compile_results {
@@ -163,14 +168,14 @@ if [[ enable_cassandra_2 -gt 0 ]]; then
   setup_cassandra "2.1.20"
   clear_cassandra
 
-  run_cassandra 2.11 21
+  run_cassandra 21
 fi
 
 if [[ enable_cassandra_3 -gt 0 ]]; then
   setup_cassandra "3.5"
   clear_cassandra
 
-  run_cassandra 2.12 3
+  run_cassandra 3
 fi
 
 if [[ publish -gt 0 ]]; then

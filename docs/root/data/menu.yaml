@@ -17,33 +17,33 @@ options:
   - title: ScalaSession
     url: cass3/scalasession/getting-started.html
     menu_type: c3
-    menu_section: ss
+    menu_section: ss3
 
     nested_options:
       - title: Getting Started
         url: cass3/scalasession/getting-started.html
-        menu_section: ss
+        menu_section: ss3
       - title: Creating a Table
         url: cass3/scalasession/create-table.html
-        menu_section: ss
+        menu_section: ss3
       - title: Insert
         url: cass3/scalasession/insert.html
-        menu_section: ss
+        menu_section: ss3
       - title: Update
         url: cass3/scalasession/update.html
-        menu_section: ss
+        menu_section: ss3
       - title: Delete
         url: cass3/scalasession/delete.html
-        menu_section: ss
+        menu_section: ss3
       - title: Select
         url: cass3/scalasession/select.html
-        menu_section: ss
+        menu_section: ss3
       - title: Batch
         url: cass3/scalasession/batch.html
-        menu_section: ss
+        menu_section: ss3
       - title: Raw Statements
         url: cass3/scalasession/raw.html
-        menu_section: ss
+        menu_section: ss3
 
 
   - title: Row Extraction
@@ -76,4 +76,48 @@ options:
 
   - title: Type Mappings
     url: cass21/type-mappings.html
+    menu_type: c21
+
+  - title: ScalaSession
+    url: cass21/scalasession/getting-started.html
+    menu_type: c21
+    menu_section: ss21
+
+    nested_options:
+      - title: Getting Started
+        url: cass21/scalasession/getting-started.html
+        menu_section: ss21
+      - title: Creating a Table
+        url: cass21/scalasession/create-table.html
+        menu_section: ss21
+      - title: Insert
+        url: cass21/scalasession/insert.html
+        menu_section: ss21
+      - title: Update
+        url: cass21/scalasession/update.html
+        menu_section: ss21
+      - title: Delete
+        url: cass21/scalasession/delete.html
+        menu_section: ss21
+      - title: Select
+        url: cass21/scalasession/select.html
+        menu_section: ss21
+      - title: Batch
+        url: cass21/scalasession/batch.html
+        menu_section: ss21
+      - title: Raw Statements
+        url: cass21/scalasession/raw.html
+        menu_section: ss21
+
+
+  - title: Row Extraction
+    url: cass21/row-extraction.html
+    menu_type: c21
+
+  - title: Custom Encoders/Decoders
+    url: cass21/custom-encoders-decoders.html
+    menu_type: c21
+
+  - title: Caching Implicits
+    url: cass21/caching-implicits.html
     menu_type: c21
