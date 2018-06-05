@@ -51,7 +51,6 @@ lazy val commonSettings = Seq(
     case Some((2, 10)) => Seq("-Xlint")
     case _             => throw new IllegalArgumentException(s"scala version not configured: ${scalaVersion.value}")
   }),
-  resolvers += "Sonatype OSS Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots",
   addCompilerPlugin("org.scalamacros" % "paradise" % "2.1.0" cross CrossVersion.full),
   libraryDependencies ++= Seq(
     "com.google.code.findbugs" % "jsr305" % "3.0.1" % "provided", // Intellij does not like "compile-internal, test-internal", use "provided" instead
@@ -61,8 +60,7 @@ lazy val commonSettings = Seq(
     "com.chuusai" %% "shapeless" % "2.3.3",
     "com.google.guava" % "guava" % "19.0",
     "com.datastax.cassandra" % "cassandra-driver-core" % cassandraVersion classifier "shaded" excludeAll ExclusionRule("com.google.guava", "guava"),
-    "org.scalatest" %% "scalatest" % "3.0.5" % "test",
-    "com.github.ichoran" %% "thyme" % "0.1.2-SNAPSHOT" % "test"
+    "org.scalatest" %% "scalatest" % "3.0.5" % "test"
   )  ++ (if (cassandraVersion startsWith "2.1.") Seq(
     "org.cassandraunit" % "cassandra-unit" % "2.2.2.1" % "test"
   ) else Seq(
