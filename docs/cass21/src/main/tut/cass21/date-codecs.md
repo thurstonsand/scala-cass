@@ -1,6 +1,6 @@
 ---
 layout: docs
-title: "Date Codecs for C* 2.1"
+title: "Date Codecs"
 section: "c21"
 ---
 ```tut:invisible
@@ -21,7 +21,7 @@ session.insert(table, ts).execute()
 val r = session.selectOneStar(table, Query(ts.str)).execute().right.toOption.flatten.get
 ```
 
-# Date Codecs for Cassandra 2.1
+# Date Codecs
 
 By default, Scala-Cass uses the timestamp format provided as default for the Java driver. It is:
 
@@ -30,7 +30,11 @@ By default, Scala-Cass uses the timestamp format provided as default for the Jav
 | timestamp      | java.util.Date                     |
 
 
-You have the option of using the Joda library as a replacement for this default.
+You have the option of using the Joda library or Jdk8 date library as a replacement for this default. While the 
+examples below showcase how to read data of joda/jdk8 types, the same process is required for writing these types to
+Cassandra.
+
+### Joda Implicits
 
 All you need to do is import the implicits required to understand the joda `Instant`, 
 `com.weather.scalacass.joda.Implicits._`
@@ -41,8 +45,16 @@ r // some row from your table
 r.as[org.joda.time.Instant]("mytimestamp") // cassandra "timestamp"
 ```
 
-The same import is required for writing joda's `Instant` to Cassandra
+### Jdk8 Implicits
 
+All you need to do is import the implicits required to understand the jdk8 `Instant`, 
+`com.weather.scalacass.jdk8.Implicits._`
+
+```tut
+import com.weather.scalacass.syntax._, com.weather.scalacass.jdk8.Implicits._
+r // some row from your table
+r.as[java.time.Instant]("mytimestamp") // cassandra "timestamp"
+```
 ```tut:invisible
 session.dropKeyspace.execute()
 session.close()

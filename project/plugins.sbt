@@ -2,10 +2,10 @@ resolvers ++= Seq(
   Resolver.sonatypeRepo("releases")
 )
 
-addSbtPlugin("me.lessis" % "bintray-sbt" % "0.3.0")
+addSbtPlugin("org.foundweekends" % "sbt-bintray" % "0.5.4")
 
-addSbtPlugin("org.scalariform" % "sbt-scalariform" % "1.6.0")
+addSbtPlugin("org.scalariform" % "sbt-scalariform" % "1.8.2")
 
-addSbtPlugin("org.wartremover" % "sbt-wartremover" % "2.0.2")
+addSbtPlugin("org.wartremover" % "sbt-wartremover" % "2.2.1")
 
-addSbtPlugin("com.fortysevendeg"  % "sbt-microsites" % "0.3.3")
+addSbtPlugin("com.47deg" % "sbt-microsites" % "0.7.18")

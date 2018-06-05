@@ -1,7 +1,7 @@
 package com.weather.scalacass
 
 import com.datastax.driver.core.DataType
-import shapeless.{::, Generic, HList, HNil, IsTuple, Lazy}
+import shapeless.{ ::, Generic, HList, HNil, IsTuple, Lazy }
 
 abstract class DerivedTupleCassFormatEncoder[T] extends TupleCassFormatEncoder[T]
 

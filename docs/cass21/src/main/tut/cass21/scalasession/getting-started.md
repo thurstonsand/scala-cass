@@ -1,21 +1,16 @@
 ---
 layout: docs
 title: "Getting Started"
-section: "c3"
+section: "c21"
 ---
 # Getting Started with ScalaSession
 
-Using a `ScalaSession` follows the same general rules as creating the Java driver's `Session`. The major difference is 
-that this library requires a cluster instance in implicit scope when working with Cassandra `tuple`s (for instance, the
-`date` type). This is because `tuple` types are defined based on the specific codecs associated with a cluster instance.
-
-This means that you need to make the cluster implicit if you are using cassandra's `tuple` types
+Using a `ScalaSession` follows the same general rules as creating the Java driver's `Session`. 
 
 ```tut:silent
 import com.datastax.driver.core.Cluster
 
-// implicit is only necessary if using tuple types
-implicit val cluster = Cluster.builder.addContactPoint("localhost").build()
+val cluster = Cluster.builder.addContactPoint("localhost").build()
 ```
 
 ## Characteristics

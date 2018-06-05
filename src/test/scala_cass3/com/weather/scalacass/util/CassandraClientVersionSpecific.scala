@@ -1,6 +1,6 @@
 package com.weather.scalacass.util
 
-import com.datastax.driver.core.{Cluster, CodecRegistry}
+import com.datastax.driver.core.{ Cluster, CodecRegistry }
 import com.datastax.driver.extras.codecs
 
 trait CassandraClientVersionSpecific {

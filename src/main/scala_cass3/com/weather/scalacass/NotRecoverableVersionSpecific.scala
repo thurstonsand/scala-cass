@@ -1,6 +1,6 @@
 package com.weather.scalacass
 
-import com.datastax.driver.core.exceptions.{TransportException, QueryExecutionException, NoHostAvailableException, BusyConnectionException, ConnectionException, DriverInternalError, PagingStateException, UnsupportedFeatureException, UnsupportedProtocolVersionException}
+import com.datastax.driver.core.exceptions.{ TransportException, QueryExecutionException, NoHostAvailableException, BusyConnectionException, ConnectionException, DriverInternalError, PagingStateException, UnsupportedFeatureException, UnsupportedProtocolVersionException }
 
 trait NotRecoverableVersionSpecific {
   def apply(t: Throwable) = t match {

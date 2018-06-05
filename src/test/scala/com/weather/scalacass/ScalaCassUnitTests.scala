@@ -9,7 +9,7 @@ import syntax._
 abstract class ScalaCassUnitTests extends CassandraWithTableTester("testDB", "testTable", ScalaCassUnitTestsVersionSpecific.extraHeaders ::: List("str varchar", "str2 ascii", "b blob",
   "d decimal", "f float", "net inet", "tid timeuuid", "vi varint", "i int", "bi bigint", "bool boolean", "dub double",
   "l list<varchar>", "m map<varchar, bigint>", "s set<double>", "id uuid", "sblob set<blob>, tup tuple<int, varchar>", "nest map<varchar, frozen<set<int>>>"), List("str")) with OptionValues {
-  def testType[GoodType: CassFormatDecoder, BadType: CassFormatDecoder](k: String, v: GoodType, default: GoodType, testCC: Boolean = true)(implicit goodCF: CassFormatEncoder[GoodType]) = {
+  def testType[GoodType : CassFormatDecoder, BadType : CassFormatDecoder](k: String, v: GoodType, default: GoodType, testCC: Boolean = true)(implicit goodCF: CassFormatEncoder[GoodType]) = {
     val args = {
       val converted = goodCF.encode(v).fold(throw _, identity).asInstanceOf[AnyRef]
       if (k == "str") Seq((k, converted)) else Seq((k, converted), ("str", "asdf"))

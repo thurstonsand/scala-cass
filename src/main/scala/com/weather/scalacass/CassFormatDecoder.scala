@@ -2,15 +2,15 @@ package com.weather.scalacass
 
 import java.nio.ByteBuffer
 
-import com.datastax.driver.core.{DataType, Row, TupleValue}
+import com.datastax.driver.core.{ DataType, Row, TupleValue }
 import com.datastax.driver.core.exceptions.InvalidTypeException
 import NotRecoverable.Try2Either
-import com.google.common.reflect.{TypeParameter, TypeToken}
+import com.google.common.reflect.{ TypeParameter, TypeToken }
 
 import scala.util.Try
 
 trait CassFormatDecoder[T] { self =>
-  private[scalacass]type From <: AnyRef
+  private[scalacass] type From <: AnyRef
   private[scalacass] def typeToken: TypeToken[From]
   private[scalacass] def f2t(f: From): Result[T]
   private[scalacass] def extract(r: Row, name: String): From
