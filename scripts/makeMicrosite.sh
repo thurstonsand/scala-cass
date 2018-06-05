@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 set -ue
 
 enable_cassandra_2=-1
@@ -125,7 +125,7 @@ function run_cassandra {
   fi
   echo "starting cassandra $version"
   trap 'if [[ -n "$cass_pid" ]]; then kill $cass_pid; fi' INT TERM EXIT
-  ./$cassandra_path/bin/cassandra -f 2&>/dev/null &
+  ./$cassandra_path/bin/cassandra -f >/dev/null &
   cass_pid=$!
   wait_for_cassandra "./$cassandra_path/bin"
 

@@ -5,7 +5,7 @@ section: "c3"
 ---
 ```tut:invisible
 import com.datastax.driver.core.{Cluster, Session}
-import com.weather.scalacass.ScalaSession
+import com.weather.scalacass.{Result, ScalaSession}
 import com.weather.scalacass.syntax._
 import com.datastax.driver.core.Row
 
@@ -26,8 +26,8 @@ insertStatement.execute()
 
 In case you need to apply a transformation during the extraction process, don't have a 1-to-1 mapping of case class
 names to cassandra table names, or are trying to use a type not included in the ScalaCass library, you can just define a
- custom encoder and decoder for any type. We will define a `UniqueId` class as an example for how you might customize 
- it. Let's say this class will only accept ids less than 15 characters long.
+custom encoder and decoder for any type. We will define a `UniqueId` class as an example for how you might customize 
+it. Let's say this class will only accept ids less than 15 characters long.
 
 ```tut:silent
 abstract case class UniqueId(id: String)
@@ -76,12 +76,12 @@ res.right.map(_.map(_.as[UniqueId]("s")))
 ```
 
 Of course, UniqueId might throw an exception, which may not be the behavior you want, so you can optionally use 
-`flatMap` for operations that might fail, which uses Scala's `Either`, right-biased, to represent it:
+`flatMap` for operations that might fail, which uses a `Result[T]` type, which is just an alias to `Either[Throwable, T]`:
 
 ```tut:silent
 abstract case class SafeUniqueId(id: String)
 object SafeUniqueId {
-  def apply(untestedId: String): Either[Throwable, SafeUniqueId] =
+  def apply(untestedId: String): Result[SafeUniqueId] =
     if (untestedId.length > 15) Left(new IllegalArgumentException("id must be less than 15 characters long"))
     else Right(new SafeUniqueId(untestedId) {})
 }
@@ -140,7 +140,7 @@ import com.google.common.reflect.TypeToken, com.datastax.driver.core.{Row, Tuple
 implicit val safeUniqueIdDecoder: CassFormatDecoder[SafeUniqueId] = new CassFormatDecoder[SafeUniqueId] {
   type From = String
   val typeToken = TypeToken.of(classOf[String])
-  def f2t(f: String): Either[Throwable, SafeUniqueId] = SafeUniqueId(f)
+  def f2t(f: String): Result[SafeUniqueId] = SafeUniqueId(f)
   def extract(r: Row, name: String): From = r.getString(name)
   def tupleExtract(tup: TupleValue, pos: Int): From = tup.getString(pos)
 }
@@ -156,7 +156,7 @@ import com.datastax.driver.core.DataType
 implicit val safeUniqueIdEncoder: CassFormatEncoder[SafeUniqueId] = new CassFormatEncoder[SafeUniqueId] {
   type From = String
   val cassDataType: DataType = DataType.varchar()
-  def encode(f: SafeUniqueId): Either[Throwable, String] = Right(f.id)
+  def encode(f: SafeUniqueId): Result[String] = Right(f.id)
 }
 ```
 

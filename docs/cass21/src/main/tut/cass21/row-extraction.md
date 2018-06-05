@@ -7,6 +7,7 @@ section: "c21"
 import com.datastax.driver.core.{Cluster, Session}
 import com.weather.scalacass.ScalaSession
 import com.datastax.driver.core.Row
+import com.weather.scalacass.scsession.SCStatement.RightBiasedEither
 
 implicit val cluster = Cluster.builder.addContactPoint("localhost").build()
 implicit val session: Session = cluster.connect()
@@ -25,19 +26,19 @@ insertStatement.execute()
 
 Cassandra's `Row` holds the response from a statement. Using the driver, conversion into a useful Scala data type is 
 cumbersome both in extracting a value from the Row, and converting it from the Java type. Scala-Cass handles all of that
-transparently.
+under the hood.
 
 As an example, start with a `Row` retrieved from Cassandra table. Let's say this table has a definition of
 
 ```tut
 case class MyRow(s: String, i: Int, l: List[Long]) // s varchar, i int, l bigint
 ```
-Then we select a row using a `ScalaSession` (for more on `select`, [see the relevant 
-page](/cass3/scalasession/select.html))
+Then we select a row using a `ScalaSession` (see more of `select` [here](/cass3/scalasession/select.html))
 
 ```tut
 case class Select(s: String)
-val row: Row = sSession.selectOneStar("mytable", Select("a str")).execute().right.toOption.flatten.get
+val rowRes = sSession.selectOneStar("mytable", Select("a str")).execute()
+val row: Row = rowRes.toOption.flatten.get 
 ```
 
 First, let's extract into `MyRow` using the regular driver
