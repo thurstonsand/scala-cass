@@ -29,7 +29,7 @@ lazy val commonSettings = Seq(
   name := "ScalaCass",
   organization := "com.github.thurstonsand",
   description := "a wrapper for the Java Cassandra driver that uses case classes to simplify and codify creating cached statements in a type-safe manner",
-  version := s"2.1.0-$cassandraVersion",
+  version := s"3.0.0-$cassandraVersion",
   scalaVersion := "2.12.6",
   crossScalaVersions := Seq("2.12.6", "2.11.12", "2.10.6"),
   scalacOptions ++= Seq(
@@ -51,6 +51,7 @@ lazy val commonSettings = Seq(
     case Some((2, 10)) => Seq("-Xlint")
     case _             => throw new IllegalArgumentException(s"scala version not configured: ${scalaVersion.value}")
   }),
+  resolvers += "Sonatype OSS Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots",
   addCompilerPlugin("org.scalamacros" % "paradise" % "2.1.0" cross CrossVersion.full),
   libraryDependencies ++= Seq(
     "com.google.code.findbugs" % "jsr305" % "3.0.1" % "provided", // Intellij does not like "compile-internal, test-internal", use "provided" instead
@@ -60,7 +61,8 @@ lazy val commonSettings = Seq(
     "com.chuusai" %% "shapeless" % "2.3.3",
     "com.google.guava" % "guava" % "19.0",
     "com.datastax.cassandra" % "cassandra-driver-core" % cassandraVersion classifier "shaded" excludeAll ExclusionRule("com.google.guava", "guava"),
-    "org.scalatest" %% "scalatest" % "3.0.5" % "test"
+    "org.scalatest" %% "scalatest" % "3.0.5" % "test",
+    "com.github.ichoran" %% "thyme" % "0.1.2-SNAPSHOT" % "test"
   )  ++ (if (cassandraVersion startsWith "2.1.") Seq(
     "org.cassandraunit" % "cassandra-unit" % "2.2.2.1" % "test"
   ) else Seq(

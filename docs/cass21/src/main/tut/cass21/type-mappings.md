@@ -6,7 +6,7 @@ section: "c21"
 
 # Type Mappings
 
-## Cassandra 2.1 on Java 7
+## Cassandra 2.1
 
 | Cassandra Type |      Scala Type      |
 |:--------------:|:--------------------:|
@@ -27,5 +27,5 @@ section: "c21"
 | tuple          | Tuple*               |
 | **timestamp**  | **java.util.Date**   |
 
-* There are overrides for the Joda library that take advantage of Cassandra's new codecs. 
+* There are overrides for the joda library and jdk8 time library that take advantage of Cassandra's new codecs. 
 [See date codecs](/21/date-codecs.html) for more

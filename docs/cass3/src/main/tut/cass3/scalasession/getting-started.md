@@ -6,8 +6,8 @@ section: "c3"
 # Getting Started with ScalaSession
 
 Using a `ScalaSession` follows the same general rules as creating the Java driver's `Session`. The major difference is 
-that this library requires a cluster instance in implicit scope when working with tuples. This is because `tuple` types 
-are defined based on the specific codecs associated with a cluster instance.
+that this library requires a cluster instance in implicit scope when working with Cassandra `tuple`s (for instance, the
+`date` type). This is because `tuple` types are defined based on the specific codecs associated with a cluster instance.
 
 This means that you need to make the cluster implicit if you are using cassandra's `tuple` types
 
@@ -38,8 +38,8 @@ implicit val session: Session = cluster.connect()
 val sSession: ScalaSession = ScalaSession("mykeyspace") // picks up session implicitly
 ```
 
-If the keyspace has not been created yet (namely in tests), you can create it using `createKeyspace` and passing in 
-parameters included after the `WITH` statement:
+If the keyspace has not been created yet (for instance, during testing), you can create it using `createKeyspace` 
+and passing in parameters included after the `WITH` statement:
 
 ```tut
 val createStatement = sSession.createKeyspace("replication = {'class':'SimpleStrategy', 'replication_factor' : 3}")
@@ -53,8 +53,7 @@ val createStatementIfNotExists = createStatement.ifNotExists
 val result = createStatementIfNotExists.execute()
 ```
 
-Finally, you can drop the keyspace if you are done using it, although this will render the `ScalaSession` unusable until
-the keyspace is created again
+Finally, you can drop the keyspace if you are done using it, although this will render the `ScalaSession` unusable
 
 ```tut
 sSession.dropKeyspace.execute()

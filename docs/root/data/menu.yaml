@@ -6,14 +6,6 @@ options:
     url: cassandra-30.html
     menu_type: c3
 
-  - title: Date Codecs
-    url: cass3/date-codecs.html
-    menu_type: c3
-
-  - title: Type Mappings
-    url: cass3/type-mappings.html
-    menu_type: c3
-
   - title: ScalaSession
     url: cass3/scalasession/getting-started.html
     menu_type: c3
@@ -45,9 +37,16 @@ options:
         url: cass3/scalasession/raw.html
         menu_section: ss3
 
-
   - title: Row Extraction
     url: cass3/row-extraction.html
+    menu_type: c3
+
+  - title: Type Mappings
+    url: cass3/type-mappings.html
+    menu_type: c3
+
+  - title: Date Codecs
+    url: cass3/date-codecs.html
     menu_type: c3
 
   - title: Custom Encoders/Decoders
@@ -70,19 +69,11 @@ options:
     menu_type: c21
     menu_type: c21
 
-  - title: Date Codecs
-    url: cass21/date-codecs.html
-    menu_type: c21
-
-  - title: Type Mappings
-    url: cass21/type-mappings.html
-    menu_type: c21
-
   - title: ScalaSession
     url: cass21/scalasession/getting-started.html
     menu_type: c21
     menu_section: ss21
-
+    
     nested_options:
       - title: Getting Started
         url: cass21/scalasession/getting-started.html
@@ -109,9 +100,16 @@ options:
         url: cass21/scalasession/raw.html
         menu_section: ss21
 
-
   - title: Row Extraction
     url: cass21/row-extraction.html
+    menu_type: c21
+
+  - title: Type Mappings
+    url: cass21/type-mappings.html
+    menu_type: c21
+    
+  - title: Date Codecs
+    url: cass21/date-codecs.html
     menu_type: c21
 
   - title: Custom Encoders/Decoders

@@ -33,8 +33,8 @@ implicit val session: Session = cluster.connect()
 val sSession: ScalaSession = ScalaSession("mykeyspace") // picks up session implicitly
 ```
 
-If the keyspace has not been created yet (namely in tests), you can create it using `createKeyspace` and passing in 
-parameters included after the `WITH` statement:
+If the keyspace has not been created yet (for instance, during testing), you can create it using `createKeyspace` 
+and passing in parameters included after the `WITH` statement:
 
 ```tut
 val createStatement = sSession.createKeyspace("replication = {'class':'SimpleStrategy', 'replication_factor' : 3}")
@@ -48,8 +48,7 @@ val createStatementIfNotExists = createStatement.ifNotExists
 val result = createStatementIfNotExists.execute()
 ```
 
-Finally, you can drop the keyspace if you are done using it, although this will render the `ScalaSession` unusable until
-the keyspace is created again
+Finally, you can drop the keyspace if you are done using it, although this will render the `ScalaSession` unusable
 
 ```tut
 sSession.dropKeyspace.execute()

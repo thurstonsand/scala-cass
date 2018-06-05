@@ -8,6 +8,7 @@ import com.datastax.driver.core.{Cluster, Session}
 import com.weather.scalacass.{Result, ScalaSession}
 import com.weather.scalacass.syntax._
 import com.datastax.driver.core.Row
+import com.weather.scalacass.scsession.SCStatement.RightBiasedEither
 
 implicit val cluster = Cluster.builder.addContactPoint("localhost").build()
 implicit val session: Session = cluster.connect()
@@ -72,7 +73,7 @@ val res = selectStatement.execute()
 Then, extract using `UniqueId`:
 
 ```tut
-res.right.map(_.map(_.as[UniqueId]("s")))
+res.map(_.map(_.as[UniqueId]("s")))
 ```
 
 Of course, UniqueId might throw an exception, which may not be the behavior you want, so you can optionally use 
@@ -112,7 +113,7 @@ val unsafeRes = unsafeSelectStatement.execute()
 And finally, try to extract it:
 
 ```tut
-unsafeRes.right.map(_.map(_.attemptAs[SafeUniqueId]("s")))
+unsafeRes.map(_.map(_.attemptAs[SafeUniqueId]("s")))
 ```
 
 ## Create a new encoder/decoder from scratch
@@ -171,7 +172,7 @@ unsafeInsertStatement.execute()
 case class UnsafeQuery(s: String)
 val unsafeSelectStatement = sSession.selectOneStar("mytable", UnsafeQuery("this_id_is_definitely_too_long_to_be_safe"))
 val unsafeRes = unsafeSelectStatement.execute()
-unsafeRes.right.map(_.map(_.attemptAs[SafeUniqueId]("s")))
+unsafeRes.map(_.map(_.attemptAs[SafeUniqueId]("s")))
 ```
 ```tut:invisible
 sSession.dropKeyspace.execute()

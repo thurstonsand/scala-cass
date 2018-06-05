@@ -25,6 +25,7 @@ Scala and Cassandra types).
   * name of table
   * number of partition keys
   * number of clustering keys
+* partition and clustering keys are chosen left-to-right, in that order. See the example below.
 * You can pass an optional parameter for the right hand side of the table definition (after the `WITH`) using the 
   `` `with` `` builder
 * parameters wrapped in `Option` or `Nullable` take the underlying type parameter as its type for table creation

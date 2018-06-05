@@ -13,7 +13,7 @@ implicit val session: Session = cluster.connect()
 val sSession: ScalaSession = ScalaSession("mykeyspace")
 sSession.createKeyspace("replication = {'class':'SimpleStrategy', 'replication_factor' : 1}").execute()
 
-case class MyTable(s: String, i: Int, l: Long)
+case class MyTable(s: String, i: Int, l: Long, li: List[String])
 val createStatement = sSession.createTable[MyTable]("mytable", 1, 0)
 createStatement.execute()
 ```
@@ -28,10 +28,49 @@ val updateStatement = sSession.update("mytable", NewValue(1234, 5678L), Query("s
 updateStatement.execute()
 ```
 
+## Add/Subtract
+
+There is a special class available to specify that you would like to either add or subtract elements
+to a Casssandra collection. Namely, `UpdateBehavior.Add` and `UpdateBehavior.Subtract`.
+
+```tut
+import com.weather.scalacass.syntax._
+case class NewValueList(li: UpdateBehavior[List, String])
+val updateStatementAdd = sSession.update("mytable", NewValueList(UpdateBehavior.Add(List("a", "b", "c"))), Query("some str"))
+updateStatementAdd.execute()
+sSession.selectOneStar("mytable", Query("some str")).execute()
+```
+
+```tut
+val updateStatementSubtract = sSession.update("mytable", NewValueList(UpdateBehavior.Subtract(List("a", "b"))), Query("some str"))
+updateStatementSubtract.execute()
+sSession.selectOneStar("mytable", Query("some str")).execute()
+```
+
+For parity, there is also `UpdateBehavior.Replace`, but simply using a class directly will act in the same way.
+
+Using `UpdateBehavior.Replace`:
+
+```tut
+val updateStatementReplace = sSession.update("mytable", NewValueList(UpdateBehavior.Replace(List("d", "e", "f"))), Query("some str"))
+updateStatementReplace.execute()
+sSession.selectOneStar("mytable", Query("some str")).execute()
+```
+
+Using regular `List`:
+
+```tut
+case class NewValueListRegular(li: List[String])
+val updateStatementRegular = sSession.update("mytable", NewValueListRegular(List("g", "h", "i")), Query("some str"))
+updateStatementRegular.execute()
+sSession.selectOneStar("mytable", Query("some str")).execute()
+```
+
 ## If Statment
 
-You can use case classes to model If statements. For now, only equivalency is possible. This means that the values
-in the if statement are translated to an `=` comparison:
+You can use case classes to model If statements. For now, only equivalency is possible, meaning values
+in the if statement are translated to an `=` comparison. If you need a different comparison operation,
+see [raw statements](/cass21/scalasession/raw.html):
 
 ```tut
 case class If(l: Long)
