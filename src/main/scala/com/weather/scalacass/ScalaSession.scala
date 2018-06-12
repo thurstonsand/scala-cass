@@ -5,6 +5,7 @@ import java.util.concurrent.Callable
 import com.datastax.driver.core._
 import com.google.common.cache.{ Cache, CacheBuilder }
 import com.weather.scalacass.scsession._
+import org.slf4j.LoggerFactory
 
 object ScalaSession {
   private implicit def Fn02Callable[V](f: => V): Callable[V] = new Callable[V] {
@@ -62,13 +63,17 @@ object ScalaSession {
 final case class ScalaSession(keyspace: String)(implicit val session: Session) {
   import ScalaSession.{ Fn02Callable, Star, NoQuery }
 
+  private val logger = LoggerFactory.getLogger(getClass.getName)
+
   private[this] val queryCache: Cache[String, Either[Throwable, PreparedStatement]] =
     CacheBuilder.newBuilder().maximumSize(1000).build[String, Either[Throwable, PreparedStatement]]()
 
   private[scalacass] def getFromCacheOrElse(key: String, statement: => PreparedStatement) = {
-    def genStatement: Either[Throwable, PreparedStatement] = try Right(statement) catch { case ex: Throwable => Left(ex) }
-    queryCache.get(key, genStatement)
-
+    def onCacheMiss: Either[Throwable, PreparedStatement] = {
+      logger.debug(s"cache miss for key %s", key)
+      try Right(statement) catch { case ex: Throwable => Left(ex) }
+    }
+    queryCache.get(key, onCacheMiss)
   }
   def invalidateCache(): Unit = queryCache.invalidateAll()
 
