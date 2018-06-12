@@ -112,6 +112,24 @@ private[scalacass] object QueryBuildingBlock {
     }
   }
 
+  sealed trait CassConsistency {
+    def level: Option[com.datastax.driver.core.ConsistencyLevel]
+  }
+
+  object CassConsistency {
+    import com.datastax.driver.core.{ ConsistencyLevel => CL }
+    final case class Consistency(private val _level: CL) extends CassConsistency {
+      val level = Some(_level)
+    }
+
+    case object Default extends CassConsistency {
+      val level: Option[CL] = None
+    }
+
+    def addConsistency(cl: CL): CassConsistency = Consistency(cl)
+    def removeConsistency: CassConsistency = Default
+  }
+
   trait CCBlock { this: QueryBuildingBlock =>
     protected def prefix: String
     protected def infix: String

@@ -36,6 +36,9 @@ options:
       - title: Raw Statements
         url: cass3/scalasession/raw.html
         menu_section: ss3
+      - title: Consistency Level
+        url: cass3/scalasession/consistency-level.html
+        menu_section: ss3
 
   - title: Row Extraction
     url: cass3/row-extraction.html
@@ -95,6 +98,9 @@ options:
         menu_section: ss21
       - title: Raw Statements
         url: cass21/scalasession/raw.html
+        menu_section: ss21
+      - title: Consistency Level
+        url: cass21/scalasession/consistency-level.html
         menu_section: ss21
 
   - title: Row Extraction

@@ -43,10 +43,7 @@ object SCStatement {
     def getOrElse[BB >: B](or: => BB): BB = e.right.getOrElse(or)
     def valueOr[BB >: B](orFn: A => BB): BB = e.fold(orFn, identity)
   }
-  type SCResultSetStatement = SCStatement[ResultSet]
-  type SCIteratorStatement = SCStatement[Iterator[Row]]
-  type SCOptionStatement = SCStatement[Option[Row]]
-  type SCBatchableStatement = SCResultSetStatement with Batchable
+  type SCBatchableStatement = SCStatement[ResultSet] with Batchable
 }
 trait SCStatement[Response] extends Product with Serializable {
   import SCStatement.{ RightBiasedEither, BiMappableFuture, resultSetFutureToScalaFuture }
@@ -54,30 +51,42 @@ trait SCStatement[Response] extends Product with Serializable {
   protected def sSession: ScalaSession
 
   protected def mkResponse(rs: ResultSet): Response
-  def execute(): Result[Response] = prepare.map(p => mkResponse(sSession.session.execute(p)))
+
+  protected def cassConsistency: CassConsistency
+
+  def execute(): Result[Response] =
+    prepareAndBind().map(b => mkResponse(sSession.session.execute(b)))
+
   def executeAsync()(implicit ec: ExecutionContext): Future[Result[Response]] =
-    prepare.fold(Future.failed, p => (sSession.session.executeAsync(p): Future[ResultSet]).bimap(identity, mkResponse))
+    prepareAndBind().fold(Future.failed, b => (sSession.session.executeAsync(b): Future[ResultSet]).bimap(identity, mkResponse))
 
   protected def queryBuildingBlocks: Seq[QueryBuildingBlock]
   private[scsession] def buildQuery: Result[(String, List[AnyRef])] = QueryBuildingBlock.build(queryBuildingBlocks)
 
   def getStringRepr: Result[String] = buildQuery.map(_._1)
 
-  protected def prepare: Result[BoundStatement] =
+  @SuppressWarnings(Array("org.wartremover.warts.Null"))
+  protected[scalacass] def prepareAndBind(): Result[BoundStatement] =
     buildQuery.flatMap { case (queryStr, anyrefArgs) =>
       sSession.getFromCacheOrElse(queryStr, sSession.session.prepare(queryStr))
-        .map(_.bind(anyrefArgs: _*))
+        .map { p =>
+          p.setConsistencyLevel(cassConsistency.level.orNull)
+          p.bind(anyrefArgs: _*)
+        }
     }
 
   protected def replaceqWithValue(repr: String, values: List[AnyRef]): String = values.foldLeft(repr) { case (r, v) => r.replaceFirst("\\?", v.toString) }
-  override def toString: String = buildQuery.fold(ex => s"problem generating statement: $ex", query => s"${getClass.getSimpleName}(${(replaceqWithValue _).tupled(query)})")
+
+  protected[scalacass] def stringifyQuery: Result[String] = buildQuery.map { case (statement, anyrefArgs) => replaceqWithValue(statement, anyrefArgs) + cassConsistency.level.fold("")(cl => s" <CONSISTENCY $cl>") }
+  override def toString: String = stringifyQuery.fold(ex => s"problem generating statement: $ex", q => s"${getClass.getSimpleName}($q)")
 }
 
 final case class SCInsertStatement private (
-    private val preableBlock: Preamble,
+    private val preambleBlock: Preamble,
     private val insertBlock: QueryBuildingBlock,
     private val ifBlock: If,
-    private val usingBlock: TTLTimestamp
+    private val usingBlock: TTLTimestamp,
+    protected val cassConsistency: CassConsistency
 )(implicit protected val sSession: ScalaSession) extends SCStatement[ResultSet] with SCBatchStatement.Batchable {
   def ifNotExists: SCInsertStatement = copy(ifBlock = If.IfNotExists)
   def noConditional: SCInsertStatement = copy(ifBlock = If.NoConditional)
@@ -88,12 +97,15 @@ final case class SCInsertStatement private (
   def noTTL: SCInsertStatement = copy(usingBlock = usingBlock.removeTTL)
   def noTimestamp: SCInsertStatement = copy(usingBlock = usingBlock.removeTimestamp)
 
-  protected def queryBuildingBlocks: Seq[QueryBuildingBlock] = Seq(preableBlock, insertBlock, ifBlock, usingBlock)
+  def consistency(cl: ConsistencyLevel): SCInsertStatement = copy(cassConsistency = CassConsistency.addConsistency(cl))
+  def defaultConsistency: SCInsertStatement = copy(cassConsistency = CassConsistency.removeConsistency)
+
+  protected def queryBuildingBlocks: Seq[QueryBuildingBlock] = Seq(preambleBlock, insertBlock, ifBlock, usingBlock)
   protected def mkResponse(rs: ResultSet): ResultSet = rs
 }
 object SCInsertStatement {
   def apply[I : CCCassFormatEncoder](keyspace: String, table: String, insertable: I, sSession: ScalaSession) =
-    new SCInsertStatement(Preamble("INSERT INTO", keyspace, table), CCBlockInsert(insertable), If.NoConditional, TTLTimestamp.Neither)(sSession)
+    new SCInsertStatement(Preamble("INSERT INTO", keyspace, table), CCBlockInsert(insertable), If.NoConditional, TTLTimestamp.Neither, CassConsistency.Default)(sSession)
 }
 
 final case class SCUpdateStatement private (
@@ -101,7 +113,8 @@ final case class SCUpdateStatement private (
     private val updateBlock: QueryBuildingBlock,
     private val whereBlock: QueryBuildingBlock,
     private val usingBlock: TTLTimestamp,
-    private val ifBlock: If
+    private val ifBlock: If,
+    protected val cassConsistency: CassConsistency
 )(implicit protected val sSession: ScalaSession) extends SCStatement[ResultSet] with SCBatchStatement.Batchable with SCUpdateStatementVersionSpecific {
   def ifExists: SCUpdateStatement = copy(ifBlock = If.IfExists)
   def `if`[A : CCCassFormatEncoder](statement: A): SCUpdateStatement = copy(ifBlock = If.IfStatement(statement))
@@ -113,19 +126,23 @@ final case class SCUpdateStatement private (
   def noTTL: SCUpdateStatement = copy(usingBlock = usingBlock.removeTTL)
   def noTimestamp: SCUpdateStatement = copy(usingBlock = usingBlock.removeTimestamp)
 
+  def consistency(cl: ConsistencyLevel): SCUpdateStatement = copy(cassConsistency = CassConsistency.addConsistency(cl))
+  def defaultConsistency: SCUpdateStatement = copy(cassConsistency = CassConsistency.removeConsistency)
+
   protected def queryBuildingBlocks: Seq[QueryBuildingBlock] = Seq(preamble, usingBlock, updateBlock, whereBlock, ifBlock)
   protected def mkResponse(rs: ResultSet): ResultSet = rs
 }
 object SCUpdateStatement {
   def apply[U : CCCassFormatEncoder, Q : CCCassFormatEncoder](keyspace: String, table: String, updateable: U, where: Q, sSession: ScalaSession) =
-    new SCUpdateStatement(Preamble("UPDATE", keyspace, table), CCBlockUpdate(updateable), CCBlockWhere(where), TTLTimestamp.Neither, If.NoConditional)(sSession)
+    new SCUpdateStatement(Preamble("UPDATE", keyspace, table), CCBlockUpdate(updateable), CCBlockWhere(where), TTLTimestamp.Neither, If.NoConditional, CassConsistency.Default)(sSession)
 }
 
 final case class SCDeleteStatement private (
     private val deleteBlock: QueryBuildingBlock,
     private val whereBlock: QueryBuildingBlock,
     private val usingBlock: TTLTimestamp,
-    private val ifBlock: If
+    private val ifBlock: If,
+    protected val cassConsistency: CassConsistency
 )(implicit protected val sSession: ScalaSession) extends SCStatement[ResultSet] with SCBatchStatement.Batchable {
   protected def mkResponse(rs: ResultSet): ResultSet = rs
 
@@ -141,7 +158,7 @@ final case class SCDeleteStatement private (
 }
 object SCDeleteStatement {
   def apply[D : CCCassFormatEncoder, Q : CCCassFormatEncoder](keyspace: String, table: String, where: Q, sSession: ScalaSession) =
-    new SCDeleteStatement(CCBlockDelete[D](Preamble("DELETE", keyspace, table)), CCBlockWhere(where), TTLTimestamp.Neither, If.NoConditional)(sSession)
+    new SCDeleteStatement(CCBlockDelete[D](Preamble("DELETE", keyspace, table)), CCBlockWhere(where), TTLTimestamp.Neither, If.NoConditional, CassConsistency.Default)(sSession)
 }
 
 abstract class SCSelectStatement[F[_]](
@@ -160,23 +177,31 @@ abstract class SCSelectStatement[F[_]](
 final case class SCSelectOneStatement(
     protected val selectBlock: QueryBuildingBlock,
     protected val whereBlock: QueryBuildingBlock,
-    protected val filteringBlock: Filtering
+    protected val filteringBlock: Filtering,
+    protected val cassConsistency: CassConsistency
 )(implicit protected val sSession: ScalaSession) extends SCSelectStatement[Option](SCSelectStatement.mkOptionResponse, Limit.LimitN(1)) {
   def allowFiltering: SCSelectOneStatement = copy(filteringBlock = Filtering.AllowFiltering)
   def noAllowFiltering: SCSelectOneStatement = copy(filteringBlock = Filtering.NoFiltering)
+
+  def consistency(cl: ConsistencyLevel): SCSelectOneStatement = copy(cassConsistency = CassConsistency.addConsistency(cl))
+  def defaultConsistency: SCSelectOneStatement = copy(cassConsistency = CassConsistency.removeConsistency)
 }
 
 final case class SCSelectItStatement(
     protected val selectBlock: QueryBuildingBlock,
     protected val whereBlock: QueryBuildingBlock,
     protected val filteringBlock: Filtering,
-    private val limitBlock: Limit
+    private val limitBlock: Limit,
+    protected val cassConsistency: CassConsistency
 )(implicit protected val sSession: ScalaSession) extends SCSelectStatement[Iterator](SCSelectStatement.mkIteratorResponse, limitBlock) {
   def limit(n: Int): SCSelectItStatement = copy(limitBlock = Limit.LimitN(n))
   def noLimit: SCSelectItStatement = copy(limitBlock = Limit.NoLimit)
 
   def allowFiltering: SCSelectItStatement = copy(filteringBlock = Filtering.AllowFiltering)
   def noAllowFiltering: SCSelectItStatement = copy(filteringBlock = Filtering.NoFiltering)
+
+  def consistency(cl: ConsistencyLevel): SCSelectItStatement = copy(cassConsistency = CassConsistency.addConsistency(cl))
+  def defaultConsistency: SCSelectItStatement = copy(cassConsistency = CassConsistency.removeConsistency)
 }
 
 object SCSelectStatement {
@@ -187,99 +212,47 @@ object SCSelectStatement {
   def mkOptionResponse(rs: ResultSet): Option[Row] = Option(rs.one())
 
   def apply[S : CCCassFormatEncoder, Q : CCCassFormatEncoder](keyspace: String, table: String, where: Q, sSession: ScalaSession) =
-    SCSelectItStatement(CCBlockSelect[S](Preamble("SELECT", keyspace, table)), CCBlockWhere(where), Filtering.NoFiltering, Limit.NoLimit)(sSession)
+    SCSelectItStatement(CCBlockSelect[S](Preamble("SELECT", keyspace, table)), CCBlockWhere(where), Filtering.NoFiltering, Limit.NoLimit, CassConsistency.Default)(sSession)
 
   def applyOne[S : CCCassFormatEncoder, Q : CCCassFormatEncoder](keyspace: String, table: String, where: Q, sSession: ScalaSession) =
-    SCSelectOneStatement(CCBlockSelect[S](Preamble("SELECT", keyspace, table)), CCBlockWhere(where), Filtering.NoFiltering)(sSession)
+    SCSelectOneStatement(CCBlockSelect[S](Preamble("SELECT", keyspace, table)), CCBlockWhere(where), Filtering.NoFiltering, CassConsistency.Default)(sSession)
 }
 
-trait SCRaw[Response] extends SCStatement[Response] {
+trait SCRaw {
   protected def rawBlock: Raw
   protected def queryBuildingBlocks: Seq[QueryBuildingBlock] = Seq(rawBlock)
 }
 final case class SCRawStatement private[scsession] (
-    protected val rawBlock: Raw
-)(implicit protected val sSession: ScalaSession) extends SCRaw[ResultSet] with SCBatchStatement.Batchable {
+    protected val rawBlock: Raw,
+    protected val cassConsistency: CassConsistency
+)(implicit protected val sSession: ScalaSession) extends SCRaw with SCStatement[ResultSet] with SCBatchStatement.Batchable {
+  def consistency(cl: ConsistencyLevel): SCRawStatement = copy(cassConsistency = CassConsistency.addConsistency(cl))
+  def defaultConsistency: SCRawStatement = copy(cassConsistency = CassConsistency.removeConsistency)
+
   protected def mkResponse(rs: ResultSet): ResultSet = rs
 }
 final case class SCRawSelectStatement[F[_]] private[scsession] (
     private val _mkResponse: ResultSet => F[Row],
-    protected val rawBlock: Raw
-)(implicit protected val sSession: ScalaSession) extends SCRaw[F[Row]] {
+    protected val rawBlock: Raw,
+    protected val cassConsistency: CassConsistency
+)(implicit protected val sSession: ScalaSession) extends SCRaw with SCStatement[F[Row]] {
   protected def mkResponse(rs: ResultSet): F[Row] = _mkResponse(rs)
+
+  def consistency(cl: ConsistencyLevel): SCRawSelectStatement[F] = copy(cassConsistency = CassConsistency.addConsistency(cl))
+  def defaultConsistency: SCRawSelectStatement[F] = copy(cassConsistency = CassConsistency.removeConsistency)
 }
 
 object SCRaw {
-  def apply(strRepr: String, anyrefArgs: List[AnyRef], sSession: ScalaSession): SCRawStatement = SCRawStatement(Raw(strRepr, anyrefArgs))(sSession)
-  def applyIterator(strRepr: String, anyrefArgs: List[AnyRef], sSession: ScalaSession): SCRawSelectStatement[Iterator] = new SCRawSelectStatement[Iterator](SCSelectStatement.mkIteratorResponse, Raw(strRepr, anyrefArgs))(sSession)
-  def applyOne(strRepr: String, anyrefArgs: List[AnyRef], sSession: ScalaSession): SCRawSelectStatement[Option] = new SCRawSelectStatement[Option](SCSelectStatement.mkOptionResponse, Raw(strRepr, anyrefArgs))(sSession)
-}
-
-final case class SCCreateKeyspaceStatement private (
-    private val createKeyspaceBlock: CreateKeyspace
-)(implicit protected val sSession: ScalaSession) extends SCStatement[ResultSet] {
-  protected def mkResponse(rs: ResultSet): ResultSet = rs
-
-  protected def queryBuildingBlocks: Seq[QueryBuildingBlock] = Seq(createKeyspaceBlock)
-
-  def ifNotExists: SCCreateKeyspaceStatement =
-    copy(createKeyspaceBlock = CreateKeyspace(createKeyspaceBlock.keyspace, If.IfNotExists, createKeyspaceBlock.properties))
-  def noConditional: SCCreateKeyspaceStatement =
-    copy(createKeyspaceBlock = CreateKeyspace(createKeyspaceBlock.keyspace, If.NoConditional, createKeyspaceBlock.properties))
-}
-object SCCreateKeyspaceStatement {
-  def apply(keyspace: String, properties: String, sSession: ScalaSession): SCCreateKeyspaceStatement = new SCCreateKeyspaceStatement(CreateKeyspace(keyspace, If.NoConditional, properties))(sSession)
-}
-final case class SCDropKeyspaceStatement private (
-    private val dropKeyspaceBlock: DropKeyspace
-)(implicit protected val sSession: ScalaSession) extends SCStatement[ResultSet] {
-  protected def mkResponse(rs: ResultSet): ResultSet = rs
-
-  protected def queryBuildingBlocks: Seq[QueryBuildingBlock] = Seq(dropKeyspaceBlock)
-}
-object SCDropKeyspaceStatement {
-  def apply(keyspace: String, sSession: ScalaSession): SCDropKeyspaceStatement = new SCDropKeyspaceStatement(DropKeyspace(keyspace))(sSession)
-}
-
-final case class SCCreateTableStatement private (
-    private val createTable: QueryBuildingBlock,
-    private val tableProperties: TableProperties
-)(implicit protected val sSession: ScalaSession) extends SCStatement[ResultSet] {
-  protected def mkResponse(rs: ResultSet): ResultSet = rs
-
-  protected def queryBuildingBlocks: Seq[QueryBuildingBlock] = Seq(createTable, tableProperties)
-
-  def `with`(properties: String): SCCreateTableStatement = copy(tableProperties = TableProperties.With(properties))
-}
-object SCCreateTableStatement {
-  def apply[T : CCCassFormatEncoder](keyspace: String, name: String, numPartitionKeys: Int, numClusteringKeys: Int, sSession: ScalaSession): SCCreateTableStatement =
-    new SCCreateTableStatement(CreateTable(keyspace, name, numPartitionKeys, numClusteringKeys), TableProperties.NoProperties)(sSession)
-}
-final case class SCTruncateTableStatement private (
-    private val truncateTableBlock: TruncateTable
-)(implicit protected val sSession: ScalaSession) extends SCStatement[ResultSet] {
-  protected def mkResponse(rs: ResultSet): ResultSet = rs
-
-  protected def queryBuildingBlocks: Seq[QueryBuildingBlock] = Seq(truncateTableBlock)
-}
-object SCTruncateTableStatement {
-  def apply(keyspace: String, table: String, sSession: ScalaSession): SCTruncateTableStatement = new SCTruncateTableStatement(TruncateTable(keyspace, table))(sSession)
-}
-final case class SCDropTableStatement private (
-    private val dropTableBlock: DropTable
-)(implicit protected val sSession: ScalaSession) extends SCStatement[ResultSet] {
-  protected def mkResponse(rs: ResultSet): ResultSet = rs
-
-  protected def queryBuildingBlocks: Seq[QueryBuildingBlock] = Seq(dropTableBlock)
-}
-object SCDropTableStatement {
-  def apply(keyspace: String, table: String, sSession: ScalaSession): SCDropTableStatement = new SCDropTableStatement(DropTable(keyspace, table))(sSession)
+  def apply(strRepr: String, anyrefArgs: List[AnyRef], sSession: ScalaSession): SCRawStatement = SCRawStatement(Raw(strRepr, anyrefArgs), CassConsistency.Default)(sSession)
+  def applyIterator(strRepr: String, anyrefArgs: List[AnyRef], sSession: ScalaSession): SCRawSelectStatement[Iterator] = new SCRawSelectStatement[Iterator](SCSelectStatement.mkIteratorResponse, Raw(strRepr, anyrefArgs), CassConsistency.Default)(sSession)
+  def applyOne(strRepr: String, anyrefArgs: List[AnyRef], sSession: ScalaSession): SCRawSelectStatement[Option] = new SCRawSelectStatement[Option](SCSelectStatement.mkOptionResponse, Raw(strRepr, anyrefArgs), CassConsistency.Default)(sSession)
 }
 
 final case class SCBatchStatement private (
     private val statements: List[SCStatement.SCBatchableStatement],
     private val usingBlock: TTLTimestamp,
-    private val batchType: BatchStatement.Type
+    private val batchType: BatchStatement.Type,
+    protected val cassConsistency: CassConsistency
 )(implicit protected val sSession: ScalaSession) extends SCStatement[ResultSet] {
   import SCStatement.{ RightBiasedEither, BiMappableFuture, resultSetFutureToScalaFuture, SCBatchableStatement }
   import SCBatchStatement.ListEitherTraverse
@@ -289,15 +262,14 @@ final case class SCBatchStatement private (
   protected def queryBuildingBlocks: Seq[QueryBuildingBlock] = throw new NotImplementedError("batch uses the cassandra session directly -- don't use me!")
 
   override def toString: String = (for {
-    tup <- statements.traverseU(_.buildQuery)
-    queryStatements = tup.map(t => s"    ${t._1};").mkString("\n")
-    fullQuery = s"""
-     |  BEGIN $batchType BATCH
-     |$queryStatements
-     |  APPLY BATCH;
-     |""".stripMargin
-    values = tup.flatMap(_._2)
-  } yield s"${getClass.getSimpleName}(${replaceqWithValue(fullQuery, values)})")
+    tup <- statements.traverseU(_.stringifyQuery)
+    queryStatements = tup.map(t => s"    $t;").mkString("\n")
+    stringified = s"""
+                     |  BEGIN $batchType BATCH
+                     |$queryStatements
+                     |  APPLY BATCH;
+                     |""".stripMargin
+  } yield s"${getClass.getSimpleName}($stringified)")
     .valueOr(ex => s"problem generating statement: $ex")
 
   private def mkBatch: Result[BatchStatement] = statements.traverseU(_.asBatch).map { ss =>
@@ -320,12 +292,12 @@ final case class SCBatchStatement private (
   def withBatchType(batchType: BatchStatement.Type): SCBatchStatement = copy(batchType = batchType)
 }
 object SCBatchStatement {
-  trait Batchable { this: SCStatement.SCResultSetStatement =>
-    def asBatch: Result[BoundStatement] = prepare
+  trait Batchable { this: SCStatement[ResultSet] =>
+    def asBatch: Result[BoundStatement] = prepareAndBind()
   }
 
   def apply(statements: List[SCStatement.SCBatchableStatement], sSession: ScalaSession): SCBatchStatement =
-    new SCBatchStatement(statements, TTLTimestamp.Neither, BatchStatement.Type.LOGGED)(sSession)
+    new SCBatchStatement(statements, TTLTimestamp.Neither, BatchStatement.Type.LOGGED, CassConsistency.Default)(sSession)
 
   // should be `private`, but the compiler thinks this is not being used (which it is), so setting to `protected` to work around bug
   protected implicit class ListEitherTraverse[LV](val list: List[LV]) extends AnyVal {
@@ -343,4 +315,70 @@ object SCBatchStatement {
     }
   }
 
+}
+
+final case class SCCreateKeyspaceStatement private (
+    private val createKeyspaceBlock: CreateKeyspace,
+    protected val cassConsistency: CassConsistency
+)(implicit protected val sSession: ScalaSession) extends SCStatement[ResultSet] {
+  protected def mkResponse(rs: ResultSet): ResultSet = rs
+
+  protected def queryBuildingBlocks: Seq[QueryBuildingBlock] = Seq(createKeyspaceBlock)
+
+  def ifNotExists: SCCreateKeyspaceStatement =
+    copy(createKeyspaceBlock = CreateKeyspace(createKeyspaceBlock.keyspace, If.IfNotExists, createKeyspaceBlock.properties))
+  def noConditional: SCCreateKeyspaceStatement =
+    copy(createKeyspaceBlock = CreateKeyspace(createKeyspaceBlock.keyspace, If.NoConditional, createKeyspaceBlock.properties))
+}
+object SCCreateKeyspaceStatement {
+  def apply(keyspace: String, properties: String, sSession: ScalaSession): SCCreateKeyspaceStatement = new SCCreateKeyspaceStatement(CreateKeyspace(keyspace, If.NoConditional, properties), CassConsistency.Default)(sSession)
+}
+final case class SCDropKeyspaceStatement private (
+    private val dropKeyspaceBlock: DropKeyspace,
+    protected val cassConsistency: CassConsistency
+)(implicit protected val sSession: ScalaSession) extends SCStatement[ResultSet] {
+  protected def mkResponse(rs: ResultSet): ResultSet = rs
+
+  protected def queryBuildingBlocks: Seq[QueryBuildingBlock] = Seq(dropKeyspaceBlock)
+}
+object SCDropKeyspaceStatement {
+  def apply(keyspace: String, sSession: ScalaSession): SCDropKeyspaceStatement = new SCDropKeyspaceStatement(DropKeyspace(keyspace), CassConsistency.Default)(sSession)
+}
+
+final case class SCCreateTableStatement private (
+    private val createTable: QueryBuildingBlock,
+    private val tableProperties: TableProperties,
+    protected val cassConsistency: CassConsistency
+)(implicit protected val sSession: ScalaSession) extends SCStatement[ResultSet] {
+  protected def mkResponse(rs: ResultSet): ResultSet = rs
+
+  protected def queryBuildingBlocks: Seq[QueryBuildingBlock] = Seq(createTable, tableProperties)
+
+  def `with`(properties: String): SCCreateTableStatement = copy(tableProperties = TableProperties.With(properties))
+}
+object SCCreateTableStatement {
+  def apply[T : CCCassFormatEncoder](keyspace: String, name: String, numPartitionKeys: Int, numClusteringKeys: Int, sSession: ScalaSession): SCCreateTableStatement =
+    new SCCreateTableStatement(CreateTable(keyspace, name, numPartitionKeys, numClusteringKeys), TableProperties.NoProperties, CassConsistency.Default)(sSession)
+}
+final case class SCTruncateTableStatement private (
+    private val truncateTableBlock: TruncateTable,
+    protected val cassConsistency: CassConsistency
+)(implicit protected val sSession: ScalaSession) extends SCStatement[ResultSet] {
+  protected def mkResponse(rs: ResultSet): ResultSet = rs
+
+  protected def queryBuildingBlocks: Seq[QueryBuildingBlock] = Seq(truncateTableBlock)
+}
+object SCTruncateTableStatement {
+  def apply(keyspace: String, table: String, sSession: ScalaSession): SCTruncateTableStatement = new SCTruncateTableStatement(TruncateTable(keyspace, table), CassConsistency.Default)(sSession)
+}
+final case class SCDropTableStatement private (
+    private val dropTableBlock: DropTable,
+    protected val cassConsistency: CassConsistency
+)(implicit protected val sSession: ScalaSession) extends SCStatement[ResultSet] {
+  protected def mkResponse(rs: ResultSet): ResultSet = rs
+
+  protected def queryBuildingBlocks: Seq[QueryBuildingBlock] = Seq(dropTableBlock)
+}
+object SCDropTableStatement {
+  def apply(keyspace: String, table: String, sSession: ScalaSession): SCDropTableStatement = new SCDropTableStatement(DropTable(keyspace, table), CassConsistency.Default)(sSession)
 }
