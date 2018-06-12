@@ -67,7 +67,7 @@ final case class ScalaSession(keyspace: String)(implicit val session: Session) e
     CacheBuilder.newBuilder().maximumSize(1000).build[String, Either[Throwable, PreparedStatement]]()
 
   private[scalacass] def getFromCacheOrElse(key: String, statement: => PreparedStatement) = {
-    def onCacheMiss = {
+    def onCacheMiss: Either[Throwable, PreparedStatement] = {
       logger.debug(s"cache miss for key $key")
       try Right(statement) catch { case ex: Throwable => Left(ex) }
     }
