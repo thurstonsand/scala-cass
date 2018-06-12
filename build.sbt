@@ -56,7 +56,6 @@ lazy val commonSettings = Seq(
     "com.google.code.findbugs" % "jsr305" % "3.0.1" % "provided", // Intellij does not like "compile-internal, test-internal", use "provided" instead
     "org.joda" % "joda-convert" % "1.8.1" % "provided", // Intellij does not like "compile-internal, test-internal", use "provided" instead
     "org.slf4j" % "slf4j-api" % "1.7.25" % "provided", // Intellij does not like "compile-internal, test-internal", use "provided" instead
-    "com.typesafe.scala-logging" %% "scala-logging" % "3.9.0",
     "joda-time" % "joda-time" % "2.9.4",
     "com.chuusai" %% "shapeless" % "2.3.3",
     "com.google.guava" % "guava" % "19.0",
