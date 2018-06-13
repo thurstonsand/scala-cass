@@ -1,7 +1,7 @@
 package com.weather.scalacass
 
-import com.datastax.driver.core.{ ConsistencyLevel, ResultSet }
-import com.weather.scalacass.scsession.SCStatement
+import com.datastax.driver.core.ConsistencyLevel
+import com.weather.scalacass.scsession.{ SCBatchStatement, SCStatement }
 import com.weather.scalacass.util.CassandraWithTableTester
 import org.scalatest.{ Assertion, OptionValues }
 
@@ -13,7 +13,7 @@ object SessionActionsUnitTest {
 class SessionActionsUnitTest extends CassandraWithTableTester(SessionActionsUnitTest.db, SessionActionsUnitTest.table,
   List("str varchar", "otherstr varchar", "d double"),
   List("str")) with OptionValues {
-  import SessionActionsUnitTest.table
+  import SessionActionsUnitTest.{ db, table }
   lazy val ss = ScalaSession(SessionActionsUnitTest.db)(client.session)
 
   case class Query(str: String)
@@ -24,7 +24,7 @@ class SessionActionsUnitTest extends CassandraWithTableTester(SessionActionsUnit
   val queryValue = Query(insertValue.str)
   val updateValue = Update("updatedStr", 4321.0)
 
-  def checkConsistency(statement: SCStatement[ResultSet], clOpt: Option[ConsistencyLevel]): Assertion = {
+  def checkConsistency[T <: SCStatement[_]](statement: T, clOpt: Option[ConsistencyLevel]): Assertion = {
     clOpt match {
       case Some(cl) => statement.toString should include(s"<CONSISTENCY $cl>")
       case None     => statement.toString should not include "<CONSISTENCY"
@@ -32,30 +32,61 @@ class SessionActionsUnitTest extends CassandraWithTableTester(SessionActionsUnit
     val bound = statement.prepareAndBind().toOption.value
     bound.preparedStatement.getConsistencyLevel shouldBe clOpt.orNull
   }
-  "setting consistency" should "work as expected" in {
-    val statement = ss.insert(table, insertValue)
-    val statementWithConsistency = statement.consistency(ConsistencyLevel.ONE)
-    val statementWithDiffConsistency = statementWithConsistency.consistency(ConsistencyLevel.THREE)
-    val statementWithNoConsistency = statementWithDiffConsistency.defaultConsistency
+
+  def fullCheck[T <: SCStatement[_]](statement: T)(plusConsistency: (T, ConsistencyLevel) => T, minusConsistency: T => T, cl: ConsistencyLevel): Assertion = {
+    val statementWithConsistency = plusConsistency(statement, cl)
+    val statementWithNoConsistency = minusConsistency(statement)
 
     checkConsistency(statement, None)
-    checkConsistency(statementWithConsistency, Some(ConsistencyLevel.ONE))
+    checkConsistency(statementWithConsistency, Some(cl))
     checkConsistency(statement, None)
-    checkConsistency(statementWithConsistency, Some(ConsistencyLevel.ONE))
-    checkConsistency(statementWithDiffConsistency, Some(ConsistencyLevel.THREE))
+    checkConsistency(statementWithConsistency, Some(cl))
     checkConsistency(statementWithNoConsistency, None)
   }
 
-  it should "work with updates too" in {
-    val statement = ss.update(table, updateValue, queryValue)
-    val statementWithConsistency = statement.consistency(ConsistencyLevel.LOCAL_ONE)
+  "setting consistency" should "work with inserts" in {
+    fullCheck(ss.insert(table, insertValue))(_ consistency _, _.defaultConsistency, ConsistencyLevel.ONE)
+  }
+
+  it should "work with updates" in {
+    fullCheck(ss.update(table, updateValue, queryValue))(_ consistency _, _.defaultConsistency, ConsistencyLevel.LOCAL_ONE)
+  }
+
+  it should "work with selects" in {
+    fullCheck(ss.selectStar(table, queryValue))(_ consistency _, _.defaultConsistency, ConsistencyLevel.SERIAL)
+    fullCheck(ss.select[Update](table, queryValue))(_ consistency _, _.defaultConsistency, ConsistencyLevel.SERIAL)
+    fullCheck(ss.selectOneStar(table, queryValue))(_ consistency _, _.defaultConsistency, ConsistencyLevel.SERIAL)
+    fullCheck(ss.selectOne[Update](table, queryValue))(_ consistency _, _.defaultConsistency, ConsistencyLevel.SERIAL)
+  }
+
+  it should "work with deletes" in {
+    fullCheck(ss.deleteRow(table, queryValue))(_ consistency _, _.defaultConsistency, ConsistencyLevel.ANY)
+  }
+
+  it should "work with raw" in {
+    fullCheck(ss.rawStatement(s"INSERT INTO $db.$table (str, otherstr, d) VALUES (?, ?, ?)"))(_ consistency _, _.defaultConsistency, ConsistencyLevel.LOCAL_QUORUM)
+    fullCheck(ss.rawSelectOne(s"SELECT * FROM $db.$table WHERE str=? LIMIT 1"))(_ consistency _, _.defaultConsistency, ConsistencyLevel.LOCAL_SERIAL)
+    fullCheck(ss.rawSelect(s"SELECT * FROM $db.$table WHERE str=?"))(_ consistency _, _.defaultConsistency, ConsistencyLevel.LOCAL_SERIAL)
+  }
+
+  it should "work with batches" in {
+    def checkConsistencyBatch(statement: SCBatchStatement, clOpt: Option[ConsistencyLevel]): Assertion = {
+      clOpt match {
+        case Some(cl) => statement.toString should include(s"<CONSISTENCY $cl>")
+        case None     => statement.toString should not include "<CONSISTENCY"
+      }
+      val bound = statement.mkBatch.toOption.value
+      bound.getSerialConsistencyLevel shouldBe clOpt.getOrElse(cluster.getConfiguration.getQueryOptions.getSerialConsistencyLevel)
+    }
+
+    val statement = ss.batchOf(ss.insert(table, insertValue))
+    val statementWithConsistency = statement.consistency(ConsistencyLevel.LOCAL_SERIAL)
     val statementWithNoConsistency = statementWithConsistency.defaultConsistency
 
-    checkConsistency(statement, None)
-    checkConsistency(statementWithConsistency, Some(ConsistencyLevel.LOCAL_ONE))
-    checkConsistency(statement, None)
-    checkConsistency(statementWithConsistency, Some(ConsistencyLevel.LOCAL_ONE))
-    checkConsistency(statementWithNoConsistency, None)
+    checkConsistencyBatch(statement, None)
+    checkConsistencyBatch(statementWithConsistency, Some(ConsistencyLevel.LOCAL_SERIAL))
+    checkConsistencyBatch(statement, None)
+    checkConsistencyBatch(statementWithConsistency, Some(ConsistencyLevel.LOCAL_SERIAL))
+    checkConsistencyBatch(statementWithNoConsistency, None)
   }
-
 }

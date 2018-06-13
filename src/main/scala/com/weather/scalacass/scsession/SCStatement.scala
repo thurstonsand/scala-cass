@@ -61,6 +61,7 @@ trait SCStatement[Response] extends Product with Serializable {
     prepareAndBind().fold(Future.failed, b => (sSession.session.executeAsync(b): Future[ResultSet]).bimap(identity, mkResponse))
 
   protected def queryBuildingBlocks: Seq[QueryBuildingBlock]
+
   private[scsession] def buildQuery: Result[(String, List[AnyRef])] = QueryBuildingBlock.build(queryBuildingBlocks)
 
   def getStringRepr: Result[String] = buildQuery.map(_._1)
@@ -155,6 +156,9 @@ final case class SCDeleteStatement private (
   def ifExists: SCDeleteStatement = copy(ifBlock = If.IfExists)
   def `if`[A : CCCassFormatEncoder](statement: A): SCDeleteStatement = copy(ifBlock = If.IfStatement(statement))
   def noConditional: SCDeleteStatement = copy(ifBlock = If.NoConditional)
+
+  def consistency(cl: ConsistencyLevel): SCDeleteStatement = copy(cassConsistency = CassConsistency.addConsistency(cl))
+  def defaultConsistency: SCDeleteStatement = copy(cassConsistency = CassConsistency.removeConsistency)
 }
 object SCDeleteStatement {
   def apply[D : CCCassFormatEncoder, Q : CCCassFormatEncoder](keyspace: String, table: String, where: Q, sSession: ScalaSession) =
@@ -268,15 +272,18 @@ final case class SCBatchStatement private (
                      |  BEGIN $batchType BATCH
                      |$queryStatements
                      |  APPLY BATCH;
-                     |""".stripMargin
+                     |${cassConsistency.level.fold("")(cl => s"  <CONSISTENCY $cl>\n")}""".stripMargin
   } yield s"${getClass.getSimpleName}($stringified)")
     .valueOr(ex => s"problem generating statement: $ex")
 
-  private def mkBatch: Result[BatchStatement] = statements.traverseU(_.asBatch).map { ss =>
+  @SuppressWarnings(Array("org.wartremover.warts.Null"))
+  private[scalacass] def mkBatch: Result[BatchStatement] = statements.traverseU(_.asBatch).map { ss =>
     import scala.collection.JavaConverters._
 
     val bs = new BatchStatement(batchType)
     bs.addAll(ss.asJava)
+    val scl = cassConsistency.level.getOrElse(sSession.session.getCluster.getConfiguration.getQueryOptions.getSerialConsistencyLevel)
+    bs.setSerialConsistencyLevel(scl)
     bs
   }
   override def execute(): Result[ResultSet] = mkBatch.map(sSession.session.execute)
@@ -290,10 +297,21 @@ final case class SCBatchStatement private (
   def and(batchables: SCBatchableStatement*): SCBatchStatement = copy(statements = statements ++ batchables)
 
   def withBatchType(batchType: BatchStatement.Type): SCBatchStatement = copy(batchType = batchType)
+
+  def consistency(cl: ConsistencyLevel): SCBatchStatement = copy(cassConsistency = CassConsistency.addConsistency(cl))
+  def defaultConsistency: SCBatchStatement = copy(cassConsistency = CassConsistency.removeConsistency)
 }
 object SCBatchStatement {
   trait Batchable { this: SCStatement[ResultSet] =>
-    def asBatch: Result[BoundStatement] = prepareAndBind()
+    @SuppressWarnings(Array("org.wartremover.warts.Null"))
+    def asBatch: Result[BoundStatement] = buildQuery.flatMap { case (queryStr, anyrefArgs) =>
+      sSession.getFromCacheOrElse(queryStr, sSession.session.prepare(queryStr))
+        .map { p =>
+          p.setConsistencyLevel(null)
+          p.bind(anyrefArgs: _*)
+        }
+    }
+
   }
 
   def apply(statements: List[SCStatement.SCBatchableStatement], sSession: ScalaSession): SCBatchStatement =

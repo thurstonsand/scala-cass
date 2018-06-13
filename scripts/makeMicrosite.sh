@@ -99,6 +99,7 @@ function clear_cassandra {
 function wait_for_cassandra {
   for i in $(seq 1 60); do
     if $1/nodetool status 2>/dev/null | grep "^UN" >/dev/null; then
+      $1/nodetool setlogginglevel ERROR 2>/dev/null
       echo "cassandra is running"
       return 0
     else
