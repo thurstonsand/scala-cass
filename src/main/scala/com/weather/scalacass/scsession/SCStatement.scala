@@ -303,6 +303,8 @@ final case class SCBatchStatement private (
 }
 object SCBatchStatement {
   trait Batchable { this: SCStatement[ResultSet] =>
+    import SCStatement.RightBiasedEither
+
     @SuppressWarnings(Array("org.wartremover.warts.Null"))
     def asBatch: Result[BoundStatement] = buildQuery.flatMap { case (queryStr, anyrefArgs) =>
       sSession.getFromCacheOrElse(queryStr, sSession.session.prepare(queryStr))
