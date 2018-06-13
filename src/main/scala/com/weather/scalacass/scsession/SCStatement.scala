@@ -32,7 +32,7 @@ object SCStatement {
     def attempt(implicit ec: ExecutionContext): Future[Result[T]] = bimap(identity, identity)
   }
 
-  implicit class RightBiasedEither[+A, +B](val e: Either[A, B]) extends AnyVal {
+  private[scalacass] implicit class RightBiasedEither[+A, +B](val e: Either[A, B]) extends AnyVal {
     def map[C](fn: B => C): Either[A, C] = e.right.map(fn)
     def flatMap[AA >: A, C](fn: B => Either[AA, C]): Either[AA, C] = e.right.flatMap(fn)
     def foreach[U](fn: B => U): Unit = e match {
@@ -42,6 +42,7 @@ object SCStatement {
     }
     def getOrElse[BB >: B](or: => BB): BB = e.right.getOrElse(or)
     def valueOr[BB >: B](orFn: A => BB): BB = e.fold(orFn, identity)
+    def toOption: Option[B] = e.right.toOption
   }
   type SCBatchableStatement = SCStatement[ResultSet] with Batchable
 }

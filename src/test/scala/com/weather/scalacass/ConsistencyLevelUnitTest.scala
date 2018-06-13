@@ -1,20 +1,20 @@
 package com.weather.scalacass
 
 import com.datastax.driver.core.ConsistencyLevel
-import com.weather.scalacass.scsession.{ SCBatchStatement, SCStatement }
+import com.weather.scalacass.scsession.{ SCBatchStatement, SCStatement }, SCStatement.RightBiasedEither
 import com.weather.scalacass.util.CassandraWithTableTester
 import org.scalatest.{ Assertion, OptionValues }
 
-object SessionActionsUnitTest {
+object ConsistencyLevelUnitTest {
   val db = "actionsdb"
   val table = "actionstable"
 }
 
-class SessionActionsUnitTest extends CassandraWithTableTester(SessionActionsUnitTest.db, SessionActionsUnitTest.table,
-  List("str varchar", "otherstr varchar", "d double"),
-  List("str")) with OptionValues {
-  import SessionActionsUnitTest.{ db, table }
-  lazy val ss = ScalaSession(SessionActionsUnitTest.db)(client.session)
+class ConsistencyLevelUnitTest extends CassandraWithTableTester(ConsistencyLevelUnitTest.db, ConsistencyLevelUnitTest.table,
+                                                                List("str varchar", "otherstr varchar", "d double"),
+                                                                List("str")) with OptionValues {
+  import ConsistencyLevelUnitTest.{ db, table }
+  lazy val ss = ScalaSession(ConsistencyLevelUnitTest.db)(client.session)
 
   case class Query(str: String)
   case class Insert(str: String, otherstr: String, d: Double)
