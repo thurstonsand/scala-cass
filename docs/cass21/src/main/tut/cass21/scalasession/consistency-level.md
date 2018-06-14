@@ -38,6 +38,10 @@ And remove it if necessary, which will mean the statement will be written with t
 val noConsistencyInsert = insertStatement.defaultConsistency
 noConsistencyInsert.execute()
 ```
+
+Finally, certain consistency levels are only allowed for read vs write operations.
+See [the documentation](https://docs.datastax.com/en/cassandra/2.1/cassandra/dml/dml_config_consistency_c.html) for more details.
+In addition, batch statements can only use `SERIAL` or `LOCAL_SERIAL` level consistency.
 ```tut:invisible
 sSession.dropKeyspace.execute()
 sSession.close()

@@ -86,7 +86,7 @@ class ConsistencyLevelUnitTest extends CassandraWithTableTester(ConsistencyLevel
     checkConsistencyBatch(statement, None)
     checkConsistencyBatch(statementWithConsistency, Some(ConsistencyLevel.LOCAL_SERIAL))
     checkConsistencyBatch(statement, None)
-    checkConsistencyBatch(statementWithConsistency, Some(ConsistencyLevel.LOCAL_SERIAL))
+    checkConsistencyBatch(statementWithConsistency.consistency(ConsistencyLevel.SERIAL), Some(ConsistencyLevel.SERIAL))
     checkConsistencyBatch(statementWithNoConsistency, None)
   }
 }
