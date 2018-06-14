@@ -9,10 +9,11 @@ object UpdateBehaviorTests {
   val db = "testDB"
   val table = "testTable"
 }
-class UpdateBehaviorTests extends CassandraWithTableTester(UpdateBehaviorTests.db, UpdateBehaviorTests.table, List("str varchar", "l list<varchar>",
-  "s set<double>"), List("str")) with OptionValues {
+class UpdateBehaviorTests extends CassandraWithTableTester(UpdateBehaviorTests.db, UpdateBehaviorTests.table,
+  List("str varchar", "l list<varchar>", "s set<double>"),
+  List("str")) with OptionValues {
   import UpdateBehaviorTests.table
-  lazy val ss = ScalaSession("testDB")(client.session)
+  lazy val ss = ScalaSession(UpdateBehaviorTests.db)(client.session)
 
   case class Query(str: String)
   case class Insert(str: String, l: List[String], s: Set[Double])

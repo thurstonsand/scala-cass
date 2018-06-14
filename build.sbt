@@ -3,7 +3,6 @@ val cassandraVersion = sys.props.getOrElse("cassandra-driver.version", "3.5.0")
 
 lazy val codeLinterSettings = {
   Seq(
-//    wartremoverWarnings in (Compile, compile) := Seq.empty,
     wartremoverWarnings in (Compile, compile) ++= Seq(
       Wart.AsInstanceOf, Wart.DefaultArguments, Wart.EitherProjectionPartial, Wart.Enumeration,
       Wart.Equals, Wart.ExplicitImplicitTypes, Wart.FinalCaseClass, Wart.FinalVal,
@@ -26,12 +25,8 @@ def addUnmanagedSourceDirsFrom(folder: String) = {
 }
 
 lazy val commonSettings = Seq(
-  name := "ScalaCass",
-  organization := "com.github.thurstonsand",
-  description := "a wrapper for the Java Cassandra driver that uses case classes to simplify and codify creating cached statements in a type-safe manner",
-  version := s"3.1.1-$cassandraVersion",
   scalaVersion := "2.12.6",
-  crossScalaVersions := Seq("2.12.6", "2.11.12", "2.10.6"),
+  crossScalaVersions := Seq("2.12.6", "2.11.12", "2.10.7"),
   scalacOptions ++= Seq(
     "-deprecation",
     "-encoding", "UTF-8",
@@ -51,7 +46,27 @@ lazy val commonSettings = Seq(
     case Some((2, 10)) => Seq("-Xlint")
     case _             => throw new IllegalArgumentException(s"scala version not configured: ${scalaVersion.value}")
   }),
-  addCompilerPlugin("org.scalamacros" % "paradise" % "2.1.0" cross CrossVersion.full),
+  addCompilerPlugin("org.scalamacros" % "paradise" % "2.1.1" cross CrossVersion.full),
+  parallelExecution in Test := false,
+) ++ codeLinterSettings
+
+lazy val macroSettings = Seq(
+  libraryDependencies ++= Seq(
+    "org.scalameta" %% "scalameta" % "3.7.4" % "provided",
+    "org.scala-lang" % "scala-reflect" % scalaVersion.value,
+    "org.scala-lang" % "scala-compiler" % scalaVersion.value % "provided",
+    "com.datastax.cassandra" % "cassandra-driver-core" % cassandraVersion classifier "shaded"
+  ) ++ (CrossVersion.partialVersion(scalaVersion.value) match {
+    case Some((2, 10)) => Seq("org.scalamacros" %% "quasiquotes" % "2.1.1" cross CrossVersion.binary)
+    case _ => Seq.empty
+  })
+)
+
+lazy val applicationSettings = Seq(
+  name := "ScalaCass",
+  organization := "com.github.thurstonsand",
+  description := "a wrapper for the Java Cassandra driver that uses case classes to simplify and codify creating cached statements in a type-safe manner",
+  version := s"3.1.1-$cassandraVersion",
   libraryDependencies ++= Seq(
     "com.google.code.findbugs" % "jsr305" % "3.0.1" % "provided", // Intellij does not like "compile-internal, test-internal", use "provided" instead
     "org.joda" % "joda-convert" % "1.8.1" % "provided", // Intellij does not like "compile-internal, test-internal", use "provided" instead
@@ -72,9 +87,8 @@ lazy val commonSettings = Seq(
       case Some((2, 10)) => sys.props("scalac.patmat.analysisBudget") = "off"
       case _             => sys.props remove "scalac.patmat.analysisBudget"
     }
-  },
-  parallelExecution in Test := false,
-) ++ codeLinterSettings
+  }
+)
 
 lazy val noPublishSettings = Seq(
   publish := ((): Unit),
@@ -124,16 +138,25 @@ lazy val micrositeSettings = Seq(
   git.remoteRepo := "git@github.com:thurstonsand/scala-cass.git"
 )
 
+// in case I need macros in the future
+//lazy val `scala-cass-macros` = project.in(file("macro"))
+//  .settings(moduleName := "scala-cass-macros")
+//  .settings(commonSettings: _*)
+//  .settings(macroSettings: _*)
+
 lazy val `scala-cass` = project.in(file("."))
   .settings(moduleName := "scala-cass",
             sourceGenerators in Compile += (sourceManaged in Compile).map(Boilerplate.gen).taskValue)
   .settings(commonSettings: _*)
+  .settings(applicationSettings: _*)
   .settings(publishSettings: _*)
   .settings(addUnmanagedSourceDirsFrom(if (cassandraVersion startsWith "2.1.") "scala_cass21" else "scala_cass3"))
+//  .dependsOn(`scala-cass-macros`)
 
 lazy val `tut-cass3` = project.in(file("docs/cass3"))
   .enablePlugins(MicrositesPlugin)
   .settings(commonSettings: _*)
+  .settings(applicationSettings: _*)
   .settings(micrositeSettings: _*)
   .settings(noPublishSettings: _*)
   .settings(addUnmanagedSourceDirsFrom("scala_cass3"): _*)
@@ -142,6 +165,7 @@ lazy val `tut-cass3` = project.in(file("docs/cass3"))
 lazy val `tut-cass21`=  project.in(file("docs/cass21"))
   .enablePlugins(MicrositesPlugin)
   .settings(commonSettings: _*)
+  .settings(applicationSettings: _*)
   .settings(micrositeSettings: _*)
   .settings(noPublishSettings: _*)
   .settings(addUnmanagedSourceDirsFrom("scala_cass21"): _*)
