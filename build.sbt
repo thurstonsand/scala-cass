@@ -1,5 +1,13 @@
-// choose "3.5.0" or "2.1.10.3"
-val cassandraVersion = sys.props.getOrElse("cassandra-driver.version", "3.5.0")
+import microsites._
+
+val cassandra3Version = "3.5.0"
+val cassandra2Version = "2.1.10.3"
+val cassandraVersion = sys.props.getOrElse("cassandra-driver.version", cassandra3Version) match {
+  case v @ (`cassandra3Version` | `cassandra2Version`) => v
+  case _ => throw new IllegalArgumentException(s"cassandra version must be one of $cassandra3Version, $cassandra2Version")
+}
+
+val baseVersion = "3.2.0"
 
 lazy val codeLinterSettings = {
   Seq(
@@ -66,7 +74,7 @@ lazy val applicationSettings = Seq(
   name := "ScalaCass",
   organization := "com.github.thurstonsand",
   description := "a wrapper for the Java Cassandra driver that uses case classes to simplify and codify creating cached statements in a type-safe manner",
-  version := s"3.1.1-$cassandraVersion",
+  version := s"$baseVersion-$cassandraVersion",
   libraryDependencies ++= Seq(
     "com.google.code.findbugs" % "jsr305" % "3.0.1" % "provided", // Intellij does not like "compile-internal, test-internal", use "provided" instead
     "org.joda" % "joda-convert" % "1.8.1" % "provided", // Intellij does not like "compile-internal, test-internal", use "provided" instead
@@ -124,7 +132,6 @@ lazy val micrositeSettings = Seq(
   micrositeGithubOwner := "thurstonsand",
   micrositeGithubRepo := "scala-cass",
   micrositeBaseUrl := sys.props.getOrElse("microsite.baseurl", "scala-cass"),
-  //micrositeHomepage := "https://github.com/thurstonsand",
   micrositeImgDirectory := baseDirectory.value / "imgs",
   micrositeCssDirectory := baseDirectory.value / "css",
   micrositeDataDirectory := baseDirectory.value / "data",
@@ -132,6 +139,13 @@ lazy val micrositeSettings = Seq(
   micrositeGitterChannelUrl := "scala-cass/Lobby",
   micrositeShareOnSocial := false,
   micrositeHighlightTheme := "docco",
+  micrositeConfigYaml := ConfigYml(
+    yamlCustomProperties = Map(
+      "baseVersion" -> baseVersion,
+      "cassandra2Version" -> cassandra2Version,
+      "cassandra3Version" -> cassandra3Version
+    )
+  ),
   includeFilter in makeSite := "*.html" | "*.css" | "*.png" | "*.jpg" | "*.gif" | "*.js" | "*.swf" | "*.yml" | "*.md",
   ghpagesNoJekyll := false,
   fork in tut := true,

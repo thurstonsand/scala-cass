@@ -11,8 +11,7 @@ object ConsistencyLevelUnitTest {
 }
 
 class ConsistencyLevelUnitTest extends CassandraWithTableTester(ConsistencyLevelUnitTest.db, ConsistencyLevelUnitTest.table,
-                                                                List("str varchar", "otherstr varchar", "d double"),
-                                                                List("str")) with OptionValues {
+  List("str varchar", "otherstr varchar", "d double"), List("str")) with OptionValues {
   import ConsistencyLevelUnitTest.{ db, table }
   lazy val ss = ScalaSession(ConsistencyLevelUnitTest.db)(client.session)
 
