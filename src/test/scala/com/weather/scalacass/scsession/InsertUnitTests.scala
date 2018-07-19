@@ -27,4 +27,9 @@ class InsertUnitTests extends ActionUnitTests {
     println(query2.getStringRepr)
     println(query2.execute().right.toOption.value)
   }
+
+  it should "insert where a row has a string with a $ in it" in {
+    val query = ss.insert(table, Table("""{ "$regex": /yeppers/ }""", 1234, Some(123)))
+    println(query.toString)
+  }
 }
