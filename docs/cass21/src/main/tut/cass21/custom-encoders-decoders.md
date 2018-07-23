@@ -5,7 +5,7 @@ section: "c21"
 ---
 ```tut:invisible
 import com.datastax.driver.core.{Cluster, Session}
-import com.weather.scalacass.{Result, ScalaSession}
+import com.weather.scalacass.{Result, ScalaSession, CCCassFormatEncoder, CCCassFormatDecoder}
 import com.weather.scalacass.syntax._
 import com.datastax.driver.core.Row
 import com.weather.scalacass.scsession.SCStatement.RightBiasedEither
@@ -19,6 +19,9 @@ sSession.createKeyspace("replication = {'class':'SimpleStrategy', 'replication_f
 case class MyTable(s: String, i: Int, l: Long)
 val createStatement = sSession.createTable[MyTable]("mytable", 1, 0)
 createStatement.execute()
+
+val createSpecialTable = sSession.rawStatement("CREATE TABLE specialtable (s varchar PRIMARY KEY, i int, special_long bigint")
+createSpecialTable.execute()
 
 val insertStatement = sSession.insert("mytable", MyTable("a_unique_id", 1234, 5678L))
 insertStatement.execute()
@@ -40,6 +43,38 @@ object UniqueId {
 ```
 
 You can provide a custom type in 2 ways:
+
+## Using `forProduct$arity` for case classes
+
+When parsing the entire row into a case class, sometimes it may not be possible to encapsulate specialized logic
+using the basic encoders. In these cases, `forProduct$arity` can be used as a way to have complete control over
+how values are extracted out of/inserted into a row. They can also be used when names in a Cassandra row do not match
+the names in the case class. Since it only applies on operations to an entire row, the functions are available
+on `CCCassFormatEncoder` and `CCCassFormatDecoder`. The functions take a format of 
+`forProduct1`/`forProduct2`/...`forProduct22`, and you choose the one that matches the number of arguments you wish
+to extract/insert into a row.
+
+```tut
+object Wrapper {
+  case class SpecialInsert(s: String, i: Int, specialLong: Long)
+  object SpecialInsert {
+    implicit val ccDecoder: CCCassFormatDecoder[SpecialInsert] =
+      CCCassFormatDecoder.forProduct3("s", "i", "special_long")((s: String, i: Int, specialLong: Long) => SpecialInsert(s, i, specialLong))
+    implicit val ccEncoder: CCCassFormatEncoder[SpecialInsert] =
+      CCCassFormatEncoder.forProduct3("s", "i", "special_long")((sc: SpecialInsert) => (sc.s, sc.i, sc.specialLong))
+  }
+}
+import Wrapper._ // Wrapper is necessary for this interpreter, and should be excluded in your code
+```
+
+And now the SpecialInsert is ready to be used:
+
+```tut
+val specialInsertStatement = sSession.insert("specialtable", SpecialInsert("asdf", 1234, 5678L))
+specialInsertStatement.execute()
+```
+
+Renaming is not the only usage of `forProduct$arity`, nor is it strictly required to create one for a case class.
 
 ## Map over an existing type
 
