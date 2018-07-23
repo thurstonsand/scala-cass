@@ -130,20 +130,20 @@ on `CCCassFormatEncoder` and `CCCassFormatDecoder`. The functions take a format 
 to extract/insert into a row.
 
 ```tut
-case class SpecialInsert(s: String, i: Int, specialLong: Long)
-object SpecialInsert {
-  implicit val ccDecoder: CCCassFormatDecoder[SpecialClass] =
-    CCCassFormatDecoder.forProduct3("s", "i", "special_long")((s: String, i: Int, specialLong: Long) => SpecialClass(s, i, specialLong))
-  implicit val ccEncoder: CCCassFormatEncoder[SpecialClass] =
-    CCCassFormatEncoder.forProduct3("s", "i", "special_long")((sc: SpecialClass) => (sc.s, sc.i, sc.specialLong)) 
+object Wrapper {
+  case class SpecialInsert(s: String, i: Int, specialLong: Long)
+  object SpecialInsert {
+    implicit val ccDecoder: CCCassFormatDecoder[SpecialInsert] =
+      CCCassFormatDecoder.forProduct3("s", "i", "special_long")((s: String, i: Int, specialLong: Long) => SpecialInsert(s, i, specialLong))
+    implicit val ccEncoder: CCCassFormatEncoder[SpecialInsert] =
+      CCCassFormatEncoder.forProduct3("s", "i", "special_long")((sc: SpecialInsert) => (sc.s, sc.i, sc.specialLong))
+  }
 }
+import Wrapper._ // Wrapper is necessary for this interpreter, and should be excluded in your code
 ```
 
 And now the SpecialInsert is ready to be used:
 
-```tut:invisible
-import SpecialInsert._
-```
 ```tut
 val specialInsertStatement = sSession.insert("specialtable", SpecialInsert("asdf", 1234, 5678L))
 specialInsertStatement.execute()

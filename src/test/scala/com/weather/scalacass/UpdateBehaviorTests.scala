@@ -1,5 +1,6 @@
 package com.weather.scalacass
 
+import com.datastax.driver.core.ResultSet
 import com.weather.scalacass.ScalaSession.UpdateBehavior
 import com.weather.scalacass.util.CassandraWithTableTester
 import org.scalatest.OptionValues
@@ -20,7 +21,7 @@ class UpdateBehaviorTests extends CassandraWithTableTester(UpdateBehaviorTests.d
   val baseStr = "some item"
   val base = Insert(baseStr, List("asdf"), Set(1.0))
   val baseQuery = Query(baseStr)
-  def insertOne(i: Insert = base) = ss.insert(table, i).execute()
+  def insertOne(i: Insert = base): Result[ResultSet] = ss.insert(table, i).execute()
 
   "explicit replacement" should "act as before" in {
     case class Replacing(l: UpdateBehavior.Replace[List, String], s: UpdateBehavior.Replace[Set, Double])
@@ -29,7 +30,7 @@ class UpdateBehaviorTests extends CassandraWithTableTester(UpdateBehaviorTests.d
     insertOne()
     ss.update(table, instance, baseQuery).execute()
 
-    val res = ss.selectOneStar(table, baseQuery).execute.right.toOption.flatten.value.as[Insert]
+    val res = ss.selectOneStar(table, baseQuery).execute().right.toOption.flatten.value.as[Insert]
     res.str shouldBe baseStr
     res.l should contain theSameElementsAs instance.l.coll
     res.s should contain theSameElementsAs instance.s.coll
@@ -42,7 +43,7 @@ class UpdateBehaviorTests extends CassandraWithTableTester(UpdateBehaviorTests.d
     insertOne()
     ss.update(table, instance, baseQuery).execute()
 
-    val res = ss.selectOneStar(table, baseQuery).execute.right.toOption.flatten.value.as[Insert]
+    val res = ss.selectOneStar(table, baseQuery).execute().right.toOption.flatten.value.as[Insert]
     res.str shouldBe baseStr
     res.l should contain theSameElementsAs instance.l
     res.s should contain theSameElementsAs instance.s
@@ -55,7 +56,7 @@ class UpdateBehaviorTests extends CassandraWithTableTester(UpdateBehaviorTests.d
     insertOne()
     ss.update(table, instance, baseQuery).execute()
 
-    val res = ss.selectOneStar(table, baseQuery).execute.right.toOption.flatten.value.as[Insert]
+    val res = ss.selectOneStar(table, baseQuery).execute().right.toOption.flatten.value.as[Insert]
     res.str shouldBe baseStr
     res.l should contain theSameElementsAs base.l ::: instance.l.coll
     res.s should contain theSameElementsAs base.s ++ instance.s.coll
@@ -68,14 +69,14 @@ class UpdateBehaviorTests extends CassandraWithTableTester(UpdateBehaviorTests.d
     val expandedBase = base.copy(l = instance.l.coll ::: base.l, s = instance.s.coll ++ base.s)
     insertOne(expandedBase)
 
-    val preres = ss.selectOneStar(table, baseQuery).execute.right.toOption.flatten.value.as[Insert]
+    val preres = ss.selectOneStar(table, baseQuery).execute().right.toOption.flatten.value.as[Insert]
     preres.str shouldBe baseStr
     preres.l should contain theSameElementsAs expandedBase.l
     preres.s should contain theSameElementsAs expandedBase.s
 
     ss.update(table, instance, baseQuery).execute()
 
-    val res = ss.selectOneStar(table, baseQuery).execute.right.toOption.flatten.value.as[Insert]
+    val res = ss.selectOneStar(table, baseQuery).execute().right.toOption.flatten.value.as[Insert]
     res.str shouldBe baseStr
     res.l should contain theSameElementsAs base.l
     res.s should contain theSameElementsAs base.s
