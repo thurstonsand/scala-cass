@@ -31,7 +31,7 @@ abstract class ScalaCassUnitTests extends CassandraWithTableTester("testDB", "te
         res.getAs[GoodType](k).value shouldBe v
         res.getOrElse(k, default) shouldBe v
         an[IllegalArgumentException] should be thrownBy res.getOrElse(s"not$k", default)
-        res.attemptAs[GoodType](k).right.toOption.value shouldBe v
+        res.attemptAs[GoodType](k).right.value shouldBe v
     }
 
     an[IllegalArgumentException] should be thrownBy res.as[GoodType](s"not$k")
@@ -42,9 +42,9 @@ abstract class ScalaCassUnitTests extends CassandraWithTableTester("testDB", "te
     a[BadTypeException] should be thrownBy res.getAs[BadType](k)
     an[IllegalArgumentException] should be thrownBy res.getAs[BadType](s"not$k")
 
-    res.attemptAs[GoodType](s"not$k").left.toOption.value shouldBe an[IllegalArgumentException]
-    res.attemptAs[BadType](k).left.toOption.value shouldBe a[BadTypeException]
-    res.attemptAs[BadType](s"not$k").left.toOption.value shouldBe an[IllegalArgumentException]
+    res.attemptAs[GoodType](s"not$k").left.value shouldBe an[IllegalArgumentException]
+    res.attemptAs[BadType](k).left.value shouldBe a[BadTypeException]
+    res.attemptAs[BadType](s"not$k").left.value shouldBe an[IllegalArgumentException]
 
     if (testCC) {
       case class TestCC(pkField: String, refField: GoodType)
@@ -57,14 +57,14 @@ abstract class ScalaCassUnitTests extends CassandraWithTableTester("testDB", "te
       ss.insert(tname, t1)(CCCassFormatEncoder[TestCC]).execute()
       k match {
         case "b" =>
-          ss.selectOneStar(tname, ScalaSession.NoQuery()).execute.right.toOption.flatten.flatMap(_.getAs[TestCC]).map(_.refField.asInstanceOf[Array[Byte]]).value should contain theSameElementsInOrderAs t1.refField.asInstanceOf[Array[Byte]]
+          ss.selectOneStar(tname, ScalaSession.NoQuery()).execute().right.toOption.flatten.flatMap(_.getAs[TestCC]).map(_.refField.asInstanceOf[Array[Byte]]).value should contain theSameElementsInOrderAs t1.refField.asInstanceOf[Array[Byte]]
         case "sblob" =>
-          ss.selectOneStar(tname, ScalaSession.NoQuery()).execute.right.toOption.flatten.flatMap(_.getAs[TestCC]).flatMap(_.refField.asInstanceOf[Set[Array[Byte]]].headOption).value should contain theSameElementsInOrderAs t1.refField.asInstanceOf[Set[Array[Byte]]].head
+          ss.selectOneStar(tname, ScalaSession.NoQuery()).execute().right.toOption.flatten.flatMap(_.getAs[TestCC]).flatMap(_.refField.asInstanceOf[Set[Array[Byte]]].headOption).value should contain theSameElementsInOrderAs t1.refField.asInstanceOf[Set[Array[Byte]]].head
         case _ =>
-          ss.selectOneStar(tname, q1).execute.right.toOption.flatten.flatMap(_.getAs[TestCC]).value shouldBe t1
+          ss.selectOneStar(tname, q1).execute().right.toOption.flatten.flatMap(_.getAs[TestCC]).value shouldBe t1
       }
       ss.delete[ScalaSession.NoQuery](tname, q1).execute()
-      ss.select[ScalaSession.Star](tname, q1).execute.right.toOption.value.toList.map(_.as[TestCC]) shouldBe empty
+      ss.select[ScalaSession.Star](tname, q1).execute().right.value.toList.map(_.as[TestCC]) shouldBe empty
       ss.dropTable(tname).execute()
     }
   }
@@ -138,6 +138,6 @@ class ScalaCassUnitTestsAll extends ScalaCassUnitTests with ScalaCassUnitTestsVe
     ss.insert(tname, t1).execute()
     ss.selectOneStar(tname, q1).execute().right.toOption.flatten.value.as[CounterCC] shouldBe t1
     ss.delete[ScalaSession.NoQuery](tname, q1).execute()
-    ss.select[ScalaSession.Star](tname, q1).execute().right.toOption.value.toList shouldBe empty
+    ss.select[ScalaSession.Star](tname, q1).execute().right.value.toList shouldBe empty
   }
 }

@@ -28,7 +28,7 @@ class ConsistencyLevelUnitTest extends CassandraWithTableTester(ConsistencyLevel
       case Some(cl) => statement.toString should include(s"<CONSISTENCY $cl>")
       case None     => statement.toString should not include "<CONSISTENCY"
     }
-    val bound = statement.prepareAndBind().toOption.value
+    val bound = statement.prepareAndBind().right.value
     bound.preparedStatement.getConsistencyLevel shouldBe clOpt.orNull
   }
 
@@ -74,7 +74,7 @@ class ConsistencyLevelUnitTest extends CassandraWithTableTester(ConsistencyLevel
         case Some(cl) => statement.toString should include(s"<CONSISTENCY $cl>")
         case None     => statement.toString should not include "<CONSISTENCY"
       }
-      val bound = statement.mkBatch.toOption.value
+      val bound = statement.mkBatch.right.value
       bound.getSerialConsistencyLevel shouldBe clOpt.getOrElse(cluster.getConfiguration.getQueryOptions.getSerialConsistencyLevel)
     }
 

@@ -47,8 +47,8 @@ class DeleteUnitTests extends ActionUnitTests {
     val query = ss.delete[SelectiveDelete](table, Query("asdf")).`if`(IfS(1234L)).usingTimestamp(12345L)
     val executed = query.executeAsync()
     Await.ready(executed, 3.seconds)
-    executed.value.value.failed.toOption.value shouldBe an[InvalidQueryException]
-    query.execute().left.toOption.value shouldBe an[InvalidQueryException]
+    executed.value.value.failure.exception shouldBe an[InvalidQueryException]
+    query.execute().left.value shouldBe an[InvalidQueryException]
 
     println(s"broke: ${query.getStringRepr}")
     val fixedQuery = query.noTimestamp

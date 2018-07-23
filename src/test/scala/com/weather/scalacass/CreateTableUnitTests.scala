@@ -24,7 +24,7 @@ class CreateTableUnitTests extends CassandraUnitTester {
 
   "createTable" should "reject a table without primary key" in {
     case class AA(str: String, str2: String, i: Int)
-    ssFixture.ss.createTable[AA]("createTableTest", 0, 0).execute.left.toOption.value shouldBe a[WrongPrimaryKeySizeException]
+    ssFixture.ss.createTable[AA]("createTableTest", 0, 0).execute.left.value shouldBe a[WrongPrimaryKeySizeException]
   }
 
   def getpk[T : CCCassFormatDecoder : CCCassFormatEncoder](tname: String, pkCount: Int, clustCount: Int) = {
