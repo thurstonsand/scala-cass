@@ -54,6 +54,7 @@ lazy val commonSettings = Seq(
     case Some((2, 10)) => Seq("-Xlint")
     case _             => throw new IllegalArgumentException(s"scala version not configured: ${scalaVersion.value}")
   }),
+  (scalacOptions in Test) -= "-Xfatal-warnings",
   addCompilerPlugin("org.scalamacros" % "paradise" % "2.1.1" cross CrossVersion.full),
   parallelExecution in Test := false,
 ) ++ codeLinterSettings

@@ -77,7 +77,13 @@ trait SCStatement[Response] extends Product with Serializable {
         }
     }
 
-  protected def replaceqWithValue(repr: String, values: List[AnyRef]): String = values.foldLeft(repr) { case (r, v) => r.replaceFirst("\\?", v.toString) }
+  private def replaceFirstWithoutRegex(str: String, target: String, replacement: String): String = {
+    val idx = str.indexOf(target)
+    if (idx === -1) str
+    else str.substring(0, idx) + replacement + str.substring(idx + target.length)
+  }
+
+  protected def replaceqWithValue(repr: String, values: List[AnyRef]): String = values.foldLeft(repr) { case (r, v) => replaceFirstWithoutRegex(r, "?", v.toString) }
 
   protected[scalacass] def stringifyQuery: Result[String] = buildQuery.map { case (statement, anyrefArgs) => replaceqWithValue(statement, anyrefArgs) + cassConsistency.level.fold("")(cl => s" <CONSISTENCY $cl>") }
   override def toString: String = stringifyQuery.fold(ex => s"problem generating statement: $ex", q => s"${getClass.getSimpleName}($q)")

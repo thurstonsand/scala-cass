@@ -43,8 +43,8 @@ class UpdateUnitTests extends ActionUnitTests {
     val query = ss.update(table, Update(123, None), Query("asdf")).usingTTL(1234).`if`(IfS(123L)).usingTimestamp(12345L)
     val executed = query.executeAsync()
     Await.ready(executed, 3.seconds)
-    executed.value.value.failed.toOption.value shouldBe an[InvalidQueryException]
-    query.execute().left.toOption.value shouldBe an[InvalidQueryException]
+    executed.value.value.failure.exception shouldBe an[InvalidQueryException]
+    query.execute().left.value shouldBe an[InvalidQueryException]
 
     println(s"broke: ${query.getStringRepr}")
     val fixedQuery = query.noTimestamp
