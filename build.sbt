@@ -7,7 +7,7 @@ val cassandraVersion = sys.props.getOrElse("cassandra-driver.version", cassandra
   case _ => throw new IllegalArgumentException(s"cassandra version must be one of $cassandra3Version, $cassandra2Version")
 }
 
-val baseVersion = "3.2.0"
+val baseVersion = "3.2.1"
 
 lazy val codeLinterSettings = {
   Seq(
