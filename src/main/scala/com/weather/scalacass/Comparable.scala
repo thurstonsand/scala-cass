@@ -27,7 +27,7 @@ object Comparable {
     def encode(f: Comparable[A]): Result[Comparable[underlying.From]] =
       f match {
         case Equal(x) =>
-          underlying.encode(x).right.map(Less.apply)
+          underlying.encode(x).right.map(Equal.apply)
         case Less(x) =>
           underlying.encode(x).right.map(Less.apply)
         case LessEqual(x) =>
