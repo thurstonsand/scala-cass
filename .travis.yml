@@ -3,12 +3,13 @@ sudo: false
 
 language: scala
 scala:
-  - 2.12.6
+  - 2.13.1
+  - 2.12.10
   - 2.11.12
   - 2.10.7
 
 jdk:
-  - oraclejdk8
+  - openjdk8
 
 env:
   - CASSANDRA_DRIVER_VERSION=3.5.0

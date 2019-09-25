@@ -33,8 +33,8 @@ def addUnmanagedSourceDirsFrom(folder: String) = {
 }
 
 lazy val commonSettings = Seq(
-  scalaVersion := "2.12.6",
-  crossScalaVersions := Seq("2.12.6", "2.11.12", "2.10.7"),
+  scalaVersion := "2.13.1",
+  crossScalaVersions := Seq("2.13.1", "2.12.10", "2.11.12", "2.10.7"),
   scalacOptions ++= Seq(
     "-deprecation",
     "-encoding", "UTF-8",
@@ -84,7 +84,7 @@ lazy val applicationSettings = Seq(
     "com.chuusai" %% "shapeless" % "2.3.3",
     "com.google.guava" % "guava" % "19.0",
     "com.datastax.cassandra" % "cassandra-driver-core" % cassandraVersion classifier "shaded" excludeAll ExclusionRule("com.google.guava", "guava"),
-    "org.scalatest" %% "scalatest" % "3.0.5" % "test"
+    "org.scalatest" %% "scalatest" % "3.0.5" % "test",
   )  ++ (if (cassandraVersion startsWith "2.1.") Seq(
     "org.cassandraunit" % "cassandra-unit" % "2.2.2.1" % "test"
   ) else Seq(
