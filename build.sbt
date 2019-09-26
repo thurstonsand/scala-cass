@@ -16,7 +16,7 @@ lazy val codeLinterSettings = {
       Wart.Equals, Wart.ExplicitImplicitTypes, Wart.FinalCaseClass, Wart.FinalVal,
       Wart.IsInstanceOf, Wart.JavaConversions, Wart.JavaSerializable, Wart.LeakingSealed,
       Wart.Null, Wart.OptionPartial, Wart.Product, Wart.Recursion, Wart.Return,
-      Wart.Serializable, Wart.StringPlusAny, Wart.TryPartial, Wart.Var, Wart.While),
+      Wart.Serializable, Wart.TryPartial, Wart.Var, Wart.While),
     wartremoverWarnings in (Compile, console) := Seq.empty
   )
 }
@@ -33,8 +33,10 @@ def addUnmanagedSourceDirsFrom(folder: String) = {
 }
 
 lazy val commonSettings = Seq(
-  scalaVersion := "2.13.1",
-  crossScalaVersions := Seq("2.13.1", "2.12.10", "2.11.12", "2.10.7"),
+  // upgrading to 2.13 is a real pain because stuff is getting deprecated, which is causing errors
+  // dealing with it later
+  scalaVersion := "2.12.10",
+  crossScalaVersions := Seq("2.12.10", "2.11.12", "2.10.7"),
   scalacOptions ++= Seq(
     "-deprecation",
     "-encoding", "UTF-8",
@@ -44,18 +46,16 @@ lazy val commonSettings = Seq(
     "-language:implicitConversions",
     "-unchecked",
     "-Xfatal-warnings",
-    "-Yno-adapted-args",
     "-Ywarn-numeric-widen",
-    "-Ywarn-value-discard",
-    "-Xfuture"
+    "-Ywarn-value-discard"
   ) ++ (CrossVersion.partialVersion(scalaVersion.value) match {
-    case Some((2, 12)) => Seq("-Xlint:adapted-args,nullary-unit,inaccessible,nullary-override,infer-any,missing-interpolator,doc-detached,private-shadow,type-parameter-shadow,poly-implicit-overload,option-implicit,delayedinit-select,by-name-right-associative,package-object-classes,unsound-match,stars-align", "-Ywarn-unused:privates,locals")
-    case Some((2, 11)) => Seq("-Xlint:adapted-args,nullary-unit,inaccessible,nullary-override,infer-any,missing-interpolator,doc-detached,private-shadow,type-parameter-shadow,poly-implicit-overload,option-implicit,delayedinit-select,by-name-right-associative,package-object-classes,unsound-match,stars-align", "-Ywarn-unused", "-Ywarn-unused-import")
-    case Some((2, 10)) => Seq("-Xlint")
+    case Some((2, 13)) => Seq("-explaintypes", "-language:experimental.macros", "-Xlint:adapted-args,constant,doc-detached,nullary-unit,inaccessible,nullary-override,infer-any,missing-interpolator,doc-detached,private-shadow,type-parameter-shadow,poly-implicit-overload,option-implicit,delayedinit-select,package-object-classes,stars-align", "-Ywarn-unused:patvars,privates,locals", "-Ymacro-annotations", "-Ywarn-extra-implicit", "-Ycache-plugin-class-loader:last-modified", "-Ycache-macro-class-loader:last-modified")
+    case Some((2, 12)) => Seq("-Yno-adapted-args", "-Xlint:adapted-args,nullary-unit,inaccessible,nullary-override,infer-any,missing-interpolator,doc-detached,private-shadow,type-parameter-shadow,poly-implicit-overload,option-implicit,delayedinit-select,by-name-right-associative,package-object-classes,unsound-match,stars-align", "-Ywarn-unused:privates,locals", "-Xfuture")
+    case Some((2, 11)) => Seq("-Yno-adapted-args", "-Xlint:adapted-args,nullary-unit,inaccessible,nullary-override,infer-any,missing-interpolator,doc-detached,private-shadow,type-parameter-shadow,poly-implicit-overload,option-implicit,delayedinit-select,by-name-right-associative,package-object-classes,unsound-match,stars-align", "-Ywarn-unused", "-Ywarn-unused-import", "-Xfuture")
+    case Some((2, 10)) => Seq("-Yno-adapted-args", "-Xlint", "-Xfuture")
     case _             => throw new IllegalArgumentException(s"scala version not configured: ${scalaVersion.value}")
   }),
   (scalacOptions in Test) -= "-Xfatal-warnings",
-  addCompilerPlugin("org.scalamacros" % "paradise" % "2.1.1" cross CrossVersion.full),
   parallelExecution in Test := false,
 ) ++ codeLinterSettings
 
@@ -66,8 +66,10 @@ lazy val macroSettings = Seq(
     "org.scala-lang" % "scala-compiler" % scalaVersion.value % "provided",
     "com.datastax.cassandra" % "cassandra-driver-core" % cassandraVersion classifier "shaded"
   ) ++ (CrossVersion.partialVersion(scalaVersion.value) match {
-    case Some((2, 10)) => Seq("org.scalamacros" %% "quasiquotes" % "2.1.1" cross CrossVersion.binary)
-    case _ => Seq.empty
+    case Some((2, 13)) => Seq.empty
+    case Some((2, 10)) => Seq("org.scalamacros" %% "quasiquotes" % "2.1.1" cross CrossVersion.binary,
+                              compilerPlugin("org.scalamacros" %% "quasiquotes" % "2.1.1" cross CrossVersion.binary))
+    case _ => Seq(compilerPlugin("org.scalamacros" %% "quasiquotes" % "2.1.1" cross CrossVersion.binary))
   })
 )
 
@@ -84,7 +86,7 @@ lazy val applicationSettings = Seq(
     "com.chuusai" %% "shapeless" % "2.3.3",
     "com.google.guava" % "guava" % "19.0",
     "com.datastax.cassandra" % "cassandra-driver-core" % cassandraVersion classifier "shaded" excludeAll ExclusionRule("com.google.guava", "guava"),
-    "org.scalatest" %% "scalatest" % "3.0.5" % "test",
+    "org.scalatest" %% "scalatest" % "3.0.8" % "test",
   )  ++ (if (cassandraVersion startsWith "2.1.") Seq(
     "org.cassandraunit" % "cassandra-unit" % "2.2.2.1" % "test"
   ) else Seq(
