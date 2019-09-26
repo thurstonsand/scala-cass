@@ -66,10 +66,8 @@ lazy val macroSettings = Seq(
     "org.scala-lang" % "scala-compiler" % scalaVersion.value % "provided",
     "com.datastax.cassandra" % "cassandra-driver-core" % cassandraVersion classifier "shaded"
   ) ++ (CrossVersion.partialVersion(scalaVersion.value) match {
-    case Some((2, 13)) => Seq.empty
-    case Some((2, 10)) => Seq("org.scalamacros" %% "quasiquotes" % "2.1.1" cross CrossVersion.binary,
-                              compilerPlugin("org.scalamacros" %% "quasiquotes" % "2.1.1" cross CrossVersion.binary))
-    case _ => Seq(compilerPlugin("org.scalamacros" %% "quasiquotes" % "2.1.1" cross CrossVersion.binary))
+    case Some((2, 10)) => Seq("org.scalamacros" %% "quasiquotes" % "2.1.1" cross CrossVersion.binary)
+    case _ => Seq.empty
   })
 )
 
@@ -92,7 +90,10 @@ lazy val applicationSettings = Seq(
   ) else Seq(
     "com.datastax.cassandra" % "cassandra-driver-extras" % cassandraVersion excludeAll (ExclusionRule("com.datastax.cassandra", "cassandra-driver-core"), ExclusionRule("com.google.guava", "guava")),
     "org.cassandraunit" % "cassandra-unit" % "3.3.0.2" % "test"
-  )),
+  )) ++ (CrossVersion.partialVersion(scalaVersion.value) match {
+    case Some((2, 13)) => Seq.empty
+    case _ => Seq(compilerPlugin("org.scalamacros" % "paradise" % "2.1.1" cross CrossVersion.full))
+  }),
   initialize := {
     CrossVersion.partialVersion(scalaVersion.value) match {
       case Some((2, 10)) => sys.props("scalac.patmat.analysisBudget") = "off"
