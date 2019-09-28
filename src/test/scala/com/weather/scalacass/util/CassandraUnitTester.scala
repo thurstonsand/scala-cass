@@ -10,6 +10,7 @@ abstract class CassandraUnitTester extends CassandraTester {
   }
 
   override def afterAll() = {
+    super.afterAll()
     EmbeddedCassandraServerHelper.cleanEmbeddedCassandra()
   }
 
