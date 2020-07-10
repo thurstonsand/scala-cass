@@ -6,7 +6,7 @@ trait LowPriorityCassFormatEncoderVersionSpecific {
   implicit def tupleFormat[TUP <: Product](implicit underlying: TupleCassFormatEncoder[TUP]): CassFormatEncoder[TUP] = new CassFormatEncoder[TUP] {
     type From = TupleValue
     val cassDataType = TupleType.of(underlying.dataTypes: _*)
-    def encode(f: TUP): Result[From] = underlying.encode(f).right.map(ar => cassDataType.newValue(ar: _*))
+    def encode(f: TUP): Result[From] = underlying.encode(f).map(ar => cassDataType.newValue(ar: _*))
   }
 }
 

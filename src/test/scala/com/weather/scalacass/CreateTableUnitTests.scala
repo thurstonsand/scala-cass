@@ -2,17 +2,19 @@ package com.weather.scalacass
 
 import com.weather.scalacass.util.CassandraUnitTester
 
-import scala.collection.JavaConverters._
+import scala.collection.convert.AsScalaConverters
 import scala.language.reflectiveCalls
 
-class CreateTableUnitTests extends CassandraUnitTester {
+class CreateTableUnitTests extends CassandraUnitTester with AsScalaConverters {
   val dbName = "testDB"
   val tableColumns = List("str varchar, str2 varchar, i int")
   val primaryKeys = List("str")
 
   override def beforeAll(): Unit = {
     super.beforeAll()
-    client.session.execute(s"CREATE KEYSPACE $dbName WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1};")
+    client.session.execute(
+      s"CREATE KEYSPACE $dbName WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1};"
+    )
     ()
   }
 
@@ -24,14 +26,20 @@ class CreateTableUnitTests extends CassandraUnitTester {
 
   "createTable" should "reject a table without primary key" in {
     case class AA(str: String, str2: String, i: Int)
-    ssFixture.ss.createTable[AA]("createTableTest", 0, 0).execute.left.value shouldBe a[WrongPrimaryKeySizeException]
+    ssFixture.ss
+      .createTable[AA]("createTableTest", 0, 0)
+      .execute
+      .left
+      .value shouldBe a[WrongPrimaryKeySizeException]
   }
 
-  def getpk[T : CCCassFormatDecoder : CCCassFormatEncoder](tname: String, pkCount: Int, clustCount: Int) = {
+  def getpk[T: CCCassFormatDecoder: CCCassFormatEncoder](tname: String,
+                                                         pkCount: Int,
+                                                         clustCount: Int) = {
     ssFixture.ss.createTable[T](tname, pkCount, clustCount).execute()
     val table = cluster.getMetadata.getKeyspace(dbName).getTable(tname)
-    val parts = table.getPartitionKey.asScala.map(_.getName)
-    val clust = table.getClusteringColumns.asScala.map(_.getName)
+    val parts = asScala(table.getPartitionKey).map(_.getName)
+    val clust = asScala(table.getClusteringColumns).map(_.getName)
     (parts, clust)
   }
 
