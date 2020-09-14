@@ -1,6 +1,6 @@
 package com.weather.scalacass
 
-import com.datastax.driver.core.{ DataType, Row, TupleValue }
+import com.datastax.driver.core.{ DataType, Row, TupleValue, UDTValue }
 
 sealed trait Nullable[+A] {
   def toOption: Option[A]
@@ -49,14 +49,19 @@ object Nullable {
     val typeToken = underlying.typeToken
     def f2t(f: From): Result[Nullable[A]] = underlying.f2t(f).right.map(Is.apply)
     def extract(r: Row, name: String): From = underlying.extract(r, name)
-
     override def decode(r: Row, name: String): Result[Nullable[A]] = super.decode(r, name) match {
       case Left(Recoverable(_)) => Right(IsNull)
       case other                => other
     }
-    def tupleExtract(tup: TupleValue, pos: Int): From = underlying.tupleExtract(tup, pos)
 
+    def tupleExtract(tup: TupleValue, pos: Int): From = underlying.tupleExtract(tup, pos)
     override def tupleDecode(tup: TupleValue, pos: Int): Result[Nullable[A]] = super.tupleDecode(tup, pos) match {
+      case Left(Recoverable(_)) => Right(IsNull)
+      case other                => other
+    }
+
+    def udtExtract(udt: UDTValue, pos: Int): From = underlying.udtExtract(udt, pos)
+    override def udtDecode(udt: UDTValue, pos: Int): Result[Nullable[A]] = super.udtDecode(udt, pos) match {
       case Left(Recoverable(_)) => Right(IsNull)
       case other                => other
     }
