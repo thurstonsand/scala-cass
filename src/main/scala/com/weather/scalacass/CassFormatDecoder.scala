@@ -2,7 +2,7 @@ package com.weather.scalacass
 
 import java.nio.ByteBuffer
 
-import com.datastax.driver.core.{ DataType, Row, TupleValue }
+import com.datastax.driver.core.{ DataType, Row, TupleValue, UDTValue }
 import com.datastax.driver.core.exceptions.InvalidTypeException
 import NotRecoverable.Try2Either
 import com.google.common.reflect.{ TypeParameter, TypeToken }
@@ -23,12 +23,18 @@ trait CassFormatDecoder[T] { self =>
     if (tup.isNull(pos)) Left(new ValueNotDefinedException(s"""position $pos was not defined in tuple $tup"""))
     else f2t(tupleExtract(tup, pos))
   ).unwrap[T]
+  private[scalacass] def udtExtract(udt: UDTValue, name: String): From
+  private[scalacass] def udtDecode(udt: UDTValue, name: String): Result[T] = Try[Result[T]](
+    if (udt.isNull(name)) Left(new ValueNotDefinedException(s"""position $name was not defined in UDT $udt"""))
+    else f2t(udtExtract(udt, name))
+  ).unwrap[T]
   final def map[U](fn: T => U): CassFormatDecoder[U] = new CassFormatDecoder[U] {
     type From = self.From
     val typeToken = self.typeToken
     def f2t(f: From): Result[U] = self.f2t(f).right.map(fn)
     def extract(r: Row, name: String): From = self.extract(r, name)
     def tupleExtract(tup: TupleValue, pos: Int): From = self.tupleExtract(tup, pos)
+    def udtExtract(udt: UDTValue, name: String): From = self.udtExtract(udt, name)
   }
   final def flatMap[U](fn: T => Result[U]): CassFormatDecoder[U] = new CassFormatDecoder[U] {
     type From = self.From
@@ -36,6 +42,7 @@ trait CassFormatDecoder[T] { self =>
     def f2t(f: From): Result[U] = self.f2t(f).right.flatMap(fn)
     def extract(r: Row, name: String): From = self.extract(r, name)
     def tupleExtract(tup: TupleValue, pos: Int): From = self.tupleExtract(tup, pos)
+    def udtExtract(udt: UDTValue, name: String): From = self.udtExtract(udt, name)
   }
 
   final def as(r: Row)(name: String): T = decode(r, name) match {
@@ -53,6 +60,7 @@ trait LowPriorityCassFormatDecoder {
     def f2t(f: From) = underlying.decode(f, 0)
     def extract(r: Row, name: String) = r getTupleValue name
     def tupleExtract(tup: TupleValue, pos: Int) = tup getTupleValue pos
+    def udtExtract(udt: UDTValue, name: String) = udt getTupleValue name
     override def decode(r: Row, name: String): Result[TUP] = super.decode(r, name) match {
       case Left(f: java.lang.ArrayIndexOutOfBoundsException) => Left(new InvalidTypeException("tuple of wrong arity", f))
       case other => other
@@ -61,6 +69,21 @@ trait LowPriorityCassFormatDecoder {
       case Left(f: java.lang.ArrayIndexOutOfBoundsException) => Left(new InvalidTypeException("tuple of wrong arity", f))
       case other => other
     }
+
+    override def udtDecode(udt: UDTValue, name: String): Result[TUP] = super.udtDecode(udt, name) match {
+      case Left(f: java.lang.ArrayIndexOutOfBoundsException) => Left(new InvalidTypeException("tuple of wrong arity", f))
+      case other => other
+    }
+  }
+
+  case class UDT[U <: Product](value: U)
+  implicit def udtFormat[U <: Product](implicit underlying: UDTCassFormatDecoder[U]): CassFormatDecoder[UDT[U]] = new CassFormatDecoder[UDT[U]] {
+    type From = UDTValue
+    val typeToken = TypeToken.of(classOf[UDTValue])
+    def f2t(f: From) = underlying.decode(f).map(UDT.apply)
+    def extract(r: Row, name: String) = r getUDTValue name
+    def tupleExtract(tup: TupleValue, pos: Int) = tup getUDTValue pos
+    def udtExtract(udt: UDTValue, name: String) = udt getUDTValue name
   }
 }
 
@@ -76,35 +99,35 @@ object CassFormatDecoder extends CassFormatDecoderVersionSpecific {
       Try[Either[Throwable, T]](f2t(tupleExtract(tup, pos))).unwrap[T]
   }
 
-  private[scalacass] def sameTypeCassFormatDecoder[T <: AnyRef](_typeToken: TypeToken[T], _extract: (Row, String) => T, _tupExtract: (TupleValue, Int) => T) = new CassFormatDecoder[T] {
+  private[scalacass] def sameTypeCassFormatDecoder[T <: AnyRef](_typeToken: TypeToken[T], _extract: (Row, String) => T, _tupExtract: (TupleValue, Int) => T, _udtExtract: (UDTValue, String) => T) = new CassFormatDecoder[T] {
     type From = T
     val typeToken = _typeToken
     def f2t(f: From) = Right(f)
     def extract(r: Row, name: String) = _extract(r, name)
     def tupleExtract(tup: TupleValue, pos: Int): T = _tupExtract(tup, pos)
+    def udtExtract(udt: UDTValue, name: String): T = _udtExtract(udt, name)
   }
-  def safeConvertCassFormatDecoder[T, F <: AnyRef](_typeToken: TypeToken[F], _f2t: F => T, _extract: (Row, String) => F, _tupExtract: (TupleValue, Int) => F) = new CassFormatDecoder[T] {
+  def safeConvertCassFormatDecoder[T, F <: AnyRef](_typeToken: TypeToken[F], _f2t: F => T, _extract: (Row, String) => F, _tupExtract: (TupleValue, Int) => F, _udtExtract: (UDTValue, String) => F) = new CassFormatDecoder[T] {
     type From = F
     val typeToken = _typeToken
     def f2t(f: From) = Right(_f2t(f))
     def extract(r: Row, name: String) = _extract(r, name)
     def tupleExtract(tup: TupleValue, pos: Int) = _tupExtract(tup, pos)
+    def udtExtract(udt: UDTValue, name: String) = _udtExtract(udt, name)
   }
 
   // decoders
 
-  implicit val stringFormat: CassFormatDecoder[String] = sameTypeCassFormatDecoder(TypeToken.of(classOf[String]), _ getString _, _ getString _)
-  implicit val uuidFormat: CassFormatDecoder[java.util.UUID] = sameTypeCassFormatDecoder(TypeToken.of(classOf[java.util.UUID]), _ getUUID _, _ getUUID _)
-  implicit val iNetFormat: CassFormatDecoder[java.net.InetAddress] = sameTypeCassFormatDecoder[java.net.InetAddress](TypeToken.of(classOf[java.net.InetAddress]), _ getInet _, _ getInet _)
-
-  implicit val intFormat: CassFormatDecoder[Int] = safeConvertCassFormatDecoder[Int, java.lang.Integer](TypeToken.of(classOf[java.lang.Integer]), Int.unbox, _ getInt _, _ getInt _)
-
-  implicit val longFormat: CassFormatDecoder[Long] = safeConvertCassFormatDecoder[Long, java.lang.Long](TypeToken.of(classOf[java.lang.Long]), Long.unbox, _ getLong _, _ getLong _)
-  implicit val booleanFormat: CassFormatDecoder[Boolean] = safeConvertCassFormatDecoder[Boolean, java.lang.Boolean](TypeToken.of(classOf[java.lang.Boolean]), Boolean.unbox, _ getBool _, _ getBool _)
-  implicit val doubleFormat: CassFormatDecoder[Double] = safeConvertCassFormatDecoder[Double, java.lang.Double](TypeToken.of(classOf[java.lang.Double]), Double.unbox, _ getDouble _, _ getDouble _)
-  implicit val floatFormat: CassFormatDecoder[Float] = safeConvertCassFormatDecoder[Float, java.lang.Float](TypeToken.of(classOf[java.lang.Float]), Float.unbox, _ getFloat _, _ getFloat _)
-  implicit val bigIntegerFormat: CassFormatDecoder[BigInt] = safeConvertCassFormatDecoder[BigInt, java.math.BigInteger](TypeToken.of(classOf[java.math.BigInteger]), BigInt.javaBigInteger2bigInt, _ getVarint _, _ getVarint _)
-  implicit val bigDecimalFormat: CassFormatDecoder[BigDecimal] = safeConvertCassFormatDecoder[BigDecimal, java.math.BigDecimal](TypeToken.of(classOf[java.math.BigDecimal]), BigDecimal.javaBigDecimal2bigDecimal, _ getDecimal _, _ getDecimal _)
+  implicit val stringFormat: CassFormatDecoder[String] = sameTypeCassFormatDecoder(TypeToken.of(classOf[String]), _ getString _, _ getString _, _ getString _)
+  implicit val uuidFormat: CassFormatDecoder[java.util.UUID] = sameTypeCassFormatDecoder(TypeToken.of(classOf[java.util.UUID]), _ getUUID _, _ getUUID _, _ getUUID _)
+  implicit val iNetFormat: CassFormatDecoder[java.net.InetAddress] = sameTypeCassFormatDecoder[java.net.InetAddress](TypeToken.of(classOf[java.net.InetAddress]), _ getInet _, _ getInet _, _ getInet _)
+  implicit val intFormat: CassFormatDecoder[Int] = safeConvertCassFormatDecoder[Int, java.lang.Integer](TypeToken.of(classOf[java.lang.Integer]), Int.unbox, _ getInt _, _ getInt _, _ getInt _)
+  implicit val longFormat: CassFormatDecoder[Long] = safeConvertCassFormatDecoder[Long, java.lang.Long](TypeToken.of(classOf[java.lang.Long]), Long.unbox, _ getLong _, _ getLong _, _ getLong _)
+  implicit val booleanFormat: CassFormatDecoder[Boolean] = safeConvertCassFormatDecoder[Boolean, java.lang.Boolean](TypeToken.of(classOf[java.lang.Boolean]), Boolean.unbox, _ getBool _, _ getBool _, _ getBool _)
+  implicit val doubleFormat: CassFormatDecoder[Double] = safeConvertCassFormatDecoder[Double, java.lang.Double](TypeToken.of(classOf[java.lang.Double]), Double.unbox, _ getDouble _, _ getDouble _, _ getDouble _)
+  implicit val floatFormat: CassFormatDecoder[Float] = safeConvertCassFormatDecoder[Float, java.lang.Float](TypeToken.of(classOf[java.lang.Float]), Float.unbox, _ getFloat _, _ getFloat _, _ getFloat _)
+  implicit val bigIntegerFormat: CassFormatDecoder[BigInt] = safeConvertCassFormatDecoder[BigInt, java.math.BigInteger](TypeToken.of(classOf[java.math.BigInteger]), BigInt.javaBigInteger2bigInt, _ getVarint _, _ getVarint _, _ getVarint _)
+  implicit val bigDecimalFormat: CassFormatDecoder[BigDecimal] = safeConvertCassFormatDecoder[BigDecimal, java.math.BigDecimal](TypeToken.of(classOf[java.math.BigDecimal]), BigDecimal.javaBigDecimal2bigDecimal, _ getDecimal _, _ getDecimal _, _ getDecimal _)
 
   def listOf[T](eltType: TypeToken[T]): TypeToken[java.util.List[T]] =
     new TypeToken[java.util.List[T]]() {}.where(new TypeParameter[T]() {}, eltType)
@@ -127,6 +150,7 @@ object CassFormatDecoder extends CassFormatDecoderVersionSpecific {
     }
     def extract(r: Row, name: String) = r getList (name, underlying.typeToken)
     def tupleExtract(tup: TupleValue, pos: Int) = tup getList (pos, underlying.typeToken)
+    def udtExtract(udt: UDTValue, name: String) = udt getList (name, underlying.typeToken)
   }
 
   def setOf[T](eltType: TypeToken[T]): TypeToken[java.util.Set[T]] =
@@ -150,6 +174,7 @@ object CassFormatDecoder extends CassFormatDecoderVersionSpecific {
     }
     def extract(r: Row, name: String) = r getSet (name, underlying.typeToken)
     def tupleExtract(tup: TupleValue, pos: Int) = tup getSet (pos, underlying.typeToken)
+    def udtExtract(udt: UDTValue, name: String): java.util.Set[underlying.From] = udt getSet (name, underlying.typeToken)
   }
 
   def mapOf[K, V](keyType: TypeToken[K], valueType: TypeToken[V]): TypeToken[java.util.Map[K, V]] =
@@ -180,6 +205,7 @@ object CassFormatDecoder extends CassFormatDecoderVersionSpecific {
       }
       def extract(r: Row, name: String) = r getMap (name, underlyingK.typeToken, underlyingV.typeToken)
       def tupleExtract(tup: TupleValue, pos: Int) = tup getMap (pos, underlyingK.typeToken, underlyingV.typeToken)
+      def udtExtract(udt: UDTValue, name: String) = udt getMap (name, underlyingK.typeToken, underlyingV.typeToken)
     }
 
   implicit val blobFormat: CassFormatDecoder[Array[Byte]] = new CassFormatDecoder[Array[Byte]] {
@@ -207,6 +233,16 @@ object CassFormatDecoder extends CassFormatDecoderVersionSpecific {
         else f2t(tupleExtract(tup, pos))
       }
     ).unwrap[Array[Byte]]
+    def udtExtract(udt: UDTValue, name: String): ByteBuffer = udt getBytes name
+    override def udtDecode(udt: UDTValue, name: String): Result[Array[Byte]] = Try[Result[Array[Byte]]](
+      if (udt.isNull(name)) Left(new ValueNotDefinedException(s"""name $name was not defined in udt $udt"""))
+      else {
+        val cassName = udt.getType.getFieldType(name).getName
+        if (cassName != DataType.Name.BLOB)
+          Left(new InvalidTypeException(s"name $name in udt $udt is not a blob"))
+        else f2t(udtExtract(udt, name))
+      }
+    ).unwrap[Array[Byte]]
   }
 
   implicit def optionFormat[A](implicit underlying: CassFormatDecoder[A]): CassFormatDecoder[Option[A]] = new CassFormatDecoder[Option[A]] {
@@ -223,6 +259,11 @@ object CassFormatDecoder extends CassFormatDecoderVersionSpecific {
       case Left(Recoverable(_)) => Right(None)
       case other                => other
     }
+    def udtExtract(udt: UDTValue, name: String) = underlying.udtExtract(udt, name)
+    override def udtDecode(udt: UDTValue, name: String): Result[Option[A]] = super.udtDecode(udt, name) match {
+      case Left(Recoverable(_)) => Right(None)
+      case other                => other
+    }
   }
 
   implicit def eitherFormat[A](implicit underlying: CassFormatDecoder[A]): CassFormatDecoder[Result[A]] = new CassFormatDecoder[Result[A]] {
@@ -236,6 +277,11 @@ object CassFormatDecoder extends CassFormatDecoderVersionSpecific {
     }
     def tupleExtract(tup: TupleValue, pos: Int) = underlying.tupleExtract(tup, pos)
     override def tupleDecode(tup: TupleValue, pos: Int) = super.tupleDecode(tup, pos) match {
+      case Left(l) => Right(Left(l))
+      case same    => same
+    }
+    def udtExtract(udt: UDTValue, name: String) = underlying.udtExtract(udt, name)
+    override def udtDecode(udt: UDTValue, name: String) = super.udtDecode(udt, name) match {
       case Left(l) => Right(Left(l))
       case same    => same
     }

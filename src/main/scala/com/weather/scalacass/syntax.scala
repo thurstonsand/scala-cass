@@ -39,6 +39,9 @@ object syntax {
     def attemptAs[T](implicit ccd: CCCassFormatDecoder[T]): Option[Result[T]] = opt.map(r => ccd.attemptAs(r))
   }
 
+  type UDT[U <: Product] = com.weather.scalacass.CassFormatDecoder.UDT[U]
+  val UDT = com.weather.scalacass.CassFormatDecoder.UDT
+
   type UpdateBehavior[F[_], A] = ScalaSession.UpdateBehavior[F, A]
   val UpdateBehavior = ScalaSession.UpdateBehavior
 

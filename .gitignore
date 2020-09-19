@@ -1,5 +1,7 @@
 target
 .idea
+.vscode
+.metals
 .ensime
 .ensime_cache
 cassandra.logdir*

@@ -29,7 +29,8 @@ class InsertUnitTests extends ActionUnitTests {
   }
 
   it should "insert where a row has a string with a $ in it" in {
-    val query = ss.insert(table, Table("""{ "$regex": /yeppers/ }""", 1234, Some(123)))
+    // using interpolator, but escaping the $ to workaround linter
+    val query = ss.insert(table, Table(f"""{ "$$regex": /yeppers/ }""", 1234, Some(123)))
     println(query.getStringRepr)
     println(query.execute().right.value)
   }
