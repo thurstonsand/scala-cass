@@ -10,7 +10,7 @@ object CassFormatDecoderVersionSpecific extends CassFormatDecoderVersionSpecific
     def f2t(f: From) = Right(f)
     def extract(r: Row, name: String) = r get (name, typeToken)
     def tupleExtract(tup: TupleValue, pos: Int) = tup get (pos, typeToken)
-    def udtExtract(udt: UDTValue, pos: Int) = udt get (pos, typeToken)
+    def udtExtract(udt: UDTValue, name: String) = udt get (name, typeToken)
   }
 }
 trait CassFormatDecoderVersionSpecific extends LowPriorityCassFormatDecoder {

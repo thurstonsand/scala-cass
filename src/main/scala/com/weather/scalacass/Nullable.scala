@@ -60,8 +60,8 @@ object Nullable {
       case other                => other
     }
 
-    def udtExtract(udt: UDTValue, pos: Int): From = underlying.udtExtract(udt, pos)
-    override def udtDecode(udt: UDTValue, pos: Int): Result[Nullable[A]] = super.udtDecode(udt, pos) match {
+    def udtExtract(udt: UDTValue, name: String): From = underlying.udtExtract(udt, name)
+    override def udtDecode(udt: UDTValue, name: String): Result[Nullable[A]] = super.udtDecode(udt, name) match {
       case Left(Recoverable(_)) => Right(IsNull)
       case other                => other
     }
